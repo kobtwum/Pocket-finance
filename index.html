@@ -585,24 +585,33 @@ if(loadingMsg) loadingMsg.textContent = 'Checking sign-in…';
 // We must await getRedirectResult BEFORE onAuthStateChanged
 // to avoid the race where auth state fires before redirect resolves
 async function initAuth() {
+  console.log('[Auth] initAuth started');
+  console.log('[Auth] Current URL:', window.location.href);
+  console.log('[Auth] Auth domain:', auth.config?.authDomain || firebaseConfig.authDomain);
+
   try {
+    console.log('[Auth] Calling getRedirectResult...');
     const result = await getRedirectResult(auth);
+    console.log('[Auth] getRedirectResult resolved. Result:', result ? 'HAS USER' : 'NULL');
     if(result?.user) {
+      console.log('[Auth] Redirect user:', result.user.email, result.user.uid);
       if(loadingMsg) loadingMsg.textContent = 'Loading your data…';
-      console.log('Redirect sign-in complete:', result.user.displayName);
     } else {
+      console.log('[Auth] No redirect result — checking existing auth state');
       if(loadingMsg) loadingMsg.textContent = 'Loading…';
     }
   } catch(e) {
-    console.error('Redirect result error:', e.code, e.message);
+    console.error('[Auth] Redirect result error:', e.code, e.message);
     if(loadingMsg) loadingMsg.textContent = 'Sign in failed';
     showToast('Sign in failed: ' + (e.code || e.message));
     const btn = document.getElementById('google-signin-btn');
     if(btn) { btn.disabled = false; btn.innerHTML = googleBtnHTML(); }
   }
 
-  // Now safe to listen for auth state — redirect result is resolved
+  // Now safe to listen for auth state
+  console.log('[Auth] Setting up onAuthStateChanged...');
   onAuthStateChanged(auth, async user => {
+    console.log('[Auth] onAuthStateChanged fired. User:', user ? user.email : 'NULL');
     if(user) {
       currentUser = user;
       if(loadingMsg) loadingMsg.textContent = 'Loading your data…';
@@ -634,16 +643,18 @@ async function initAuth() {
         });
       }
 
-      // Load data then show app
+      console.log('[Auth] Loading user data...');
       await loadUserData(user.uid);
       startRealtimeSync(user.uid);
 
       document.getElementById('login-screen').classList.add('hidden');
       document.getElementById('loading-overlay').classList.add('hidden');
       document.getElementById('app-shell').style.display = 'flex';
+      console.log('[Auth] App shell shown');
 
       initApp();
     } else {
+      console.log('[Auth] No user — showing login screen');
       currentUser = null;
       document.getElementById('loading-overlay').classList.add('hidden');
       document.getElementById('login-screen').classList.remove('hidden');

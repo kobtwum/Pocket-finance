@@ -522,13 +522,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);f
 <!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut as fbSignOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut as fbSignOut, onAuthStateChanged, browserLocalPersistence, setPersistence } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFirestore, enableIndexedDbPersistence, doc, collection, getDocs, setDoc, deleteDoc, onSnapshot, writeBatch, query } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ── FIREBASE CONFIG ────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyBuTkiDr-fB_woNrLqobALzYKX3gidq5TE",
-  authDomain: "pocket-finance-cf7a7.firebaseapp.com",
+  authDomain: "kobtwum.github.io",
   databaseURL: "https://pocket-finance-cf7a7-default-rtdb.firebaseio.com",
   projectId: "pocket-finance-cf7a7",
   storageBucket: "pocket-finance-cf7a7.firebasestorage.app",
@@ -548,13 +548,18 @@ enableIndexedDbPersistence(db).catch(err => {
 
 // ── AUTH ───────────────────────────────────────────────
 const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
+
+// Set local persistence so auth survives the redirect round-trip
+setPersistence(auth, browserLocalPersistence).catch(e => console.warn('Persistence error:', e));
 
 async function doSignIn() {
   const btn = document.getElementById('google-signin-btn');
   if(btn) { btn.disabled = true; btn.textContent = 'Redirecting to Google…'; }
   try {
+    await setPersistence(auth, browserLocalPersistence);
     await signInWithRedirect(auth, provider);
-    // Page will redirect away — no code after this runs
+    // Page redirects away — nothing after this runs
   } catch(e) {
     console.error('Sign in error:', e);
     showToast('Sign in failed — please try again');
@@ -572,9 +577,10 @@ function googleBtnHTML() {
   return `<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg> Continue with Google`;
 }
 
-// Handle the redirect result when the page loads back after Google auth
+// Handle redirect result on page load
 const loadingMsg = document.getElementById('loading-msg');
-if(loadingMsg) loadingMsg.textContent = 'Signing you in…';
+if(loadingMsg) loadingMsg.textContent = 'Checking sign-in…';
+
 getRedirectResult(auth).then(result => {
   if(result?.user) {
     if(loadingMsg) loadingMsg.textContent = 'Loading your data…';
@@ -583,8 +589,9 @@ getRedirectResult(auth).then(result => {
     if(loadingMsg) loadingMsg.textContent = 'Loading…';
   }
 }).catch(e => {
-  console.error('Redirect result error:', e);
-  showToast('Sign in failed — please try again');
+  console.error('Redirect result error:', e.code, e.message);
+  if(loadingMsg) loadingMsg.textContent = 'Sign in failed';
+  showToast('Sign in failed: ' + (e.code || e.message));
   const btn = document.getElementById('google-signin-btn');
   if(btn) { btn.disabled = false; btn.innerHTML = googleBtnHTML(); }
 });

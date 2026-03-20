@@ -528,7 +528,7 @@ import { getFirestore, enableIndexedDbPersistence, doc, collection, getDocs, set
 // ── FIREBASE CONFIG ────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyBuTkiDr-fB_woNrLqobALzYKX3gidq5TE",
-  authDomain: "kobtwum.github.io",
+  authDomain: "pocket-finance-cf7a7.firebaseapp.com",
   databaseURL: "https://pocket-finance-cf7a7-default-rtdb.firebaseio.com",
   projectId: "pocket-finance-cf7a7",
   storageBucket: "pocket-finance-cf7a7.firebasestorage.app",
@@ -581,26 +581,82 @@ function googleBtnHTML() {
 const loadingMsg = document.getElementById('loading-msg');
 if(loadingMsg) loadingMsg.textContent = 'Checking sign-in…';
 
-getRedirectResult(auth).then(result => {
-  if(result?.user) {
-    if(loadingMsg) loadingMsg.textContent = 'Loading your data…';
-    console.log('Redirect sign-in complete:', result.user.displayName);
-  } else {
-    if(loadingMsg) loadingMsg.textContent = 'Loading…';
+// ── AUTH STATE OBSERVER ────────────────────────────────
+// We must await getRedirectResult BEFORE onAuthStateChanged
+// to avoid the race where auth state fires before redirect resolves
+async function initAuth() {
+  try {
+    const result = await getRedirectResult(auth);
+    if(result?.user) {
+      if(loadingMsg) loadingMsg.textContent = 'Loading your data…';
+      console.log('Redirect sign-in complete:', result.user.displayName);
+    } else {
+      if(loadingMsg) loadingMsg.textContent = 'Loading…';
+    }
+  } catch(e) {
+    console.error('Redirect result error:', e.code, e.message);
+    if(loadingMsg) loadingMsg.textContent = 'Sign in failed';
+    showToast('Sign in failed: ' + (e.code || e.message));
+    const btn = document.getElementById('google-signin-btn');
+    if(btn) { btn.disabled = false; btn.innerHTML = googleBtnHTML(); }
   }
-}).catch(e => {
-  console.error('Redirect result error:', e.code, e.message);
-  if(loadingMsg) loadingMsg.textContent = 'Sign in failed';
-  showToast('Sign in failed: ' + (e.code || e.message));
-  const btn = document.getElementById('google-signin-btn');
-  if(btn) { btn.disabled = false; btn.innerHTML = googleBtnHTML(); }
-});
 
-// Wire up buttons directly — no window.* needed
+  // Now safe to listen for auth state — redirect result is resolved
+  onAuthStateChanged(auth, async user => {
+    if(user) {
+      currentUser = user;
+      if(loadingMsg) loadingMsg.textContent = 'Loading your data…';
+
+      // Update avatar
+      const initials = (user.displayName||'U').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+      const avatarEl = document.getElementById('user-avatar');
+      if(avatarEl) avatarEl.textContent = initials;
+      const menuAvatarEl = document.getElementById('menu-avatar');
+      if(menuAvatarEl) menuAvatarEl.textContent = initials;
+      const menuNameEl = document.getElementById('menu-name');
+      if(menuNameEl) menuNameEl.textContent = user.displayName || '';
+      const menuEmailEl = document.getElementById('menu-email');
+      if(menuEmailEl) menuEmailEl.textContent = user.email || '';
+      const settingsNameEl = document.getElementById('settings-name');
+      if(settingsNameEl) settingsNameEl.textContent = user.displayName || '';
+      const settingsEmailEl = document.getElementById('settings-email');
+      if(settingsEmailEl) settingsEmailEl.textContent = user.email || '';
+
+      if(user.photoURL) {
+        ['user-avatar','menu-avatar','settings-avatar'].forEach(id => {
+          const el = document.getElementById(id);
+          if(!el) return;
+          const img = document.createElement('img');
+          img.src = user.photoURL;
+          img.className = 'avatar';
+          img.style.cssText = 'width:' + (id==='user-avatar'?'28':'44') + 'px;height:' + (id==='user-avatar'?'28':'44') + 'px;';
+          el.replaceWith(img);
+        });
+      }
+
+      // Load data then show app
+      await loadUserData(user.uid);
+      startRealtimeSync(user.uid);
+
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('loading-overlay').classList.add('hidden');
+      document.getElementById('app-shell').style.display = 'flex';
+
+      initApp();
+    } else {
+      currentUser = null;
+      document.getElementById('loading-overlay').classList.add('hidden');
+      document.getElementById('login-screen').classList.remove('hidden');
+      document.getElementById('app-shell').style.display = 'none';
+    }
+  });
+}
+
+initAuth();
+
+// Wire up all auth buttons
 document.getElementById('google-signin-btn').addEventListener('click', doSignIn);
 document.getElementById('user-avatar').addEventListener('click', () => openModal('user-modal'));
-
-// Sign-out buttons
 ['signout-btn','signout-modal-btn'].forEach(id => {
   const el = document.getElementById(id);
   if(el) el.addEventListener('click', id === 'signout-modal-btn'
@@ -608,7 +664,6 @@ document.getElementById('user-avatar').addEventListener('click', () => openModal
     : doSignOut);
 });
 
-// ── STATE ──────────────────────────────────────────────
 const DEFAULT_CATS = [
   {name:'Food & Dining',icon:'🍽️',color:'#e67e22'},{name:'Transport',icon:'🚗',color:'#2471a3'},
   {name:'Rent & Housing',icon:'🏠',color:'#8e44ad'},{name:'Utilities',icon:'💡',color:'#16a085'},
@@ -810,48 +865,7 @@ function startRealtimeSync(uid) {
   unsubListeners = [u1, u2, u3, u4];
 }
 
-// ── AUTH STATE OBSERVER ────────────────────────────────
-onAuthStateChanged(auth, async user => {
-  if(user) {
-    currentUser = user;
-
-    // Update avatar
-    const initials = (user.displayName||'U').split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
-    document.getElementById('user-avatar').textContent = initials;
-    document.getElementById('menu-avatar').textContent = initials;
-    document.getElementById('menu-name').textContent = user.displayName || '';
-    document.getElementById('menu-email').textContent = user.email || '';
-    if(user.photoURL) {
-      ['user-avatar','menu-avatar','settings-avatar'].forEach(id => {
-        const el = document.getElementById(id);
-        const img = document.createElement('img');
-        img.src = user.photoURL;
-        img.className = 'avatar';
-        img.style.cssText = 'width:' + (id==='user-avatar'?'28':'44') + 'px;height:' + (id==='user-avatar'?'28':'44') + 'px;';
-        el.replaceWith(img);
-      });
-    }
-    document.getElementById('settings-name').textContent = user.displayName || '';
-    document.getElementById('settings-email').textContent = user.email || '';
-
-    // Load data then show app
-    await loadUserData(user.uid);
-    startRealtimeSync(user.uid);
-
-    document.getElementById('login-screen').classList.add('hidden');
-    document.getElementById('loading-overlay').classList.add('hidden');
-    document.getElementById('app-shell').style.display = 'flex';
-
-    initApp();
-  } else {
-    currentUser = null;
-    document.getElementById('loading-overlay').classList.add('hidden');
-    document.getElementById('login-screen').classList.remove('hidden');
-    document.getElementById('app-shell').style.display = 'none';
-  }
-});
-
-// ── HELPERS ────────────────────────────────────────────
+// ── STATE ──────────────────────────────────────────────
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const fmt = n => '₵' + parseFloat(n||0).toLocaleString('en-GH', {minimumFractionDigits:2, maximumFractionDigits:2});
 const today = () => new Date().toISOString().split('T')[0];

@@ -171,6 +171,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);f
 body.dark .card{background:var(--paper-2);border-color:rgba(255,255,255,.06);}
 .card-dark{background:var(--ink);border-radius:var(--radius);padding:16px;margin-bottom:12px;}
 body.dark .card-dark{background:#0a0a14;}
+body.dark .topbar{background:#0a0a14;border-bottom:1px solid rgba(255,255,255,.06);}
+body.dark .tb-logo{color:var(--gold) !important;}
+body.dark .btn-dark{background:#1a1a2e;color:rgba(255,255,255,.9);border:1px solid rgba(255,255,255,.12);}
+body.dark .met{background:var(--paper-3);}
+body.dark .s-row{border-bottom-color:var(--paper-3);}
+body.dark .more-drawer{background:var(--paper-2);}
+body.dark .more-item{background:var(--paper-3);}
 .ct{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px;}
 .ct-g{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:5px;}
 .cv{font-family:'DM Serif Display',serif;font-size:24px;color:var(--ink);}
@@ -248,7 +255,7 @@ body.dark .modal{background:var(--paper-2);}
 .inst-ban{background:var(--gold-pale);border:1.5px solid var(--gold-light);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;}
 .inst-ban .ibt{flex:1;font-size:12px;color:var(--ink-2);line-height:1.5;}
 .inst-ban .ibt strong{color:var(--ink);display:block;margin-bottom:1px;}
-.toast{position:fixed;bottom:calc(var(--sb) + 88px);left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:white;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:500;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;box-shadow:0 4px 20px rgba(26,26,46,.25);}
+.toast{position:fixed;bottom:calc(var(--sb) + 88px);left:50%;transform:translateX(-50%) translateY(20px);background:#1a1a2e;color:white;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:500;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;box-shadow:0 4px 20px rgba(26,26,46,.25);}
 @media(min-width:1024px){.toast{bottom:28px;}}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .empty{text-align:center;padding:28px 16px;color:var(--ink-3);}
@@ -1048,8 +1055,56 @@ function renderExp(){
   document.getElementById('exp-list').innerHTML=fl.length?fl.map(e=>eRow(e)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses for this period</p></div>';
 }
 window.openExpenseModal=function(id){EID=id||null;document.getElementById('exp-mt').textContent=id?'Edit Expense':'Add Expense';popCatSel('exp-cat');if(id){const e=S.expenses.find(x=>x.id===id);if(e){document.getElementById('exp-desc').value=e.desc;document.getElementById('exp-amt').value=e.amount;document.getElementById('exp-cat').value=e.cat;document.getElementById('exp-date').value=e.date;document.getElementById('exp-note').value=e.note||'';}}else{document.getElementById('exp-desc').value='';document.getElementById('exp-amt').value='';document.getElementById('exp-cat').value='Food & Dining';document.getElementById('exp-date').value=tod();document.getElementById('exp-note').value='';}openModal('expense-modal');};
-window.saveExpense=async function(){const desc=document.getElementById('exp-desc').value.trim(),amount=parseFloat(document.getElementById('exp-amt').value),cat=document.getElementById('exp-cat').value,date=document.getElementById('exp-date').value,note=document.getElementById('exp-note').value.trim();if(!desc||!amount||!date){showToast('Fill in all fields');return;}const id=EID||'e'+Date.now();const data={desc,amount,cat,date,note};if(EID){const i=S.expenses.findIndex(e=>e.id===EID);if(i>-1)S.expenses[i]={...S.expenses[i],...data};}else S.expenses.push({id,...data});closeModal('expense-modal');renderExp();renderDash();showToast(EID?'Updated ✓':'Expense added ✓');EID=null;saveDoc('expenses',id,data);};
-window.delExp=async function(id){const e=S.expenses.find(x=>x.id===id);if(e?.linkedGoal){if(!confirm('Also delete linked savings contribution?'))return;const lk=S.contributions.find(c=>c.linkedExpense===id);if(lk){S.contributions=S.contributions.filter(c=>c.id!==lk.id);await delDoc('contributions',lk.id);}}else if(!confirm('Delete this expense?'))return;S.expenses=S.expenses.filter(x=>x.id!==id);await delDoc('expenses',id);renderExp();renderDash();showToast('Deleted');};
+window.saveExpense=async function(){
+  const desc=document.getElementById('exp-desc').value.trim(),amount=parseFloat(document.getElementById('exp-amt').value),cat=document.getElementById('exp-cat').value,date=document.getElementById('exp-date').value,note=document.getElementById('exp-note').value.trim();
+  if(!desc||!amount||!date){showToast('Fill in all fields');return;}
+  const id=EID||'e'+Date.now();
+  const data={desc,amount,cat,date,note};
+  // Auto-create/update a contribution when category is Savings Transfer
+  if(cat==='Savings Transfer'){
+    if(EID){
+      const existing=S.expenses.find(e=>e.id===EID);
+      const lcid=existing?.linkedContrib;
+      if(lcid){
+        const ci=S.contributions.findIndex(c=>c.id===lcid);
+        if(ci>-1)S.contributions[ci]={...S.contributions[ci],amount,date};
+        await saveDoc('contributions',lcid,{goalId:null,amount,date,linkedExpense:EID,manual:true});
+        data.linkedContrib=lcid;
+      } else {
+        // editing old expense that didn't have a contribution yet — create one now
+        const cId='c'+Date.now();
+        const contrib={goalId:null,amount,date,linkedExpense:id,manual:true};
+        S.contributions.push({id:cId,...contrib});
+        await saveDoc('contributions',cId,contrib);
+        data.linkedContrib=cId;
+      }
+    } else {
+      const cId='c'+Date.now();
+      const contrib={goalId:null,amount,date,linkedExpense:id,manual:true};
+      S.contributions.push({id:cId,...contrib});
+      await saveDoc('contributions',cId,contrib);
+      data.linkedContrib=cId;
+    }
+  }
+  if(EID){const i=S.expenses.findIndex(e=>e.id===EID);if(i>-1)S.expenses[i]={...S.expenses[i],...data};}
+  else S.expenses.push({id,...data});
+  await saveDoc('expenses',id,data);
+  closeModal('expense-modal');renderExp();renderDash();
+  showToast(EID?'Updated ✓':'Expense added ✓');EID=null;
+};
+window.delExp=async function(id){
+  const e=S.expenses.find(x=>x.id===id);
+  // Delete any linked contribution (from goal OR manual savings transfer)
+  const linkedContribId=e?.linkedGoal
+    ? S.contributions.find(c=>c.linkedExpense===id)?.id
+    : e?.linkedContrib;
+  if(e?.linkedGoal||e?.linkedContrib){
+    if(!confirm('Also delete the linked savings record?'))return;
+    if(linkedContribId){S.contributions=S.contributions.filter(c=>c.id!==linkedContribId);await delDoc('contributions',linkedContribId);}
+  } else if(!confirm('Delete this expense?'))return;
+  S.expenses=S.expenses.filter(x=>x.id!==id);
+  await delDoc('expenses',id);renderExp();renderDash();showToast('Deleted');
+};
 window.changeMonth=function(dir){S.currentMonth+=dir;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}renderExp();};
 
 // ── CATEGORIES ──
@@ -1135,7 +1190,7 @@ window.calcLoan=function(){
   const r=(rate/100)/12,n=Math.round(yrs*12);const mo=r===0?pr/n:pr*(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);const tot=mo*n,int=tot-pr,ir=inc>0?(mo/inc*100).toFixed(1):null;
   let gH='';if(gear&&inc>0){const ma=inc*(gear/100);const ok=mo<=ma;gH=`<div style="margin-top:10px;padding:10px;background:${ok?'var(--green-light)':'var(--red-light)'};border-radius:var(--radius-sm);font-size:12px;color:${ok?'var(--green)':'var(--red)'};">${ok?`✓ Within your ${gear}% gearing — max affordable is ${fmt(ma)}/mo`:`⚠ Exceeds ${gear}% gearing. Max affordable is ${fmt(ma)}/mo.`}</div>`;}
   let bal=pr;const yr=[];for(let y=1;y<=Math.ceil(yrs);y++){const ms=y<=Math.floor(yrs)?12:Math.round((yrs%1)*12)||12;let yI=0,yP=0;for(let mo2=0;mo2<ms;mo2++){if(bal<=0)break;const ip=bal*r;const pp=Math.min(mo-ip,bal);yI+=ip;yP+=pp;bal=Math.max(0,bal-pp);}yr.push({y,yP,yI,b:bal});}
-  document.getElementById('ln-res').innerHTML=`<div style="margin-top:14px;padding:12px;background:var(--ink);border-radius:var(--radius-sm);"><div style="font-size:10px;color:var(--gold);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">${lbl} Summary</div><div style="font-family:'DM Serif Display',serif;font-size:28px;color:white;">${fmt(mo)}<span style="font-family:'DM Sans',sans-serif;font-size:13px;color:rgba(255,255,255,.5);"> / month</span></div>${ir?`<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:3px;">${ir}% of your monthly income</div>`:''}</div><div class="g2" style="margin-top:10px;"><div class="met"><div class="met-l">Principal</div><div class="met-v">${fmt(pr)}</div><div class="met-s">Borrowed amount</div></div><div class="met"><div class="met-l">Total Interest</div><div class="met-v" style="color:var(--red)">${fmt(int)}</div><div class="met-s">Cost of borrowing</div></div><div class="met"><div class="met-l">Total Repayment</div><div class="met-v">${fmt(tot)}</div><div class="met-s">Principal + interest</div></div><div class="met"><div class="met-l">Full Cost</div><div class="met-v">${fmt(tot+(dep||0))}</div><div class="met-s">Incl. deposit</div></div></div>${gH}${yr.length>1?`<div style="margin-top:12px;"><div style="font-size:11px;font-weight:500;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;">Year-by-year breakdown</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--paper-2);">${['Year','Principal','Interest','Balance'].map(h=>`<th style="padding:6px 8px;text-align:${h==='Year'?'left':'right'};font-weight:500;color:var(--ink-3);">${h}</th>`).join('')}</tr></thead><tbody>${yr.map(row=>`<tr style="border-bottom:1px solid var(--paper-2);"><td style="padding:6px 8px;font-weight:500;">Year ${row.y}</td><td style="padding:6px 8px;text-align:right;color:var(--green);">${fmt(row.yP)}</td><td style="padding:6px 8px;text-align:right;color:var(--red);">${fmt(row.yI)}</td><td style="padding:6px 8px;text-align:right;">${fmt(row.b)}</td></tr>`).join('')}</tbody></table></div></div>`:''}`;
+  document.getElementById('ln-res').innerHTML=`<div style="margin-top:14px;padding:12px;background:#1a1a2e;border-radius:var(--radius-sm);"><div style="font-size:10px;color:var(--gold);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">${lbl} Summary</div><div style="font-family:'DM Serif Display',serif;font-size:28px;color:white;">${fmt(mo)}<span style="font-family:'DM Sans',sans-serif;font-size:13px;color:rgba(255,255,255,.5);"> / month</span></div>${ir?`<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:3px;">${ir}% of your monthly income</div>`:''}</div><div class="g2" style="margin-top:10px;"><div class="met"><div class="met-l">Principal</div><div class="met-v">${fmt(pr)}</div><div class="met-s">Borrowed amount</div></div><div class="met"><div class="met-l">Total Interest</div><div class="met-v" style="color:var(--red)">${fmt(int)}</div><div class="met-s">Cost of borrowing</div></div><div class="met"><div class="met-l">Total Repayment</div><div class="met-v">${fmt(tot)}</div><div class="met-s">Principal + interest</div></div><div class="met"><div class="met-l">Full Cost</div><div class="met-v">${fmt(tot+(dep||0))}</div><div class="met-s">Incl. deposit</div></div></div>${gH}${yr.length>1?`<div style="margin-top:12px;"><div style="font-size:11px;font-weight:500;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;">Year-by-year breakdown</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--paper-2);">${['Year','Principal','Interest','Balance'].map(h=>`<th style="padding:6px 8px;text-align:${h==='Year'?'left':'right'};font-weight:500;color:var(--ink-3);">${h}</th>`).join('')}</tr></thead><tbody>${yr.map(row=>`<tr style="border-bottom:1px solid var(--paper-2);"><td style="padding:6px 8px;font-weight:500;">Year ${row.y}</td><td style="padding:6px 8px;text-align:right;color:var(--green);">${fmt(row.yP)}</td><td style="padding:6px 8px;text-align:right;color:var(--red);">${fmt(row.yI)}</td><td style="padding:6px 8px;text-align:right;">${fmt(row.b)}</td></tr>`).join('')}</tbody></table></div></div>`:''}`;
 };
 window.exportData=function(){const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pocket-backup-'+new Date().toISOString().split('T')[0]+'.json';a.click();showToast('Exported ✓');};
 window.handleImport=function(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async ev=>{try{const d=JSON.parse(ev.target.result);if(!d.expenses&&!d.incomeSources){showToast('Invalid backup file');return;}if(!confirm('This will overwrite all your current data. Continue?'))return;// Upload to Firestore

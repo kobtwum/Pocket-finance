@@ -913,8 +913,6 @@ document.getElementById('user-av').addEventListener('click',()=>openModal('user-
 ['so-btn','so-modal-btn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',id==='so-modal-btn'?()=>{doSignOut();closeModal('user-modal');}:doSignOut);});
 
 async function initAuth(){
-  // Start both in parallel — don't let getRedirectResult block the auth state check
-  // onAuthStateChanged fires from IndexedDB cache almost instantly for returning users
   const redirectPromise=getRedirectResult(auth,browserPopupRedirectResolver).catch(e=>{
     if(e.code&&e.code!=='auth/no-current-user')console.warn('Redirect result:',e.code);
   });
@@ -922,25 +920,37 @@ async function initAuth(){
   onAuthStateChanged(auth,async user=>{
     if(user){
       CU=user;setAvatars(user);
-      // Show app immediately — onSnapshot listeners will populate data
+      // Always hide loading and show app immediately
       document.getElementById('login-screen').classList.add('hidden');
       document.getElementById('loading-overlay').classList.add('hidden');
+      document.getElementById('onboarding-screen').style.display='none';
       document.getElementById('app-shell').style.display='flex';
       initApp();
-      // Start real-time sync — fires immediately from cache, then from server
+      // Start sync
       READY={profile:false,expenses:false,income:false,contributions:false};
       startSync(user.uid);
-      // Auto-log recurring and check onboarding after first full sync
-      setTimeout(()=>{if(checkReady()){autoLogRecurring();if(shouldShowOnboarding())showOnboarding();}},3500);
+      // Check onboarding after data loads — but always show app regardless
+      const checkOb=()=>{
+        autoLogRecurring();
+        // Only show onboarding if truly no data exists
+        if(shouldShowOnboarding()){
+          showOnboarding();
+        }
+      };
+      // Try after 2s, 4s, and 6s — stops as soon as data is ready
+      let obChecked=false;
+      [2000,4000,6000].forEach(delay=>{
+        setTimeout(()=>{
+          if(obChecked)return;
+          if(checkReady()||delay===6000){
+            obChecked=true;
+            checkOb();
+          }
+        },delay);
+      });
     }else{
-      // Wait for redirect result before concluding no user
-      // (covers the case where we just came back from Google redirect)
       await redirectPromise;
-      // Check again — redirect may have signed user in
-      if(auth.currentUser){
-        // onAuthStateChanged will fire again with the user, do nothing here
-        return;
-      }
+      if(auth.currentUser)return;
       CU=null;
       setTimeout(()=>{
         document.getElementById('loading-overlay').classList.add('hidden');

@@ -659,7 +659,7 @@ window.closeModal=closeModal;
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,signOut as fbOut,onAuthStateChanged,browserLocalPersistence,browserPopupRedirectResolver,setPersistence}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import{getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,collection,getDocs,setDoc,deleteDoc,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import{getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,collection,setDoc,deleteDoc,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const FC={apiKey:"AIzaSyBuTkiDr-fB_woNrLqobALzYKX3gidq5TE",authDomain:"pocket-finance-cf7a7.firebaseapp.com",databaseURL:"https://pocket-finance-cf7a7-default-rtdb.firebaseio.com",projectId:"pocket-finance-cf7a7",storageBucket:"pocket-finance-cf7a7.firebasestorage.app",messagingSenderId:"94342153271",appId:"1:94342153271:web:0f6b411a01d8a9c160abb2"};
 const app=initializeApp(FC),auth=getAuth(app);
@@ -723,13 +723,16 @@ async function initAuth(){
   onAuthStateChanged(auth,async user=>{
     if(user){
       CU=user;setAvatars(user);
-      // Show app immediately — don't wait for data
+      // Show app immediately — onSnapshot listeners will populate data
       document.getElementById('login-screen').classList.add('hidden');
       document.getElementById('loading-overlay').classList.add('hidden');
       document.getElementById('app-shell').style.display='flex';
       initApp();
-      // Load data in background — UI updates as it arrives
-      loadData(user.uid).then(()=>{startSync(user.uid);autoLogRecurring();refreshPage();});
+      // Start real-time sync — fires immediately from cache, then from server
+      READY={profile:false,expenses:false,income:false,contributions:false};
+      startSync(user.uid);
+      // Auto-log recurring after first full sync
+      setTimeout(()=>{if(checkReady())autoLogRecurring();},3000);
     }else{
       // Wait for redirect result before concluding no user
       // (covers the case where we just came back from Google redirect)
@@ -776,25 +779,73 @@ async function saveS(){if(!CU)return;setSyncDot('syncing');try{const b=writeBatc
 async function saveDoc(col,id,data){if(!CU)return;setSyncDot('syncing');try{await setDoc(uDoc(col,id),{...data,updatedAt:Date.now()});setSyncDot('online');}catch(e){setSyncDot('error');}}
 async function delDoc(col,id){if(!CU)return;try{await deleteDoc(uDoc(col,id));}catch(e){setSyncDot('error');}}
 
-async function loadData(uid){setSyncDot('syncing');try{
-  const [ps,es,is,cs]=await Promise.all([
-    getDocs(collection(db,'users',uid,'meta')),
-    getDocs(collection(db,'users',uid,'expenses')),
-    getDocs(collection(db,'users',uid,'income')),
-    getDocs(collection(db,'users',uid,'contributions'))
-  ]);
-  ps.forEach(d=>{if(d.id==='profile'){const v=d.data();S.profile.name=v.name||'';if(v.categories?.length)S.categories=v.categories;if(v.budgets)S.budgets=v.budgets;if(v.goals)S.goals=v.goals;if(v.recurringExpenses)S.recurringExpenses=v.recurringExpenses;if(v.selectedColor)S.selectedColor=v.selectedColor;}});
-  S.expenses=[];es.forEach(d=>S.expenses.push({id:d.id,...d.data()}));
-  S.incomeSources=[];is.forEach(d=>S.incomeSources.push({id:d.id,...d.data()}));
-  S.contributions=[];cs.forEach(d=>S.contributions.push({id:d.id,...d.data()}));
-  setSyncDot('online');}catch(e){setSyncDot('offline');showToast('Loaded from cache');}}
+// ── SYNC — single source of truth via onSnapshot ──
+// No separate getDocs call. onSnapshot fires immediately from local cache,
+// then again from server. Both devices always see the same Firestore state.
+let READY={profile:false,expenses:false,income:false,contributions:false};
+function checkReady(){return Object.values(READY).every(Boolean);}
 
-function startSync(uid){UL.forEach(u=>u());UL=[];
-  const u1=onSnapshot(doc(db,'users',uid,'meta','profile'),sn=>{if(!sn.exists())return;const v=sn.data();if(v.categories?.length)S.categories=v.categories;if(v.budgets)S.budgets=v.budgets;if(v.goals)S.goals=v.goals;if(v.recurringExpenses)S.recurringExpenses=v.recurringExpenses;refreshPage();setSyncDot('online');},()=>setSyncDot('offline'));
-  const u2=onSnapshot(collection(db,'users',uid,'expenses'),sn=>{sn.docChanges().forEach(c=>{if(c.type==='added'||c.type==='modified'){const i=S.expenses.findIndex(e=>e.id===c.doc.id);const it={id:c.doc.id,...c.doc.data()};if(i>-1)S.expenses[i]=it;else S.expenses.push(it);}if(c.type==='removed')S.expenses=S.expenses.filter(e=>e.id!==c.doc.id);});refreshPage();setSyncDot('online');},()=>setSyncDot('offline'));
-  const u3=onSnapshot(collection(db,'users',uid,'income'),sn=>{sn.docChanges().forEach(c=>{if(c.type==='added'||c.type==='modified'){const i=S.incomeSources.findIndex(s=>s.id===c.doc.id);const it={id:c.doc.id,...c.doc.data()};if(i>-1)S.incomeSources[i]=it;else S.incomeSources.push(it);}if(c.type==='removed')S.incomeSources=S.incomeSources.filter(s=>s.id!==c.doc.id);});document.getElementById('tb-inc').textContent=fmt(totInc());refreshPage();setSyncDot('online');},()=>setSyncDot('offline'));
-  const u4=onSnapshot(collection(db,'users',uid,'contributions'),sn=>{sn.docChanges().forEach(c=>{if(c.type==='added'||c.type==='modified'){const i=S.contributions.findIndex(x=>x.id===c.doc.id);const it={id:c.doc.id,...c.doc.data()};if(i>-1)S.contributions[i]=it;else S.contributions.push(it);}if(c.type==='removed')S.contributions=S.contributions.filter(x=>x.id!==c.doc.id);});refreshPage();setSyncDot('online');},()=>setSyncDot('offline'));
-  UL=[u1,u2,u3,u4];}
+function startSync(uid){
+  UL.forEach(u=>u());UL=[];
+  setSyncDot('syncing');
+
+  const u1=onSnapshot(doc(db,'users',uid,'meta','profile'),sn=>{
+    if(sn.exists()){
+      const v=sn.data();
+      S.profile.name=v.name||'';
+      if(v.categories?.length)S.categories=v.categories;
+      S.budgets=v.budgets||[];
+      S.goals=v.goals||[];
+      S.recurringExpenses=v.recurringExpenses||[];
+      if(v.selectedColor)S.selectedColor=v.selectedColor;
+    }
+    READY.profile=true;
+    if(checkReady()){refreshPage();setSyncDot('online');}
+  },()=>setSyncDot('offline'));
+
+  const u2=onSnapshot(collection(db,'users',uid,'expenses'),sn=>{
+    // On first snapshot, replace entirely. On subsequent, apply changes.
+    if(!READY.expenses){
+      S.expenses=[];sn.forEach(d=>S.expenses.push({id:d.id,...d.data()}));
+      READY.expenses=true;
+    } else {
+      sn.docChanges().forEach(c=>{
+        if(c.type==='added'||c.type==='modified'){const i=S.expenses.findIndex(e=>e.id===c.doc.id);const it={id:c.doc.id,...c.doc.data()};if(i>-1)S.expenses[i]=it;else S.expenses.push(it);}
+        if(c.type==='removed')S.expenses=S.expenses.filter(e=>e.id!==c.doc.id);
+      });
+    }
+    if(checkReady()){refreshPage();setSyncDot('online');}
+  },()=>setSyncDot('offline'));
+
+  const u3=onSnapshot(collection(db,'users',uid,'income'),sn=>{
+    if(!READY.income){
+      S.incomeSources=[];sn.forEach(d=>S.incomeSources.push({id:d.id,...d.data()}));
+      READY.income=true;
+    } else {
+      sn.docChanges().forEach(c=>{
+        if(c.type==='added'||c.type==='modified'){const i=S.incomeSources.findIndex(s=>s.id===c.doc.id);const it={id:c.doc.id,...c.doc.data()};if(i>-1)S.incomeSources[i]=it;else S.incomeSources.push(it);}
+        if(c.type==='removed')S.incomeSources=S.incomeSources.filter(s=>s.id!==c.doc.id);
+      });
+    }
+    document.getElementById('tb-inc').textContent=fmt(totInc());
+    if(checkReady()){refreshPage();setSyncDot('online');}
+  },()=>setSyncDot('offline'));
+
+  const u4=onSnapshot(collection(db,'users',uid,'contributions'),sn=>{
+    if(!READY.contributions){
+      S.contributions=[];sn.forEach(d=>S.contributions.push({id:d.id,...d.data()}));
+      READY.contributions=true;
+    } else {
+      sn.docChanges().forEach(c=>{
+        if(c.type==='added'||c.type==='modified'){const i=S.contributions.findIndex(x=>x.id===c.doc.id);const it={id:c.doc.id,...c.doc.data()};if(i>-1)S.contributions[i]=it;else S.contributions.push(it);}
+        if(c.type==='removed')S.contributions=S.contributions.filter(x=>x.id!==c.doc.id);
+      });
+    }
+    if(checkReady()){refreshPage();setSyncDot('online');}
+  },()=>setSyncDot('offline'));
+
+  UL=[u1,u2,u3,u4];
+}
 
 // ── HELPERS ──
 const MOS=['January','February','March','April','May','June','July','August','September','October','November','December'];

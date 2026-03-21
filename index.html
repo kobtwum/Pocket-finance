@@ -145,7 +145,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);f
   .d-title{font-family:'DM Serif Display',serif;font-size:22px;color:var(--ink);font-weight:400;}
   .d-actions{display:flex;align-items:center;gap:10px;}
   .content{padding:24px 32px 24px;}
-  .bottomnav{display:none;}
   .fab{display:none !important;}
   /* Desktop modal - centered */
   .mo{align-items:center;justify-content:center;}
@@ -903,12 +902,18 @@ function applyLayout(){
   const pt=document.getElementById('d-ptitle');
   const da=document.getElementById('d-acts');
   const fb=document.getElementById('fab');
+  const bn=document.getElementById('bottomnav');
+  const md=document.getElementById('more-drawer');
+  const mo=document.getElementById('more-overlay');
   if(d){
     if(sb)sb.style.display='flex';
     if(mb)mb.style.display='none';
     if(pt)pt.style.display='block';
     if(da)da.style.display='flex';
     if(fb)fb.style.display='none';
+    if(bn)bn.style.display='none';
+    if(md)md.classList.remove('open');
+    if(mo)mo.classList.remove('open');
     document.getElementById('dash-stats').className='d-g4';
     document.getElementById('dash-lower').className='d-g2';
     document.getElementById('bud-wrap').className='d-g2';
@@ -920,6 +925,7 @@ function applyLayout(){
     if(mb)mb.style.display='flex';
     if(pt)pt.style.display='none';
     if(da)da.style.display='none';
+    if(bn)bn.style.display='flex';
     if(fb)fb.style.display=['dashboard','expenses','savings','recurring'].includes(CP)?'flex':'none';
     ['dash-stats','dash-lower','bud-wrap','inc-wrap','an-charts','set-wrap'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='';});
     document.getElementById('dash-stats').className='g2';

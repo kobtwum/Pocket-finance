@@ -47,7 +47,7 @@ body.dark{
   --shadow:0 4px 24px rgba(0,0,0,0.3);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;overflow:hidden;}
+html,body{height:100%;overflow:hidden;position:fixed;width:100%;}
 body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);font-size:14px;transition:background var(--tr),color var(--tr);}
 
 /* LOGIN */
@@ -77,7 +77,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);f
 #sync-dot.error{background:#c0392b;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
-/* APP SHELL - MOBILE FIRST */
 .app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 .topbar{background:var(--ink);color:white;padding:calc(var(--st) + 12px) 18px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:50;}
 .tb-left{display:flex;align-items:center;gap:8px;}
@@ -89,20 +88,28 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);f
 .av{width:28px;height:28px;border-radius:50%;border:2px solid rgba(201,168,76,.4);cursor:pointer;object-fit:cover;}
 .av-ph{width:28px;height:28px;border-radius:50%;background:rgba(201,168,76,.2);border:2px solid rgba(201,168,76,.4);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:var(--gold);cursor:pointer;flex-shrink:0;}
 
-.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:14px 14px calc(var(--sb) + 78px);}
+.content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding:14px 14px calc(var(--sb) + 80px);min-height:0;}
 .page{display:none;}.page.active{display:block;}
 
 .bottomnav{display:flex;background:var(--paper);border-top:1px solid var(--paper-3);padding-bottom:var(--sb);flex-shrink:0;z-index:50;box-shadow:0 -4px 20px rgba(26,26,46,.07);}
-.nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 2px;cursor:pointer;border:none;background:none;color:var(--ink-3);font-size:9px;font-family:'DM Sans',sans-serif;gap:3px;transition:color .15s;}
+.nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 2px;cursor:pointer;border:none;background:none;color:var(--ink-3);font-size:9px;font-family:'DM Sans',sans-serif;gap:3px;transition:color .15s;min-width:0;}
 .nav-tab .ti{font-size:18px;line-height:1;}
 .nav-tab.active{color:var(--gold);}
-.fab{position:fixed;bottom:calc(var(--sb) + 72px);right:18px;width:52px;height:52px;border-radius:50%;background:var(--gold);color:var(--ink);font-size:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(201,168,76,.4);cursor:pointer;border:none;z-index:40;transition:transform .15s;}
+/* More drawer */
+.more-drawer{position:fixed;bottom:0;left:0;right:0;background:var(--paper);border-top:1px solid var(--paper-3);border-radius:16px 16px 0 0;padding:12px 16px calc(var(--sb) + 12px);z-index:200;transform:translateY(100%);transition:transform .25s cubic-bezier(.34,1.1,.64,1);box-shadow:0 -8px 32px rgba(26,26,46,.12);}
+.more-drawer.open{transform:translateY(0);}
+.more-overlay{position:fixed;inset:0;z-index:199;background:rgba(26,26,46,.3);opacity:0;pointer-events:none;transition:opacity .2s;}
+.more-overlay.open{opacity:1;pointer-events:all;}
+.more-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.more-item{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 8px;border-radius:12px;cursor:pointer;border:none;background:var(--paper-2);color:var(--ink-3);font-size:10px;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.more-item.active{background:var(--gold-pale);color:var(--gold);}
+.more-item .ti{font-size:20px;line-height:1;}
+.fab{position:fixed;bottom:calc(var(--sb) + 70px);right:16px;width:50px;height:50px;border-radius:50%;background:var(--gold);color:var(--ink);font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(201,168,76,.4);cursor:pointer;border:none;z-index:40;transition:transform .15s;}
 .fab:active{transform:scale(.92);}
 
 /* DESKTOP >= 1024px */
 @media(min-width:1024px){
-  html,body{overflow:hidden;}
-  .app{flex-direction:row;height:100vh;}
+  .app{flex-direction:row;height:100vh;position:fixed;inset:0;}
   /* Sidebar */
   .sidebar{width:var(--sw);background:#1a1a2e;color:white;display:flex;flex-direction:column;flex-shrink:0;height:100vh;transition:width .25s ease;overflow:hidden;z-index:60;}
   body.dark .sidebar{background:#0a0a14;border-right:1px solid rgba(255,255,255,.06);}
@@ -514,16 +521,29 @@ body.dark .modal{background:var(--paper-2);}
 
 </div><!-- end .content -->
 
-<!-- MOBILE BOTTOM NAV -->
-<nav class="bottomnav">
+<!-- MOBILE BOTTOM NAV - 5 tabs + More -->
+<nav class="bottomnav" id="bottomnav">
   <button class="nav-tab active" onclick="showPage('dashboard')" id="tab-dashboard"><span class="ti">◈</span><span class="tl">Home</span></button>
   <button class="nav-tab" onclick="showPage('expenses')" id="tab-expenses"><span class="ti">↕</span><span class="tl">Expenses</span></button>
   <button class="nav-tab" onclick="showPage('budget')" id="tab-budget"><span class="ti">⊟</span><span class="tl">Budget</span></button>
   <button class="nav-tab" onclick="showPage('savings')" id="tab-savings"><span class="ti">◎</span><span class="tl">Savings</span></button>
-  <button class="nav-tab" onclick="showPage('analytics')" id="tab-analytics"><span class="ti">◻</span><span class="tl">Analytics</span></button>
-  <button class="nav-tab" onclick="showPage('income')" id="tab-income"><span class="ti">＋</span><span class="tl">Income</span></button>
-  <button class="nav-tab" onclick="showPage('settings')" id="tab-settings"><span class="ti">⚙</span><span class="tl">Settings</span></button>
+  <button class="nav-tab" id="tab-more" onclick="toggleMoreDrawer()"><span class="ti">⋯</span><span class="tl">More</span></button>
 </nav>
+
+<!-- More Drawer -->
+<div class="more-overlay" id="more-overlay" onclick="closeMoreDrawer()"></div>
+<div class="more-drawer" id="more-drawer">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <span style="font-size:13px;font-weight:500;color:var(--ink-3);">More</span>
+    <button onclick="closeMoreDrawer()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--ink-3);padding:2px 6px;">✕</button>
+  </div>
+  <div class="more-grid">
+    <button class="more-item" id="more-analytics" onclick="showPage('analytics');closeMoreDrawer()"><span class="ti">◻</span>Analytics</button>
+    <button class="more-item" id="more-income" onclick="showPage('income');closeMoreDrawer()"><span class="ti">＋</span>Income</button>
+    <button class="more-item" id="more-recurring" onclick="showPage('recurring');closeMoreDrawer()"><span class="ti">↻</span>Recurring</button>
+    <button class="more-item" id="more-settings" onclick="showPage('settings');closeMoreDrawer()"><span class="ti">⚙</span>Settings</button>
+  </div>
+</div>
 </div><!-- end .d-main -->
 </div><!-- end .app -->
 
@@ -832,15 +852,30 @@ applySBC();
 document.querySelectorAll('.sb-item[data-page]').forEach(btn=>{btn.addEventListener('click',()=>showPage(btn.dataset.page));});
 document.getElementById('sb-user').addEventListener('click',()=>openModal('user-modal'));
 
+// More drawer
+window.toggleMoreDrawer=function(){const d=document.getElementById('more-drawer'),o=document.getElementById('more-overlay');d.classList.toggle('open');o.classList.toggle('open');}
+window.closeMoreDrawer=function(){document.getElementById('more-drawer').classList.remove('open');document.getElementById('more-overlay').classList.remove('open');}
+
 // ── NAV ──
 let CP='dashboard';
 function refreshPage(){({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:renderIncome,recurring:renderRecurring})[CP]?.();}
+const PRIMARY_TABS=['dashboard','expenses','budget','savings'];
+const MORE_TABS=['analytics','income','recurring','settings'];
+
 window.showPage=function(id){
   CP=id;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab,.sb-item').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.more-item').forEach(t=>t.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
-  const mt=document.getElementById('tab-'+id);if(mt)mt.classList.add('active');
+  // Highlight correct nav item
+  if(PRIMARY_TABS.includes(id)){
+    const mt=document.getElementById('tab-'+id);if(mt)mt.classList.add('active');
+  } else {
+    // Highlight More button and the specific drawer item
+    const moreBtn=document.getElementById('tab-more');if(moreBtn)moreBtn.classList.add('active');
+    const moreItem=document.getElementById('more-'+id);if(moreItem)moreItem.classList.add('active');
+  }
   document.querySelectorAll('.sb-item[data-page="'+id+'"]').forEach(el=>el.classList.add('active'));
   document.getElementById('main-content').scrollTop=0;
   const fb=document.getElementById('fab');

@@ -971,9 +971,7 @@ function setAvatars(user){
   ['um-name','set-name','sb-uname'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=user.displayName||'';});
   ['um-email','set-email'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=user.email||'';});
 }
-initAuth();
-
-// ── STATE ──
+// initAuth() called below after S and all state variables are declared
 const DCATS=[{name:'Food & Dining',icon:'🍽️',color:'#e67e22'},{name:'Transport',icon:'🚗',color:'#2471a3'},{name:'Rent & Housing',icon:'🏠',color:'#8e44ad'},{name:'Utilities',icon:'💡',color:'#16a085'},{name:'Shopping',icon:'🛍️',color:'#d35400'},{name:'Health',icon:'🏥',color:'#c0392b'},{name:'Entertainment',icon:'🎬',color:'#27ae60'},{name:'Loan Repayment',icon:'🔑',color:'#c9a84c'},{name:'Savings Transfer',icon:'💰',color:'#2d7a5f'},{name:'Other',icon:'📌',color:'#7a7a9a'}];
 let S={profile:{name:''},incomeSources:[],expenses:[],categories:[...DCATS],budgets:[],goals:[],contributions:[],recurringExpenses:[],currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),selectedColor:'#e67e22'};
 let CU=null,UL=[];
@@ -1625,6 +1623,8 @@ function showToast(msg){const t=document.getElementById('toast');document.getEle
 window.showToast=showToast;
 
 // ── INIT ──
+// All functions and state declared — now safe to start auth
+initAuth();
 
 // ── ONBOARDING ──────────────────────────────────────────
 function shouldShowOnboarding(){
@@ -1947,7 +1947,7 @@ window.exportPDF=function(){
   const bc=byCat(m,y);
   const budRows=S.budgets.map(b=>{
     const sp=bc[b.cat]||0,pct=(sp/b.limit*100);
-    const status=pct>=100?'Over':(pct>=getBudgetThreshold()?'Warning'):'OK';
+    const status=pct>=100?'Over':pct>=getBudgetThreshold()?'Warning':'OK';
     return[pdfTxt(b.cat),pdfFmt(b.limit),pdfFmt(sp),pct.toFixed(0)+'%',status];
   });
   if(budRows.length){

@@ -142,9 +142,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);f
   .fab{display:none !important;}
   /* Desktop modal - centered */
   .mo{align-items:center;justify-content:center;}
-  .modal{border-radius:var(--radius);width:480px;max-width:90vw;transform:scale(.95);padding:28px;max-height:88vh;}
-  .mo.open .modal{transform:scale(1);}
-  .mhandle{display:none;}
+  .modal{border-radius:var(--radius);width:480px;max-width:90vw;transform:scale(.95);padding:28px;max-height:88vh;transition:transform .2s ease,opacity .15s ease;opacity:0;}
+  .mo.open .modal{transform:scale(1);opacity:1;}
+  .mh{display:none;}
   .mfooter{flex-direction:row;justify-content:flex-end;}
   .mfooter .btn-full{width:auto;flex:none;}
   .mfooter .btn-gold{order:2;}
@@ -628,14 +628,27 @@ body.dark .modal{background:var(--paper-2);}
 
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
+<script>
+// These must be global — called from onclick attributes in HTML
+function openModal(id){const el=document.getElementById(id);if(el)el.classList.add('open');}
+function closeModal(id){const el=document.getElementById(id);if(el)el.classList.remove('open');}
+window.openModal=openModal;
+window.closeModal=closeModal;
+</script>
+
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,signOut as fbOut,onAuthStateChanged,browserLocalPersistence,browserPopupRedirectResolver,setPersistence}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import{getFirestore,enableIndexedDbPersistence,doc,collection,getDocs,setDoc,deleteDoc,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import{getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,collection,getDocs,setDoc,deleteDoc,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const FC={apiKey:"AIzaSyBuTkiDr-fB_woNrLqobALzYKX3gidq5TE",authDomain:"pocket-finance-cf7a7.firebaseapp.com",databaseURL:"https://pocket-finance-cf7a7-default-rtdb.firebaseio.com",projectId:"pocket-finance-cf7a7",storageBucket:"pocket-finance-cf7a7.firebasestorage.app",messagingSenderId:"94342153271",appId:"1:94342153271:web:0f6b411a01d8a9c160abb2"};
-const app=initializeApp(FC),auth=getAuth(app),db=getFirestore(app);
-enableIndexedDbPersistence(db).catch(()=>{});
+const app=initializeApp(FC),auth=getAuth(app);
+// Use persistent cache — loads from local storage first, syncs network in background
+const db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
+
+// Module-local references to the global modal functions
+const openModal=id=>{const el=document.getElementById(id);if(el)el.classList.add('open');};
+const closeModal=id=>{const el=document.getElementById(id);if(el)el.classList.remove('open');};
 
 // ── CURRENCY ──
 let CUR=localStorage.getItem('pkt_cur')||'GHS';
@@ -681,17 +694,31 @@ document.getElementById('user-av').addEventListener('click',()=>openModal('user-
 ['so-btn','so-modal-btn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',id==='so-modal-btn'?()=>{doSignOut();closeModal('user-modal');}:doSignOut);});
 
 async function initAuth(){
-  // Handle redirect result if coming back from redirect flow
-  try{await getRedirectResult(auth,browserPopupRedirectResolver);}catch(e){if(e.code&&e.code!=='auth/no-current-user')console.warn('Redirect result:',e.code);}
+  // Start both in parallel — don't let getRedirectResult block the auth state check
+  // onAuthStateChanged fires from IndexedDB cache almost instantly for returning users
+  const redirectPromise=getRedirectResult(auth,browserPopupRedirectResolver).catch(e=>{
+    if(e.code&&e.code!=='auth/no-current-user')console.warn('Redirect result:',e.code);
+  });
+
   onAuthStateChanged(auth,async user=>{
     if(user){
       CU=user;setAvatars(user);
-      await loadData(user.uid);startSync(user.uid);autoLogRecurring();
+      // Show app immediately — don't wait for data
       document.getElementById('login-screen').classList.add('hidden');
       document.getElementById('loading-overlay').classList.add('hidden');
       document.getElementById('app-shell').style.display='flex';
       initApp();
+      // Load data in background — UI updates as it arrives
+      loadData(user.uid).then(()=>{startSync(user.uid);autoLogRecurring();refreshPage();});
     }else{
+      // Wait for redirect result before concluding no user
+      // (covers the case where we just came back from Google redirect)
+      await redirectPromise;
+      // Check again — redirect may have signed user in
+      if(auth.currentUser){
+        // onAuthStateChanged will fire again with the user, do nothing here
+        return;
+      }
       CU=null;
       setTimeout(()=>{
         document.getElementById('loading-overlay').classList.add('hidden');
@@ -730,11 +757,16 @@ async function saveDoc(col,id,data){if(!CU)return;setSyncDot('syncing');try{awai
 async function delDoc(col,id){if(!CU)return;try{await deleteDoc(uDoc(col,id));}catch(e){setSyncDot('error');}}
 
 async function loadData(uid){setSyncDot('syncing');try{
-  const ps=await getDocs(collection(db,'users',uid,'meta'));
+  const [ps,es,is,cs]=await Promise.all([
+    getDocs(collection(db,'users',uid,'meta')),
+    getDocs(collection(db,'users',uid,'expenses')),
+    getDocs(collection(db,'users',uid,'income')),
+    getDocs(collection(db,'users',uid,'contributions'))
+  ]);
   ps.forEach(d=>{if(d.id==='profile'){const v=d.data();S.profile.name=v.name||'';if(v.categories?.length)S.categories=v.categories;if(v.budgets)S.budgets=v.budgets;if(v.goals)S.goals=v.goals;if(v.recurringExpenses)S.recurringExpenses=v.recurringExpenses;if(v.selectedColor)S.selectedColor=v.selectedColor;}});
-  const es=await getDocs(collection(db,'users',uid,'expenses'));S.expenses=[];es.forEach(d=>S.expenses.push({id:d.id,...d.data()}));
-  const is=await getDocs(collection(db,'users',uid,'income'));S.incomeSources=[];is.forEach(d=>S.incomeSources.push({id:d.id,...d.data()}));
-  const cs=await getDocs(collection(db,'users',uid,'contributions'));S.contributions=[];cs.forEach(d=>S.contributions.push({id:d.id,...d.data()}));
+  S.expenses=[];es.forEach(d=>S.expenses.push({id:d.id,...d.data()}));
+  S.incomeSources=[];is.forEach(d=>S.incomeSources.push({id:d.id,...d.data()}));
+  S.contributions=[];cs.forEach(d=>S.contributions.push({id:d.id,...d.data()}));
   setSyncDot('online');}catch(e){setSyncDot('offline');showToast('Loaded from cache');}}
 
 function startSync(uid){UL.forEach(u=>u());UL=[];
@@ -870,14 +902,14 @@ function renderExp(){
   document.getElementById('exp-list').innerHTML=fl.length?fl.map(e=>eRow(e)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses for this period</p></div>';
 }
 window.openExpenseModal=function(id){EID=id||null;document.getElementById('exp-mt').textContent=id?'Edit Expense':'Add Expense';popCatSel('exp-cat');if(id){const e=S.expenses.find(x=>x.id===id);if(e){document.getElementById('exp-desc').value=e.desc;document.getElementById('exp-amt').value=e.amount;document.getElementById('exp-cat').value=e.cat;document.getElementById('exp-date').value=e.date;document.getElementById('exp-note').value=e.note||'';}}else{document.getElementById('exp-desc').value='';document.getElementById('exp-amt').value='';document.getElementById('exp-cat').value='Food & Dining';document.getElementById('exp-date').value=tod();document.getElementById('exp-note').value='';}openModal('expense-modal');};
-window.saveExpense=async function(){const desc=document.getElementById('exp-desc').value.trim(),amount=parseFloat(document.getElementById('exp-amt').value),cat=document.getElementById('exp-cat').value,date=document.getElementById('exp-date').value,note=document.getElementById('exp-note').value.trim();if(!desc||!amount||!date){showToast('Fill in all fields');return;}const id=EID||'e'+Date.now();const data={desc,amount,cat,date,note};if(EID){const i=S.expenses.findIndex(e=>e.id===EID);if(i>-1)S.expenses[i]={...S.expenses[i],...data};}else S.expenses.push({id,...data});await saveDoc('expenses',id,data);closeModal('expense-modal');renderExp();renderDash();showToast(EID?'Updated ✓':'Expense added ✓');EID=null;};
+window.saveExpense=async function(){const desc=document.getElementById('exp-desc').value.trim(),amount=parseFloat(document.getElementById('exp-amt').value),cat=document.getElementById('exp-cat').value,date=document.getElementById('exp-date').value,note=document.getElementById('exp-note').value.trim();if(!desc||!amount||!date){showToast('Fill in all fields');return;}const id=EID||'e'+Date.now();const data={desc,amount,cat,date,note};if(EID){const i=S.expenses.findIndex(e=>e.id===EID);if(i>-1)S.expenses[i]={...S.expenses[i],...data};}else S.expenses.push({id,...data});closeModal('expense-modal');renderExp();renderDash();showToast(EID?'Updated ✓':'Expense added ✓');EID=null;saveDoc('expenses',id,data);};
 window.delExp=async function(id){const e=S.expenses.find(x=>x.id===id);if(e?.linkedGoal){if(!confirm('Also delete linked savings contribution?'))return;const lk=S.contributions.find(c=>c.linkedExpense===id);if(lk){S.contributions=S.contributions.filter(c=>c.id!==lk.id);await delDoc('contributions',lk.id);}}else if(!confirm('Delete this expense?'))return;S.expenses=S.expenses.filter(x=>x.id!==id);await delDoc('expenses',id);renderExp();renderDash();showToast('Deleted');};
 window.changeMonth=function(dir){S.currentMonth+=dir;if(S.currentMonth>11){S.currentMonth=0;S.currentYear++;}if(S.currentMonth<0){S.currentMonth=11;S.currentYear--;}renderExp();};
 
 // ── CATEGORIES ──
 window.pickColor=function(el){document.querySelectorAll('.sw').forEach(s=>s.classList.remove('sel'));el.classList.add('sel');S.selectedColor=el.dataset.c;};
 window.openCatModal=function(){document.getElementById('nc-name').value='';document.getElementById('nc-icon').value='';openModal('cat-modal');};
-window.saveCategory=async function(){const name=document.getElementById('nc-name').value.trim(),icon=document.getElementById('nc-icon').value.trim()||'📌';if(!name){showToast('Enter a category name');return;}if(S.categories.find(c=>c.name.toLowerCase()===name.toLowerCase())){showToast('Already exists');return;}S.categories.push({name,icon,color:S.selectedColor||'#888'});await saveS();closeModal('cat-modal');renderBudget();showToast('"'+name+'" created');};
+window.saveCategory=async function(){const name=document.getElementById('nc-name').value.trim(),icon=document.getElementById('nc-icon').value.trim()||'📌';if(!name){showToast('Enter a category name');return;}if(S.categories.find(c=>c.name.toLowerCase()===name.toLowerCase())){showToast('Already exists');return;}S.categories.push({name,icon,color:S.selectedColor||'#888'});closeModal('cat-modal');renderBudget();showToast('"'+name+'" created');saveS();};
 
 // ── BUDGET ──
 function renderBudget(){
@@ -891,7 +923,7 @@ function renderBudget(){
   document.getElementById('bud-leg').innerHTML=S.budgets.map(b=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${gCat(b.cat).color};display:inline-block;"></span>${b.cat}</span>`).join('');
 }
 window.openBudgetModal=function(cat){popCatSel('bud-cat');if(cat){document.getElementById('bud-cat').value=cat;const b=S.budgets.find(x=>x.cat===cat);if(b)document.getElementById('bud-lim').value=b.limit;}else document.getElementById('bud-lim').value='';openModal('budget-modal');};
-window.saveBudget=async function(){const cat=document.getElementById('bud-cat').value,limit=parseFloat(document.getElementById('bud-lim').value);if(!limit){showToast('Enter a limit');return;}const i=S.budgets.findIndex(b=>b.cat===cat);if(i>-1)S.budgets[i].limit=limit;else S.budgets.push({cat,limit});await saveS();closeModal('budget-modal');renderBudget();showToast('Budget saved ✓');};
+window.saveBudget=async function(){const cat=document.getElementById('bud-cat').value,limit=parseFloat(document.getElementById('bud-lim').value);if(!limit){showToast('Enter a limit');return;}const i=S.budgets.findIndex(b=>b.cat===cat);if(i>-1)S.budgets[i].limit=limit;else S.budgets.push({cat,limit});closeModal('budget-modal');renderBudget();showToast('Budget saved ✓');saveS();};
 window.delBudget=async function(cat){if(!confirm('Remove budget for '+cat+'?'))return;S.budgets=S.budgets.filter(b=>b.cat!==cat);await saveS();renderBudget();showToast('Removed');};
 
 // ── SAVINGS ──
@@ -903,7 +935,7 @@ function renderSavings(){
 }
 window.openGoalModal=function(){GID=null;document.getElementById('goal-mt').textContent='New Savings Goal';['g-name','g-target','g-date','g-mon'].forEach(id=>document.getElementById(id).value='');document.getElementById('g-icon').value='🎯';openModal('goal-modal');};
 window.editGoal=function(id){GID=id;const g=S.goals.find(x=>x.id===id);if(!g)return;document.getElementById('goal-mt').textContent='Edit Savings Goal';document.getElementById('g-name').value=g.name;document.getElementById('g-target').value=g.target;document.getElementById('g-date').value=g.date;document.getElementById('g-mon').value=g.monthly;document.getElementById('g-icon').value=g.icon;openModal('goal-modal');};
-window.saveGoal=async function(){const name=document.getElementById('g-name').value.trim(),target=parseFloat(document.getElementById('g-target').value),date=document.getElementById('g-date').value,monthly=parseFloat(document.getElementById('g-mon').value)||0,icon=document.getElementById('g-icon').value;if(!name||!target||!date){showToast('Fill in all required fields');return;}if(GID){const i=S.goals.findIndex(g=>g.id===GID);if(i>-1)S.goals[i]={...S.goals[i],name,target,date,monthly,icon};}else S.goals.push({id:'g'+Date.now(),name,target,date,monthly,icon});await saveS();closeModal('goal-modal');renderSavings();showToast('Goal saved ✓');GID=null;};
+window.saveGoal=async function(){const name=document.getElementById('g-name').value.trim(),target=parseFloat(document.getElementById('g-target').value),date=document.getElementById('g-date').value,monthly=parseFloat(document.getElementById('g-mon').value)||0,icon=document.getElementById('g-icon').value;if(!name||!target||!date){showToast('Fill in all required fields');return;}if(GID){const i=S.goals.findIndex(g=>g.id===GID);if(i>-1)S.goals[i]={...S.goals[i],name,target,date,monthly,icon};}else S.goals.push({id:'g'+Date.now(),name,target,date,monthly,icon});closeModal('goal-modal');renderSavings();showToast('Goal saved ✓');GID=null;saveS();};
 window.delGoal=async function(id){if(!confirm('Delete goal and all contributions?'))return;const lk=S.contributions.filter(c=>c.goalId===id).map(c=>c.linkedExpense).filter(Boolean);for(const eid of lk){S.expenses=S.expenses.filter(e=>e.id!==eid);await delDoc('expenses',eid);}const cs=S.contributions.filter(c=>c.goalId===id);for(const c of cs)await delDoc('contributions',c.id);S.goals=S.goals.filter(g=>g.id!==id);S.contributions=S.contributions.filter(c=>c.goalId!==id);await saveS();renderSavings();renderDash();showToast('Goal deleted');};
 window.openContributeModal=function(){document.getElementById('co-goal').innerHTML=S.goals.map(g=>`<option value="${g.id}">${g.icon} ${g.name}</option>`).join('');document.getElementById('co-date').value=tod();document.getElementById('co-amt').value='';openModal('contrib-modal');};
 window.quickContrib=function(goalId){window.openContributeModal();document.getElementById('co-goal').value=goalId;};
@@ -970,8 +1002,7 @@ await saveS();showToast('Import successful ✓');refreshPage();}catch(err){showT
 window.clearAllData=async function(){if(!confirm('Delete ALL your data permanently?'))return;if(!confirm('Are you absolutely sure?'))return;for(const e of S.expenses)await delDoc('expenses',e.id);for(const s of S.incomeSources)await delDoc('income',s.id);for(const c of S.contributions)await delDoc('contributions',c.id);S.expenses=[];S.incomeSources=[];S.contributions=[];S.budgets=[];S.goals=[];S.categories=[...DCATS];S.recurringExpenses=[];await saveS();showToast('All data deleted');renderDash();};
 
 // ── MODALS & TOAST ──
-window.openModal=function(id){document.getElementById(id).classList.add('open');};
-window.closeModal=function(id){document.getElementById(id).classList.remove('open');};
+// openModal and closeModal are defined in the global script above
 document.querySelectorAll('.mo').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
 document.querySelectorAll('.modal').forEach(m=>{let sy=0;m.addEventListener('touchstart',e=>{sy=e.touches[0].clientY;},{passive:true});m.addEventListener('touchmove',e=>{if(e.touches[0].clientY-sy>80&&m.scrollTop===0)m.closest('.mo').classList.remove('open');},{passive:true});});
 function showToast(msg){const t=document.getElementById('toast');document.getElementById('toast-msg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}

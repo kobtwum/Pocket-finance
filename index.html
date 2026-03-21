@@ -369,6 +369,7 @@ body.dark .modal{background:var(--paper-2);}
 
 <!-- DASHBOARD -->
 <div id="page-dashboard" class="page active">
+  <div id="bud-alert-wrap"></div>
   <div class="card-dark"><div class="ct-g" id="greeting">Good morning ✦</div><div id="inc-strip" class="inc-strip"></div></div>
   <div id="dash-stats" class="g2"></div>
   <div id="dash-lower">
@@ -381,6 +382,7 @@ body.dark .modal{background:var(--paper-2);}
 <!-- EXPENSES -->
 <div id="page-expenses" class="page">
   <div class="mnav"><button onclick="changeMonth(-1)">←</button><div class="mdisp" id="mdisp"></div><button onclick="changeMonth(1)">→</button></div>
+  <div class="ar" style="margin-bottom:10px;"><button class="btn btn-gold" style="flex:none;" onclick="openExpenseModal()">+ Add Expense</button></div>
   <div class="g2" id="exp-stats"></div>
   <div class="card">
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
@@ -481,6 +483,13 @@ body.dark .modal{background:var(--paper-2);}
           <select class="fi" id="set-cur" onchange="setCur(this.value)" style="width:auto;padding:6px 10px;font-size:12px;"></select>
         </div>
         <div class="s-row">
+          <div><div class="s-lbl">Budget Warning</div><div class="s-sub">Warn when % of budget used</div></div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input class="fi" type="number" id="bud-threshold" min="50" max="99" placeholder="80" style="width:60px;padding:6px 8px;font-size:13px;" oninput="saveBudgetThreshold(this.value)"/>
+            <span style="font-size:12px;color:var(--ink-3);">%</span>
+          </div>
+        </div>
+        <div class="s-row">
           <div><div class="s-lbl">Exchange Rate</div><div class="s-sub" id="rate-sub">Rate vs GHS (manual)</div></div>
           <div style="display:flex;align-items:center;gap:6px;">
             <span style="font-size:12px;color:var(--ink-3);">1 GHS =</span>
@@ -568,6 +577,7 @@ body.dark .modal{background:var(--paper-2);}
   <div class="g2"><div class="fg"><label class="fl">Amount</label><input class="fi" type="number" inputmode="decimal" id="exp-amt" placeholder="0.00"/></div><div class="fg"><label class="fl">Date</label><input class="fi" type="date" id="exp-date"/></div></div>
   <div class="fg"><label class="fl">Category</label><select class="fi" id="exp-cat"></select></div>
   <div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="exp-note" placeholder="Any detail..."/></div>
+  <div id="bud-warn-hint" style="display:none;border-radius:var(--radius-sm);padding:9px 12px;font-size:11px;margin-bottom:4px;"></div>
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('expense-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveExpense()">Save Expense</button></div>
 </div></div>
 
@@ -648,6 +658,13 @@ body.dark .modal{background:var(--paper-2);}
   <div class="g2">
     <div class="fg" style="display:flex;align-items:flex-end;padding-bottom:2px;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:500;color:var(--ink-2);"><input type="checkbox" id="in-pin" style="width:16px;height:16px;cursor:pointer;"/> 📌 Pin to dashboard</label></div>
     <div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="in-note" placeholder="Any detail..."/></div>
+  </div>
+  <div id="in-spread-row" style="display:none;" class="s-row" style="padding:8px 0;">
+    <div><div class="s-lbl" style="font-size:12px;">Recording method</div><div class="s-sub">How to show this in your monthly income</div></div>
+    <select class="fi" id="in-spread" style="width:auto;padding:6px 8px;font-size:12px;">
+      <option value="spread">Spread across all months</option>
+      <option value="received">Record in month received</option>
+    </select>
   </div>
   <div id="in-freq-note" style="background:var(--blue-light);border-radius:var(--radius-sm);padding:8px 12px;font-size:11px;color:var(--blue);margin-bottom:4px;display:none;"></div>
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('income-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveIncome()">Save</button></div>
@@ -957,10 +974,23 @@ const MOS=['January','February','March','April','May','June','July','August','Se
 const tod=()=>new Date().toISOString().split('T')[0];
 const gCat=name=>S.categories.find(c=>c.name===name)||{icon:'📌',color:'#888',name};
 // Monthly equivalent — function declaration so it's hoisted
-function monthlyEq(src){
+function monthlyEq(src,forMonth,forYear){
   if(!src||src.noncash)return 0;
   const a=parseFloat(src.amount)||0;
-  switch(src.freq||src.frequency||'monthly'){
+  const freq=src.freq||src.frequency||'monthly';
+  const spread=src.spread||'spread';
+  // For quarterly/annual with 'received' mode, only show in payment month
+  if((freq==='quarterly'||freq==='annual')&&spread==='received'){
+    if(forMonth===undefined)return freq==='quarterly'?a/3:a/12; // default for totInc
+    // Check if this month is a payment month
+    const payDay=src.day||1;
+    const startDate=src.date?new Date(src.date):new Date(new Date().getFullYear(),0,payDay);
+    const sm=startDate.getMonth(),sy=startDate.getFullYear();
+    const monthsFromStart=(forYear-sy)*12+(forMonth-sm);
+    if(freq==='quarterly')return monthsFromStart>=0&&monthsFromStart%3===0?a:0;
+    if(freq==='annual')return monthsFromStart>=0&&monthsFromStart%12===0?a:0;
+  }
+  switch(freq){
     case'weekly':return a*52/12;
     case'biweekly':return a*26/12;
     case'quarterly':return a/3;
@@ -976,7 +1006,7 @@ function incInMonth(m,y){
     const freq=s.freq||s.frequency||'monthly';
     if(freq==='onetime'){if(!s.date)return false;const d=new Date(s.date);return d.getMonth()===m&&d.getFullYear()===y;}
     return true;
-  }).reduce((t,s)=>t+(monthlyEq(s)||0),0);
+  }).reduce((t,s)=>t+(monthlyEq(s,m,y)||0),0);
 }
 function totIncThisMonth(){return incInMonth(new Date().getMonth(),new Date().getFullYear());}
 const mExps=(m,y)=>S.expenses.filter(e=>{const d=new Date(e.date);return d.getMonth()===m&&d.getFullYear()===y;});
@@ -1117,6 +1147,7 @@ function renderDash(){
   document.getElementById('dash-rec').innerHTML=rec.length?rec.map(e=>eRow(e,true)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses yet this month</p></div>';
   const bc=byCat(m,y);
   document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,p2=Math.min(100,b.limit>0?sp/b.limit*100:0).toFixed(0);const c=gCat(b.cat);return`<div class="bc"><div class="bc-h"><div class="bc-n">${c.icon} ${b.cat}</div><div class="bc-a"><strong>${fmt(sp)}</strong>/${fmt(b.limit)}</div></div><div class="pw"><div class="pb ${p2>90?'pb-red':p2>70?'pb-gold':'pb-green'}" style="width:${p2}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
+  renderBudgetAlerts();
   document.getElementById('dash-sav').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),p3=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green);font-size:18px">${g.icon}</div><div class="li-nm"><div class="p">${g.name}</div><div class="s">${fmt(sv)} of ${fmt(g.target)}</div></div><span class="pill pill-g">${p3}%</span></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No savings goals yet</p></div>';
 }
 
@@ -1143,7 +1174,22 @@ function renderExp(){
   fl.sort((a,b)=>new Date(b.date)-new Date(a.date));
   document.getElementById('exp-list').innerHTML=fl.length?fl.map(e=>eRow(e)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses for this period</p></div>';
 }
-window.openExpenseModal=function(id){EID=id||null;document.getElementById('exp-mt').textContent=id?'Edit Expense':'Add Expense';popCatSel('exp-cat');if(id){const e=S.expenses.find(x=>x.id===id);if(e){document.getElementById('exp-desc').value=e.desc;document.getElementById('exp-amt').value=e.amount;document.getElementById('exp-cat').value=e.cat;document.getElementById('exp-date').value=e.date;document.getElementById('exp-note').value=e.note||'';}}else{document.getElementById('exp-desc').value='';document.getElementById('exp-amt').value='';document.getElementById('exp-cat').value='Food & Dining';document.getElementById('exp-date').value=tod();document.getElementById('exp-note').value='';}openModal('expense-modal');};
+window.openExpenseModal=function(id){
+  EID=id||null;
+  document.getElementById('exp-mt').textContent=id?'Edit Expense':'Add Expense';
+  popCatSel('exp-cat');
+  if(id){const e=S.expenses.find(x=>x.id===id);if(e){document.getElementById('exp-desc').value=e.desc;document.getElementById('exp-amt').value=e.amount;document.getElementById('exp-cat').value=e.cat;document.getElementById('exp-date').value=e.date;document.getElementById('exp-note').value=e.note||'';}}
+  else{document.getElementById('exp-desc').value='';document.getElementById('exp-amt').value='';document.getElementById('exp-cat').value='Food & Dining';document.getElementById('exp-date').value=tod();document.getElementById('exp-note').value='';}
+  // Wire up budget warning on input change
+  setTimeout(()=>{
+    const catEl=document.getElementById('exp-cat');
+    const amtEl=document.getElementById('exp-amt');
+    if(catEl)catEl.onchange=checkExpenseModalBudget;
+    if(amtEl)amtEl.oninput=checkExpenseModalBudget;
+    checkExpenseModalBudget();
+  },50);
+  openModal('expense-modal');
+};
 window.saveExpense=async function(){
   const desc=document.getElementById('exp-desc').value.trim(),amount=parseFloat(document.getElementById('exp-amt').value),cat=document.getElementById('exp-cat').value,date=document.getElementById('exp-date').value,note=document.getElementById('exp-note').value.trim();
   if(!desc||!amount||!date){showToast('Fill in all fields');return;}
@@ -1212,6 +1258,68 @@ function renderBudget(){
   CI['bud-chart']=new Chart(document.getElementById('bud-chart').getContext('2d'),{type:'doughnut',data:{labels:lb,datasets:[{data:dt,backgroundColor:cl.map(c=>c+'cc'),borderColor:cl,borderWidth:2,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'62%'}});
   document.getElementById('bud-leg').innerHTML=S.budgets.map(b=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${gCat(b.cat).color};display:inline-block;"></span>${b.cat}</span>`).join('');
 }
+// ── BUDGET WARNINGS ──
+function getBudgetThreshold(){return parseInt(localStorage.getItem('bud_threshold')||'80');}
+window.saveBudgetThreshold=function(val){
+  const v=parseInt(val);
+  if(v>=50&&v<=99){localStorage.setItem('bud_threshold',v);showToast('Warning threshold set to '+v+'%');}
+}
+// Track which alerts were already shown this month
+function alertKey(){const n=new Date();return'bud_alerted_'+n.getFullYear()+'_'+n.getMonth();}
+function getAlerted(){try{return JSON.parse(localStorage.getItem(alertKey())||'[]');}catch{return[];}}
+function markAlerted(cat){const a=getAlerted();if(!a.includes(cat)){a.push(cat);localStorage.setItem(alertKey(),JSON.stringify(a));}}
+
+// Check budget status for a category — returns {pct, over, approaching, spent, limit}
+function catBudgetStatus(cat,m,y){
+  const b=S.budgets.find(x=>x.cat===cat);if(!b)return null;
+  const spent=(byCat(m,y)[cat]||0);
+  const pct=b.limit>0?spent/b.limit*100:0;
+  const threshold=getBudgetThreshold();
+  return{pct,over:pct>=100,approaching:pct>=threshold&&pct<100,spent,limit:b.limit,threshold};
+}
+
+// Show inline warning in expense modal when category or amount changes
+function checkExpenseModalBudget(){
+  const cat=document.getElementById('exp-cat')?.value;
+  const amt=parseFloat(document.getElementById('exp-amt')?.value)||0;
+  const hint=document.getElementById('bud-warn-hint');
+  if(!hint)return;
+  const now=new Date(),m=now.getMonth(),y=now.getFullYear();
+  const b=S.budgets.find(x=>x.cat===cat);
+  if(!b){hint.style.display='none';return;}
+  const currentSpent=byCat(m,y)[cat]||0;
+  const newTotal=currentSpent+(EID?amt-(S.expenses.find(e=>e.id===EID)?.amount||0):amt);
+  const newPct=b.limit>0?newTotal/b.limit*100:0;
+  const threshold=getBudgetThreshold();
+  if(newTotal>b.limit){
+    hint.style.cssText='display:block;background:var(--red-light);color:var(--red);border-radius:var(--radius-sm);padding:9px 12px;font-size:11px;margin-bottom:4px;';
+    hint.textContent='⚠ This will exceed your '+cat+' budget by '+fmt(newTotal-b.limit)+' ('+newPct.toFixed(0)+'% of '+fmt(b.limit)+')';
+  }else if(newPct>=threshold){
+    hint.style.cssText='display:block;background:var(--gold-pale);color:#8a6a1f;border-radius:var(--radius-sm);padding:9px 12px;font-size:11px;margin-bottom:4px;';
+    hint.textContent='ℹ Approaching '+cat+' budget limit — '+newPct.toFixed(0)+'% used ('+fmt(newTotal)+' of '+fmt(b.limit)+')';
+  }else{hint.style.display='none';}
+}
+
+// Show dashboard budget alerts for exceeded/approaching categories
+function renderBudgetAlerts(){
+  const w=document.getElementById('bud-alert-wrap');if(!w)return;
+  const now=new Date(),m=now.getMonth(),y=now.getFullYear();
+  const threshold=getBudgetThreshold();
+  const alerted=getAlerted();
+  const alerts=[];
+  S.budgets.forEach(b=>{
+    const status=catBudgetStatus(b.cat,m,y);if(!status)return;
+    if(status.over){
+      alerts.push({cat:b.cat,msg:'Over budget by '+fmt(status.spent-status.limit),type:'error'});
+    }else if(status.approaching&&!alerted.includes(b.cat)){
+      alerts.push({cat:b.cat,msg:status.pct.toFixed(0)+'% of budget used',type:'warn'});
+      markAlerted(b.cat);
+      showToast('⚠ '+b.cat+' at '+status.pct.toFixed(0)+'% of budget');
+    }
+  });
+  w.innerHTML=alerts.length?alerts.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:var(--radius-sm);margin-bottom:8px;background:${a.type==='error'?'var(--red-light)':'var(--gold-pale)'};color:${a.type==='error'?'var(--red)':'#8a6a1f'};font-size:12px;font-weight:500;">${a.type==='error'?'⛔':'⚠'} <span>${a.cat}: ${a.msg}</span></div>`).join(''):'';
+}
+
 window.openBudgetModal=function(cat){popCatSel('bud-cat');if(cat){document.getElementById('bud-cat').value=cat;const b=S.budgets.find(x=>x.cat===cat);if(b)document.getElementById('bud-lim').value=b.limit;}else document.getElementById('bud-lim').value='';openModal('budget-modal');};
 window.saveBudget=async function(){const cat=document.getElementById('bud-cat').value,limit=parseFloat(document.getElementById('bud-lim').value);if(!limit){showToast('Enter a limit');return;}const i=S.budgets.findIndex(b=>b.cat===cat);if(i>-1)S.budgets[i].limit=limit;else S.budgets.push({cat,limit});closeModal('budget-modal');renderBudget();showToast('Budget saved ✓');saveS();};
 window.delBudget=async function(cat){if(!confirm('Remove budget for '+cat+'?'))return;S.budgets=S.budgets.filter(b=>b.cat!==cat);await saveS();renderBudget();showToast('Removed');};
@@ -1283,7 +1391,7 @@ function renderIncStatement(){
     if(freq==='onetime'){if(!s.date)return false;const d=new Date(s.date);return d.getMonth()===m&&d.getFullYear()===y;}
     return true;
   });
-  const cashM=activeSources.reduce((t,s)=>t+monthlyEq(s),0);
+  const cashM=activeSources.reduce((t,s)=>t+monthlyEq(s,m,y),0);
   const nonCash=S.incomeSources.filter(s=>s.noncash);
   const stats=document.getElementById('inc-month-stats');
   if(stats)stats.innerHTML=`
@@ -1317,7 +1425,10 @@ window.updateIncomeModalFields=function(){
   else{dayRow.style.display='block';dateRow.style.display='none';}
   const labels={monthly:'Payment Day of Month',weekly:'Payment Day (1=Mon, 7=Sun)',biweekly:'First Pay Day',quarterly:'Payment Month Day',annual:'Payment Day of Year'};
   if(lbl)lbl.textContent=labels[freq]||'Payment Day';
-  const notes={weekly:`Monthly equivalent: amount × 52 ÷ 12`,biweekly:`Monthly equivalent: amount × 26 ÷ 12`,quarterly:`Monthly equivalent: amount ÷ 3`,annual:`Monthly equivalent: amount ÷ 12`,onetime:`One-time payment — shown only in the month received`};
+  // Show spread option for quarterly/annual
+  const spreadRow=document.getElementById('in-spread-row');
+  if(spreadRow)spreadRow.style.display=(freq==='quarterly'||freq==='annual')?'flex':'none';
+  const notes={weekly:`Monthly equivalent: amount × 52 ÷ 12`,biweekly:`Monthly equivalent: amount × 26 ÷ 12`,quarterly:`Choose: spread evenly (÷3/mo) or record full amount in payment month`,annual:`Choose: spread evenly (÷12/mo) or record full amount in payment month`,onetime:`One-time payment — shown only in the month received`};
   if(note){note.textContent=notes[freq]||'';note.style.display=notes[freq]?'block':'none';}
 }
 window.openIncomeModal=function(id){
@@ -1335,6 +1446,7 @@ window.openIncomeModal=function(id){
       document.getElementById('in-note').value=s.note||'';
       document.getElementById('in-nc').checked=s.noncash||false;
       document.getElementById('in-pin').checked=s.pinned||false;
+      if(document.getElementById('in-spread'))document.getElementById('in-spread').value=s.spread||'spread';
     }
   }else{
     ['in-name','in-amt','in-day','in-date','in-note'].forEach(id=>document.getElementById(id).value='');
@@ -1342,6 +1454,7 @@ window.openIncomeModal=function(id){
     document.getElementById('in-type').value='salary';
     document.getElementById('in-nc').checked=false;
     document.getElementById('in-pin').checked=false;
+    if(document.getElementById('in-spread'))document.getElementById('in-spread').value='spread';
   }
   updateIncomeModalFields();
   openModal('income-modal');
@@ -1356,10 +1469,11 @@ window.saveIncome=async function(){
   const pinned=document.getElementById('in-pin').checked;
   const day=freq==='onetime'?null:(parseInt(document.getElementById('in-day').value)||null);
   const date=freq==='onetime'?document.getElementById('in-date').value:null;
+  const spread=document.getElementById('in-spread')?.value||'spread';
   if(!name||!amount){showToast('Fill in name and amount');return;}
   if(freq==='onetime'&&!date){showToast('Enter the date received');return;}
   const id=IID||'i'+Date.now();
-  const data={name,amount,freq,type,day,date,note,noncash,pinned};
+  const data={name,amount,freq,type,day,date,note,noncash,pinned,spread};
   if(IID){const i=S.incomeSources.findIndex(s=>s.id===IID);if(i>-1)S.incomeSources[i]={...S.incomeSources[i],...data};}
   else S.incomeSources.push({id,...data});
   await saveDoc('income',id,data);
@@ -1404,6 +1518,7 @@ function initApp(){
   applyLayout();
   setTimeout(setContentBounds, 100);
   applyDark();updateCurUI();setTimeout(updateCurUI,200);
+  const bti=document.getElementById('bud-threshold');if(bti)bti.value=getBudgetThreshold();
   renderDash();
   setSyncDot(navigator.onLine?'online':'offline');
   setInterval(()=>{const g=document.getElementById('greeting');if(g)g.textContent=greet()+' ✦';},60000);

@@ -722,21 +722,20 @@ function fmt(n){
   const rate=getRate(CUR);const cv=v*rate;const sym=CURRENCIES[CUR]?.symbol||CUR;
   return sym+cv.toLocaleString(CURRENCIES[CUR]?.locale||'en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
-window.setCur=function(c){CUR=c;localStorage.setItem('pkt_cur',c);updateCurUI();refreshPage();try{const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(totInc());}catch(e){}}
-window.updateRate=function(val){if(!val||isNaN(val))return;localStorage.setItem('pkt_rate_'+CUR,val);refreshPage();try{const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(totInc());}catch(e){}}
+window.setCur=function(c){CUR=c;localStorage.setItem('pkt_cur',c);updateCurUI();try{refreshPage();}catch(e){}try{const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(totInc());}catch(e){}}
+window.updateRate=function(val){if(!val||isNaN(val))return;localStorage.setItem('pkt_rate_'+CUR,val);try{refreshPage();}catch(e){}try{const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(totInc());}catch(e){}}
 function updateCurUI(){
-  // Update topbar dropdown
+  // Only updates UI elements — never reads S, never calls refreshPage
   ['topbar-cur','set-cur'].forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     el.innerHTML=Object.entries(CURRENCIES).map(([k,v])=>`<option value="${k}" ${k===CUR?'selected':''}>${v.symbol} ${k}</option>`).join('');
     el.value=CUR;
   });
-  // Update rate input
   const ri=document.getElementById('rate-input');
   const rs=document.getElementById('rate-sub');
   if(ri){
     if(CUR==='GHS'){ri.value='';ri.disabled=true;ri.placeholder='Base currency';}
-    else{ri.disabled=false;ri.value=getRate(CUR);ri.placeholder=DEFAULT_RATES[CUR]||'';}
+    else{ri.disabled=false;ri.value=getRate(CUR);ri.placeholder=String(DEFAULT_RATES[CUR]||'');}
   }
   if(rs)rs.textContent=CUR==='GHS'?'GHS is the base currency':`1 GHS = ${CURRENCIES[CUR]?.symbol||CUR} (edit to update)`;
 }
@@ -745,7 +744,7 @@ function updateCurUI(){
 let DARK=localStorage.getItem('pkt_dark')==='1';
 function applyDark(){document.body.classList.toggle('dark',DARK);['dk-btn','dk-set'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.toggle('on',DARK);});}
 window.toggleDark=function(){DARK=!DARK;localStorage.setItem('pkt_dark',DARK?'1':'0');applyDark();}
-applyDark();updateCurUI();
+applyDark(); // safe to call immediately — only touches DOM classes, not S
 
 // ── AUTH ──
 const prov=new GoogleAuthProvider();

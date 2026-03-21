@@ -1011,8 +1011,8 @@ function fmt(n){
   const rate=getRate(CUR);const cv=v*rate;const sym=CURRENCIES[CUR]?.symbol||CUR;
   return sym+cv.toLocaleString(CURRENCIES[CUR]?.locale||'en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
-window.setCur=function(c){CUR=c;localStorage.setItem('pkt_cur',c);updateCurUI();try{refreshPage();}catch(e){}try{const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(totInc());}catch(e){}}
-window.updateRate=function(val){if(!val||isNaN(val))return;localStorage.setItem('pkt_rate_'+CUR,val);try{refreshPage();}catch(e){}try{const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(totInc());}catch(e){}}
+window.setCur=function(c){CUR=c;localStorage.setItem('pkt_cur',c);updateCurUI();try{refreshPage();}catch(e){}try{const _m2=new Date().getMonth(),_y2=new Date().getFullYear(),_sp2=mExps(_m2,_y2).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(totInc()-_sp2);}catch(e){}}
+window.updateRate=function(val){if(!val||isNaN(val))return;localStorage.setItem('pkt_rate_'+CUR,val);try{refreshPage();}catch(e){}try{const _m2=new Date().getMonth(),_y2=new Date().getFullYear(),_sp2=mExps(_m2,_y2).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(totInc()-_sp2);}catch(e){}}
 function updateCurUI(){
   // Only updates UI elements — never reads S, never calls refreshPage
   ['topbar-cur','set-cur'].forEach(id=>{
@@ -1218,7 +1218,7 @@ function startSync(uid){
         if(c.type==='removed')S.incomeSources=S.incomeSources.filter(s=>s.id!==c.doc.id);
       });
     }
-    {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0),_sv=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===_m&&d.getFullYear()===_y;}).reduce((s,c)=>s+parseFloat(c.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp-_sv);}
+    {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
     if(checkReady()){refreshPage();setSyncDot('online');}
   },()=>setSyncDot('offline'));
 
@@ -1291,6 +1291,7 @@ const CI={};function dChart(id){if(CI[id]){CI[id].destroy();delete CI[id];}}
 // ── RESPONSIVE LAYOUT ──
 const isDesk=()=>window.innerWidth>=1024;
 function applyLayout(){
+  if(window.location.hash==='#widget')return;
   const d=isDesk();
   const sb=document.getElementById('sidebar');
   const mb=document.getElementById('mob-brand');
@@ -1327,7 +1328,7 @@ function applyLayout(){
     setTimeout(setContentBounds, 50);
   }
 }
-window.addEventListener('resize',applyLayout);
+window.addEventListener('resize',()=>{if(window.location.hash!=='#widget')applyLayout();});
 
 // Sidebar collapse
 let SBC=localStorage.getItem('sb_col')==='1';
@@ -1397,7 +1398,7 @@ window.addEventListener('appinstalled',()=>{document.getElementById('inst-wrap')
 function renderDash(){
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
   document.getElementById('greeting').textContent=greet()+' ✦';
-  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0),_sv=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===_m&&d.getFullYear()===_y;}).reduce((s,c)=>s+parseFloat(c.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp-_sv);}
+  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
   const sbInc=document.getElementById('sb-inc');if(sbInc)sbInc.textContent=fmt(totInc())+' / month';
   // Dashboard strip: show pinned sources + total
   const pinned=S.incomeSources.filter(s=>s.pinned&&!s.noncash);
@@ -1406,7 +1407,8 @@ function renderDash(){
   const spent=mSpent(m,y),inc=totInc(),rem=inc-spent,pct=Math.min(100,inc>0?spent/inc*100:0).toFixed(0);
   const savM=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,c)=>s+parseFloat(c.amount),0);
   const nonSavSpent=mExps(m,y).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
-  const remAfterAll=inc-nonSavSpent-savM;
+  const allSpentM=mExps(m,y).reduce((s,e)=>s+parseFloat(e.amount),0);
+  const remAfterAll=inc-allSpentM;
   document.getElementById('dash-stats').innerHTML=`
     <div class="card" style="padding:14px;"><div class="ct">Total Income</div><div class="cv">${fmt(inc)}</div><div class="cs">${MOS[m]}</div></div>
     <div class="card" style="padding:14px;"><div class="ct">Spent</div><div class="cv" style="color:var(--red)">${fmt(nonSavSpent)}</div><div class="cs">${pct}% of income</div></div>
@@ -1577,8 +1579,18 @@ function renderBudgetAlerts(){
       showToast('⚠ '+b.cat+' at '+status.pct.toFixed(0)+'% of budget');
     }
   });
-  w.innerHTML=alerts.length?alerts.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:var(--radius-sm);margin-bottom:8px;background:${a.type==='error'?'var(--red-light)':'var(--gold-pale)'};color:${a.type==='error'?'var(--red)':'#8a6a1f'};font-size:12px;font-weight:500;">${a.type==='error'?'⛔':'⚠'} <span>${a.cat}: ${a.msg}</span></div>`).join(''):'';
+  const dismissedKey='bud_dismissed_'+new Date().getMonth()+'_'+new Date().getFullYear();
+  let dismissed=[];try{dismissed=JSON.parse(localStorage.getItem(dismissedKey)||'[]');}catch{}
+  const visible=alerts.filter(a=>!dismissed.includes(a.cat));
+  w.innerHTML=visible.length?visible.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:var(--radius-sm);margin-bottom:8px;background:${a.type==='error'?'var(--red-light)':'var(--gold-pale)'};color:${a.type==='error'?'var(--red)':'#8a6a1f'};font-size:12px;font-weight:500;">${a.type==='error'?'⛔':'⚠'} <span style="flex:1;">${a.cat}: ${a.msg}</span><button onclick="dismissBudgetAlert('${a.cat}')" style="background:none;border:none;cursor:pointer;color:inherit;opacity:.5;font-size:16px;padding:0 2px;flex-shrink:0;">✕</button></div>`).join(''):'';
 }
+window.dismissBudgetAlert=function(cat){
+  const key='bud_dismissed_'+new Date().getMonth()+'_'+new Date().getFullYear();
+  let dismissed=[];try{dismissed=JSON.parse(localStorage.getItem(key)||'[]');}catch{}
+  if(!dismissed.includes(cat))dismissed.push(cat);
+  localStorage.setItem(key,JSON.stringify(dismissed));
+  renderBudgetAlerts();
+};
 
 window.openBudgetModal=function(cat){
   popCatSel('bud-cat');
@@ -1698,7 +1710,7 @@ function renderIncStatement(){
 }
 
 function renderIncome(){
-  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0),_sv=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===_m&&d.getFullYear()===_y;}).reduce((s,c)=>s+parseFloat(c.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp-_sv);}
+  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
   document.getElementById('inc-list').innerHTML=S.incomeSources.length?S.incomeSources.map(s=>{const freq=s.freq||'monthly';const mEq=monthlyEq(s);return`<div class="li"><div class="li-ic" style="background:${s.noncash?'var(--blue-light)':'var(--green-light)'};color:${s.noncash?'var(--blue)':'var(--green)'}">💰</div><div class="li-nm"><div class="p">${s.name}${s.noncash?' <span class="pill pill-b" style="font-size:9px">non-cash</span>':''}${s.pinned?' <span class="pill pill-gold" style="font-size:9px">📌</span>':''}</div><div class="s">${freq} · ${s.type||'income'}${s.day?' · Day '+s.day:''}${s.note?' · '+s.note:''}</div></div><div style="text-align:right;margin-right:8px;"><div style="font-family:'DM Serif Display',serif;font-size:14px;">${fmt(s.noncash?parseFloat(s.amount):mEq)}</div>${freq!=='monthly'&&freq!=='onetime'&&!s.noncash?`<div style="font-size:9px;color:var(--ink-3);">~${fmt(mEq)}/mo</div>`:''}</div><button class="btn btn-ghost btn-sm" onclick="openIncomeModal('${s.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delInc('${s.id}')">✕</button></div>`;}).join(''):'<div class="empty"><div class="icon">💰</div><p>No income sources yet</p></div>';
   document.getElementById('tot-inc').textContent=fmt(totInc());
   dChart('inc-chart');if(S.incomeSources.length){const clrs=['#c9a84c','#2d7a5f','#2471a3','#8e44ad','#c0392b','#e67e22'];const cashSrc=S.incomeSources.filter(s=>!s.noncash);CI['inc-chart']=new Chart(document.getElementById('inc-chart').getContext('2d'),{type:'doughnut',data:{labels:cashSrc.map(s=>s.name),datasets:[{data:cashSrc.map(s=>monthlyEq(s)),backgroundColor:clrs.map((c,i)=>clrs[i%clrs.length]+'cc'),borderColor:clrs,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'60%'}});document.getElementById('inc-leg').innerHTML=cashSrc.map((s,i)=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${clrs[i%clrs.length]};display:inline-block;"></span>${s.name}</span>`).join('');}
@@ -2748,7 +2760,7 @@ function initApp(){
     localStorage.setItem('pkt_onboarded','1');
   }
   document.getElementById('greeting').textContent=greet()+' ✦';
-  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0),_sv=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===_m&&d.getFullYear()===_y;}).reduce((s,c)=>s+parseFloat(c.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp-_sv);}
+  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
   document.getElementById('exp-date').value=tod();
   document.getElementById('co-date').value=tod();
   applyLayout();

@@ -104,7 +104,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);f
   html,body{overflow:hidden;}
   .app{flex-direction:row;height:100vh;}
   /* Sidebar */
-  .sidebar{width:var(--sw);background:var(--ink);color:white;display:flex;flex-direction:column;flex-shrink:0;height:100vh;transition:width .25s ease;overflow:hidden;z-index:60;}
+  .sidebar{width:var(--sw);background:#1a1a2e;color:white;display:flex;flex-direction:column;flex-shrink:0;height:100vh;transition:width .25s ease;overflow:hidden;z-index:60;}
+  body.dark .sidebar{background:#0a0a14;border-right:1px solid rgba(255,255,255,.06);}
   .sidebar.col{width:var(--swc);}
   .sb-head{padding:22px 16px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;}
   .sb-logo{font-family:'DM Serif Display',serif;font-size:22px;color:var(--gold);white-space:nowrap;overflow:hidden;transition:opacity .2s;}
@@ -472,6 +473,8 @@ body.dark .modal{background:var(--paper-2);}
         <div class="sh"><h2>Data</h2></div>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <button class="btn btn-ghost btn-full" onclick="exportData()">↓ Export JSON backup</button>
+          <button class="btn btn-ghost btn-full" onclick="document.getElementById('import-file').click()">↑ Import JSON backup</button>
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(event)"/>
           <button class="btn btn-danger btn-full" onclick="clearAllData()">✕ Delete all my data</button>
         </div>
       </div>
@@ -627,7 +630,7 @@ body.dark .modal{background:var(--paper-2);}
 
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import{getAuth,GoogleAuthProvider,signInWithRedirect,getRedirectResult,signOut as fbOut,onAuthStateChanged,browserLocalPersistence,setPersistence}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,signOut as fbOut,onAuthStateChanged,browserLocalPersistence,browserPopupRedirectResolver,setPersistence}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import{getFirestore,enableIndexedDbPersistence,doc,collection,getDocs,setDoc,deleteDoc,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const FC={apiKey:"AIzaSyBuTkiDr-fB_woNrLqobALzYKX3gidq5TE",authDomain:"pocket-finance-cf7a7.firebaseapp.com",databaseURL:"https://pocket-finance-cf7a7-default-rtdb.firebaseio.com",projectId:"pocket-finance-cf7a7",storageBucket:"pocket-finance-cf7a7.firebasestorage.app",messagingSenderId:"94342153271",appId:"1:94342153271:web:0f6b411a01d8a9c160abb2"};
@@ -654,9 +657,21 @@ setPersistence(auth,browserLocalPersistence).catch(()=>{});
 
 async function doSignIn(){
   const btn=document.getElementById('google-signin-btn');
-  if(btn){btn.disabled=true;btn.textContent='Redirecting to Google…';}
-  try{await setPersistence(auth,browserLocalPersistence);await signInWithRedirect(auth,prov);}
-  catch(e){showToast('Sign in failed');if(btn){btn.disabled=false;btn.innerHTML=gBtnHTML();}}
+  if(btn){btn.disabled=true;btn.innerHTML='<span style="opacity:.6">Signing in…</span>';}
+  try{
+    // Try popup first (works in Chrome, Firefox, Safari)
+    await setPersistence(auth,browserLocalPersistence);
+    await signInWithPopup(auth,prov,browserPopupRedirectResolver);
+  }catch(e){
+    if(e.code==='auth/popup-blocked'||e.code==='auth/cancelled-popup-request'||e.code==='auth/popup-closed-by-user'){
+      // Popup blocked — fall back to redirect
+      try{await signInWithRedirect(auth,prov,browserPopupRedirectResolver);}
+      catch(e2){showToast('Sign in failed: '+(e2.code||e2.message));if(btn){btn.disabled=false;btn.innerHTML=gBtnHTML();}}
+    } else {
+      showToast('Sign in failed: '+(e.code||e.message));
+      if(btn){btn.disabled=false;btn.innerHTML=gBtnHTML();}
+    }
+  }
 }
 async function doSignOut(){if(!confirm('Sign out of Pocket?'))return;await fbOut(auth);location.reload();}
 function gBtnHTML(){return`<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg> Continue with Google`;}
@@ -666,7 +681,8 @@ document.getElementById('user-av').addEventListener('click',()=>openModal('user-
 ['so-btn','so-modal-btn'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('click',id==='so-modal-btn'?()=>{doSignOut();closeModal('user-modal');}:doSignOut);});
 
 async function initAuth(){
-  try{await getRedirectResult(auth);}catch(e){showToast('Sign in failed: '+(e.code||e.message));}
+  // Handle redirect result if coming back from redirect flow
+  try{await getRedirectResult(auth,browserPopupRedirectResolver);}catch(e){if(e.code&&e.code!=='auth/no-current-user')console.warn('Redirect result:',e.code);}
   onAuthStateChanged(auth,async user=>{
     if(user){
       CU=user;setAvatars(user);
@@ -944,6 +960,13 @@ window.calcLoan=function(){
   document.getElementById('ln-res').innerHTML=`<div style="margin-top:14px;padding:12px;background:var(--ink);border-radius:var(--radius-sm);"><div style="font-size:10px;color:var(--gold);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">${lbl} Summary</div><div style="font-family:'DM Serif Display',serif;font-size:28px;color:white;">${fmt(mo)}<span style="font-family:'DM Sans',sans-serif;font-size:13px;color:rgba(255,255,255,.5);"> / month</span></div>${ir?`<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:3px;">${ir}% of your monthly income</div>`:''}</div><div class="g2" style="margin-top:10px;"><div class="met"><div class="met-l">Principal</div><div class="met-v">${fmt(pr)}</div><div class="met-s">Borrowed amount</div></div><div class="met"><div class="met-l">Total Interest</div><div class="met-v" style="color:var(--red)">${fmt(int)}</div><div class="met-s">Cost of borrowing</div></div><div class="met"><div class="met-l">Total Repayment</div><div class="met-v">${fmt(tot)}</div><div class="met-s">Principal + interest</div></div><div class="met"><div class="met-l">Full Cost</div><div class="met-v">${fmt(tot+(dep||0))}</div><div class="met-s">Incl. deposit</div></div></div>${gH}${yr.length>1?`<div style="margin-top:12px;"><div style="font-size:11px;font-weight:500;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;">Year-by-year breakdown</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--paper-2);">${['Year','Principal','Interest','Balance'].map(h=>`<th style="padding:6px 8px;text-align:${h==='Year'?'left':'right'};font-weight:500;color:var(--ink-3);">${h}</th>`).join('')}</tr></thead><tbody>${yr.map(row=>`<tr style="border-bottom:1px solid var(--paper-2);"><td style="padding:6px 8px;font-weight:500;">Year ${row.y}</td><td style="padding:6px 8px;text-align:right;color:var(--green);">${fmt(row.yP)}</td><td style="padding:6px 8px;text-align:right;color:var(--red);">${fmt(row.yI)}</td><td style="padding:6px 8px;text-align:right;">${fmt(row.b)}</td></tr>`).join('')}</tbody></table></div></div>`:''}`;
 };
 window.exportData=function(){const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pocket-backup-'+new Date().toISOString().split('T')[0]+'.json';a.click();showToast('Exported ✓');};
+window.handleImport=function(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async ev=>{try{const d=JSON.parse(ev.target.result);if(!d.expenses&&!d.incomeSources){showToast('Invalid backup file');return;}if(!confirm('This will overwrite all your current data. Continue?'))return;// Upload to Firestore
+if(d.expenses)for(const ex of d.expenses)await saveDoc('expenses',ex.id,ex);
+if(d.incomeSources)for(const is of d.incomeSources)await saveDoc('income',is.id,is);
+if(d.contributions)for(const co of d.contributions)await saveDoc('contributions',co.id,co);
+S={...S,...d};if(d.categories?.length)S.categories=d.categories;
+S.budgets=d.budgets||S.budgets;S.goals=d.goals||S.goals;S.recurringExpenses=d.recurringExpenses||[];
+await saveS();showToast('Import successful ✓');refreshPage();}catch(err){showToast('Invalid or corrupted file');}};r.readAsText(f);e.target.value='';};
 window.clearAllData=async function(){if(!confirm('Delete ALL your data permanently?'))return;if(!confirm('Are you absolutely sure?'))return;for(const e of S.expenses)await delDoc('expenses',e.id);for(const s of S.incomeSources)await delDoc('income',s.id);for(const c of S.contributions)await delDoc('contributions',c.id);S.expenses=[];S.incomeSources=[];S.contributions=[];S.budgets=[];S.goals=[];S.categories=[...DCATS];S.recurringExpenses=[];await saveS();showToast('All data deleted');renderDash();};
 
 // ── MODALS & TOAST ──

@@ -303,7 +303,7 @@ body.dark .modal{background:var(--paper-2);}
 
 
 <!-- ONBOARDING -->
-<div id="onboarding-screen" class="hidden" style="position:fixed;inset:0;background:var(--ink);z-index:9000;display:flex;flex-direction:column;overflow-y:auto;">
+<div id="onboarding-screen" style="display:none;position:fixed;inset:0;background:#1a1a2e;z-index:9000;flex-direction:column;overflow-y:auto;">
   <div style="max-width:480px;margin:0 auto;padding:40px 28px;width:100%;">
     <div style="font-family:'DM Serif Display',serif;font-size:36px;color:var(--gold);margin-bottom:6px;">Welcome to Pocket</div>
     <div style="font-size:13px;color:rgba(255,255,255,.45);margin-bottom:32px;">Let's set up your finances in 3 quick steps</div>
@@ -1618,20 +1618,18 @@ window.showToast=showToast;
 
 // ── ONBOARDING ──────────────────────────────────────────
 function shouldShowOnboarding(){
-  // Never show if user has explicitly completed or skipped onboarding
+  // Hard no if user has explicitly completed or skipped
   if(localStorage.getItem('pkt_onboarded'))return false;
-  // Never show if user already has data — they're a returning user
-  if(S.incomeSources.length>0||S.expenses.length>0||S.budgets.length>0)return false;
+  // Hard no if user already has any data
+  if(S.incomeSources.length>0||S.expenses.length>0||S.budgets.length>0||S.goals.length>0)return false;
   return true;
 }
 function showOnboarding(){
-  document.getElementById('onboarding-screen').classList.remove('hidden');
   document.getElementById('onboarding-screen').style.display='flex';
   document.getElementById('app-shell').style.display='none';
   obRenderBudRows();
 }
 function hideOnboarding(){
-  document.getElementById('onboarding-screen').classList.add('hidden');
   document.getElementById('onboarding-screen').style.display='none';
   localStorage.setItem('pkt_onboarded','1');
   document.getElementById('app-shell').style.display='flex';
@@ -1871,8 +1869,20 @@ window.exportPDF=function(){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
-  const ink=[26,26,46],gold=[201,168,76],green=[45,122,95],red=[192,57,43],gray=[122,122,154];
+  const ink=[26,26,46],gold=[201,168,76],green=[45,122,95],red=[192,57,43],gray=[122,122,154],amber=[180,120,20];
   const W=doc.internal.pageSize.getWidth();
+
+  // jsPDF helvetica doesn't support ₵ or emojis — use plain text equivalents
+  function pdfFmt(n){
+    const v=parseFloat(n||0);
+    if(CUR==='GHS')return'GHS '+v.toLocaleString('en-GH',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const rate=getRate(CUR);const cv=v*rate;
+    const sym={USD:'USD',EUR:'EUR',GBP:'GBP',NGN:'NGN',KES:'KES',ZAR:'ZAR',XOF:'CFA'}[CUR]||CUR;
+    return sym+' '+cv.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+  // Strip emojis from text for PDF
+  function pdfTxt(s){return(s||'').replace(/[\u{1F300}-\u{1FFFF}\u{2600}-\u{27FF}\u{FE00}-\u{FEFF}]/gu,'').trim();}
+
   // Header
   doc.setFillColor(...ink);doc.rect(0,0,W,32,'F');
   doc.setFont('helvetica','bold');doc.setFontSize(22);doc.setTextColor(...gold);
@@ -1884,46 +1894,98 @@ window.exportPDF=function(){
   doc.setFontSize(8);doc.setTextColor(180,180,200);
   doc.text('Generated '+new Date().toLocaleDateString('en-GH',{day:'numeric',month:'long',year:'numeric'}),W-14,27,{align:'right'});
   let y2=44;
-  // Income summary
-  const inc=totInc(),spent=mSpent(m,y),savM=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,c)=>s+parseFloat(c.amount),0);
+
+  // KPI cards
+  const inc=totInc();
+  const savM=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,c)=>s+parseFloat(c.amount),0);
   const nonSav=mExps(m,y).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
   const rem=inc-nonSav-savM;
-  // KPI cards
-  const cards=[['Total Income',fmt(inc),...green],['Spent',fmt(nonSav),...red],['Saved',fmt(savM),...green],['Remaining',fmt(rem),...(rem>=0?green:red)]];
-  const cardW=(W-28)/4,cardH=20;
+  const cards=[['Total Income',pdfFmt(inc),...green],['Spent',pdfFmt(nonSav),...red],['Saved',pdfFmt(savM),...green],['Remaining',pdfFmt(rem),...(rem>=0?green:red)]];
+  const cardW=(W-28)/4,cardH=22;
   cards.forEach(([lbl,val,r,g,b],i)=>{
     const x=14+i*(cardW+2);
     doc.setFillColor(245,244,240);doc.roundedRect(x,y2,cardW,cardH,2,2,'F');
-    doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(...gray);doc.text(lbl,x+4,y2+6);
-    doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(r,g,b);doc.text(val,x+4,y2+14);
+    doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(...gray);doc.text(lbl,x+3,y2+7);
+    doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(r,g,b);
+    // Word-wrap the amount if needed
+    const lines=doc.splitTextToSize(val,cardW-6);
+    doc.text(lines[0],x+3,y2+15);
   });
-  y2+=28;
+  y2+=30;
+
   // Expenses table
-  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(...ink);doc.text('Expenses — '+MOS[m],14,y2);y2+=4;
-  const expRows=mExps(m,y).sort((a,b)=>new Date(b.date)-new Date(a.date)).map(e=>[e.date,e.desc.slice(0,40),e.cat,fmt(e.amount)]);
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(...ink);
+  doc.text('Expenses — '+MOS[m],14,y2);y2+=4;
+  const expRows=mExps(m,y).sort((a,b)=>new Date(b.date)-new Date(a.date))
+    .map(e=>[e.date,pdfTxt(e.desc).slice(0,38),pdfTxt(e.cat),pdfFmt(e.amount)]);
   if(expRows.length){
-    doc.autoTable({startY:y2,head:[['Date','Description','Category','Amount']],body:expRows,theme:'grid',headStyles:{fillColor:ink,textColor:[255,255,255],fontSize:8,fontStyle:'bold'},bodyStyles:{fontSize:7,textColor:ink},columnStyles:{0:{cellWidth:22},1:{cellWidth:80},2:{cellWidth:35},3:{cellWidth:25,halign:'right'}},styles:{cellPadding:2},margin:{left:14,right:14}});
+    doc.autoTable({startY:y2,head:[['Date','Description','Category','Amount']],body:expRows,theme:'grid',
+      headStyles:{fillColor:ink,textColor:[255,255,255],fontSize:8,fontStyle:'bold'},
+      bodyStyles:{fontSize:7,textColor:ink},
+      columnStyles:{0:{cellWidth:22},1:{cellWidth:78},2:{cellWidth:38},3:{cellWidth:28,halign:'right'}},
+      styles:{cellPadding:2},margin:{left:14,right:14}});
     y2=doc.lastAutoTable.finalY+8;
-  }else{doc.setFont('helvetica','italic');doc.setFontSize(8);doc.setTextColor(...gray);doc.text('No expenses this month',14,y2);y2+=10;}
+  }else{
+    doc.setFont('helvetica','italic');doc.setFontSize(8);doc.setTextColor(...gray);
+    doc.text('No expenses this month',14,y2);y2+=10;
+  }
+
   // Budget status
-  if(doc.internal.pageSize.getHeight()-y2<40){doc.addPage();y2=20;}
-  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(...ink);doc.text('Budget Status',14,y2);y2+=4;
+  if(doc.internal.pageSize.getHeight()-y2<50){doc.addPage();y2=20;}
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(...ink);
+  doc.text('Budget Status',14,y2);y2+=4;
   const bc=byCat(m,y);
-  const budRows=S.budgets.map(b=>{const sp=bc[b.cat]||0,pct=(sp/b.limit*100).toFixed(0)+'%';return[b.cat,fmt(b.limit),fmt(sp),pct,sp>b.limit?'Over':'OK'];});
+  const budRows=S.budgets.map(b=>{
+    const sp=bc[b.cat]||0,pct=(sp/b.limit*100);
+    const status=pct>=100?'Over':(pct>=getBudgetThreshold()?'Warning'):'OK';
+    return[pdfTxt(b.cat),pdfFmt(b.limit),pdfFmt(sp),pct.toFixed(0)+'%',status];
+  });
   if(budRows.length){
-    doc.autoTable({startY:y2,head:[['Category','Limit','Spent','%','Status']],body:budRows,theme:'grid',headStyles:{fillColor:ink,textColor:[255,255,255],fontSize:8,fontStyle:'bold'},bodyStyles:{fontSize:7,textColor:ink},columnStyles:{3:{halign:'right'},4:{halign:'center'}},styles:{cellPadding:2},margin:{left:14,right:14},didDrawCell:(data)=>{if(data.column.index===4&&data.section==='body'){const over=data.cell.text[0]==='Over';doc.setTextColor(over?192:45,over?57:122,over?43:95);}}});
+    doc.autoTable({startY:y2,head:[['Category','Limit','Spent','%','Status']],body:budRows,theme:'grid',
+      headStyles:{fillColor:ink,textColor:[255,255,255],fontSize:8,fontStyle:'bold'},
+      bodyStyles:{fontSize:7,textColor:ink},
+      columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'center'}},
+      styles:{cellPadding:2},margin:{left:14,right:14},
+      didDrawCell:(data)=>{
+        if(data.column.index===4&&data.section==='body'){
+          const v=data.cell.text[0];
+          if(v==='Over')doc.setTextColor(...red);
+          else if(v==='Warning')doc.setTextColor(...amber);
+          else doc.setTextColor(...green);
+          doc.setFont('helvetica','bold');
+          doc.text(v,data.cell.x+data.cell.width/2,data.cell.y+data.cell.height/2+1,{align:'center'});
+        }
+      }
+    });
     y2=doc.lastAutoTable.finalY+8;
   }
+
   // Savings goals
-  if(doc.internal.pageSize.getHeight()-y2<40){doc.addPage();y2=20;}
-  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(...ink);doc.text('Savings Goals',14,y2);y2+=4;
-  const goalRows=S.goals.map(g=>{const sv=gSaved(g.id),pct=g.target>0?(sv/g.target*100).toFixed(1)+'%':'0%';return[g.icon+' '+g.name,fmt(g.target),fmt(sv),pct,g.date];});
+  if(doc.internal.pageSize.getHeight()-y2<50){doc.addPage();y2=20;}
+  doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(...ink);
+  doc.text('Savings Goals',14,y2);y2+=4;
+  const goalRows=S.goals.map(g=>{
+    const sv=gSaved(g.id),pct=g.target>0?(sv/g.target*100).toFixed(1)+'%':'0%';
+    return[pdfTxt(g.name),pdfFmt(g.target),pdfFmt(sv),pct,g.date];
+  });
   if(goalRows.length){
-    doc.autoTable({startY:y2,head:[['Goal','Target','Saved','Progress','Target Date']],body:goalRows,theme:'grid',headStyles:{fillColor:ink,textColor:[255,255,255],fontSize:8,fontStyle:'bold'},bodyStyles:{fontSize:7,textColor:ink},styles:{cellPadding:2},margin:{left:14,right:14}});
+    doc.autoTable({startY:y2,head:[['Goal','Target','Saved','Progress','Target Date']],body:goalRows,theme:'grid',
+      headStyles:{fillColor:ink,textColor:[255,255,255],fontSize:8,fontStyle:'bold'},
+      bodyStyles:{fontSize:7,textColor:ink},
+      columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'}},
+      styles:{cellPadding:2},margin:{left:14,right:14}});
   }
-  // Footer
+
+  // Footer on every page
   const pages=doc.internal.getNumberOfPages();
-  for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFillColor(...ink);doc.rect(0,doc.internal.pageSize.getHeight()-10,W,10,'F');doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(...gold);doc.text('Pocket — Personal Finance',14,doc.internal.pageSize.getHeight()-4);doc.setTextColor(180,180,200);doc.text('Page '+i+' of '+pages,W-14,doc.internal.pageSize.getHeight()-4,{align:'right'});}
+  for(let i=1;i<=pages;i++){
+    doc.setPage(i);
+    doc.setFillColor(...ink);
+    doc.rect(0,doc.internal.pageSize.getHeight()-10,W,10,'F');
+    doc.setFont('helvetica','normal');doc.setFontSize(7);
+    doc.setTextColor(...gold);doc.text('Pocket — Personal Finance',14,doc.internal.pageSize.getHeight()-4);
+    doc.setTextColor(180,180,200);doc.text('Page '+i+' of '+pages,W-14,doc.internal.pageSize.getHeight()-4,{align:'right'});
+  }
   doc.save('Pocket-Report-'+MOS[m]+'-'+y+'.pdf');
   showToast('PDF exported ✓');
 }

@@ -1107,9 +1107,9 @@ function renderDash(){
   const spent=mSpent(m,y),inc=totInc(),rem=inc-spent,pct=Math.min(100,inc>0?spent/inc*100:0).toFixed(0);
   const savM=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,c)=>s+parseFloat(c.amount),0);
   const nonSavSpent=mExps(m,y).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
-  const remAfterAll=income-nonSavSpent-savM;
+  const remAfterAll=inc-nonSavSpent-savM;
   document.getElementById('dash-stats').innerHTML=`
-    <div class="card" style="padding:14px;"><div class="ct">Total Income</div><div class="cv">${fmt(income)}</div><div class="cs">${MOS[m]}</div></div>
+    <div class="card" style="padding:14px;"><div class="ct">Total Income</div><div class="cv">${fmt(inc)}</div><div class="cs">${MOS[m]}</div></div>
     <div class="card" style="padding:14px;"><div class="ct">Spent</div><div class="cv" style="color:var(--red)">${fmt(nonSavSpent)}</div><div class="cs">${pct}% of income</div></div>
     <div class="card" style="padding:14px;"><div class="ct">Saved</div><div class="cv" style="color:var(--green)">${fmt(savM)}</div><div class="cs">Total: ${fmt(allSaved())}</div></div>
     <div class="card" style="padding:14px;"><div class="ct">Remaining</div><div class="cv" style="color:${remAfterAll<0?'var(--red)':'var(--green)'}">${fmt(remAfterAll)}</div><div class="cs">${remAfterAll>=0?'Available':'Over budget'}</div></div>`;

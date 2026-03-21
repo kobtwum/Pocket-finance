@@ -47,7 +47,7 @@ body.dark{
   --shadow:0 4px 24px rgba(0,0,0,0.3);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;overflow:hidden;position:fixed;width:100%;}
+html,body{height:100%;height:100dvh;overflow:hidden;}
 body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);font-size:14px;transition:background var(--tr),color var(--tr);}
 
 /* LOGIN */
@@ -88,7 +88,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);f
 .av{width:28px;height:28px;border-radius:50%;border:2px solid rgba(201,168,76,.4);cursor:pointer;object-fit:cover;}
 .av-ph{width:28px;height:28px;border-radius:50%;background:rgba(201,168,76,.2);border:2px solid rgba(201,168,76,.4);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:var(--gold);cursor:pointer;flex-shrink:0;}
 
-.content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding:14px 14px calc(var(--sb) + 80px);min-height:0;}
+.content{flex:1;overflow-y:scroll;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding:14px 14px calc(var(--sb) + 80px);min-height:0;touch-action:pan-y;}
 .page{display:none;}.page.active{display:block;}
 
 .bottomnav{display:flex;background:var(--paper);border-top:1px solid var(--paper-3);padding-bottom:var(--sb);flex-shrink:0;z-index:50;box-shadow:0 -4px 20px rgba(26,26,46,.07);}
@@ -659,12 +659,16 @@ window.closeModal=closeModal;
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,signOut as fbOut,onAuthStateChanged,browserLocalPersistence,browserPopupRedirectResolver,setPersistence}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import{getFirestore,initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,collection,setDoc,deleteDoc,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import{getFirestore,enableIndexedDbPersistence,doc,collection,setDoc,deleteDoc,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const FC={apiKey:"AIzaSyBuTkiDr-fB_woNrLqobALzYKX3gidq5TE",authDomain:"pocket-finance-cf7a7.firebaseapp.com",databaseURL:"https://pocket-finance-cf7a7-default-rtdb.firebaseio.com",projectId:"pocket-finance-cf7a7",storageBucket:"pocket-finance-cf7a7.firebasestorage.app",messagingSenderId:"94342153271",appId:"1:94342153271:web:0f6b411a01d8a9c160abb2"};
 const app=initializeApp(FC),auth=getAuth(app);
-// Use persistent cache — loads from local storage first, syncs network in background
-const db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
+const db=getFirestore(app);
+// Enable offline persistence (IndexedDB) — battle-tested for GitHub Pages
+enableIndexedDbPersistence(db).catch(e=>{
+  if(e.code==='failed-precondition')console.warn('Multiple tabs: persistence limited to one tab');
+  else if(e.code==='unimplemented')console.warn('Browser does not support persistence');
+});
 
 // Module-local references to the global modal functions
 const openModal=id=>{const el=document.getElementById(id);if(el)el.classList.add('open');};
@@ -775,9 +779,37 @@ window.addEventListener('online',()=>setSyncDot('online'));
 window.addEventListener('offline',()=>setSyncDot('offline'));
 function uDoc(c,i){return doc(db,'users',CU.uid,c,i);}
 function pDoc(){return doc(db,'users',CU.uid,'meta','profile');}
-async function saveS(){if(!CU)return;setSyncDot('syncing');try{const b=writeBatch(db);b.set(pDoc(),{name:S.profile.name,categories:S.categories,budgets:S.budgets,goals:S.goals,recurringExpenses:S.recurringExpenses||[],selectedColor:S.selectedColor,updatedAt:Date.now()});await b.commit();setSyncDot('online');}catch(e){setSyncDot('error');showToast('Sync error');}}
-async function saveDoc(col,id,data){if(!CU)return;setSyncDot('syncing');try{await setDoc(uDoc(col,id),{...data,updatedAt:Date.now()});setSyncDot('online');}catch(e){setSyncDot('error');}}
-async function delDoc(col,id){if(!CU)return;try{await deleteDoc(uDoc(col,id));}catch(e){setSyncDot('error');}}
+async function saveS(){
+  if(!CU){console.warn('saveS: no user');return;}
+  setSyncDot('syncing');
+  try{
+    const b=writeBatch(db);
+    b.set(pDoc(),{name:S.profile.name,categories:S.categories,budgets:S.budgets,goals:S.goals,recurringExpenses:S.recurringExpenses||[],selectedColor:S.selectedColor,updatedAt:Date.now()});
+    await b.commit();
+    setSyncDot('online');
+  }catch(e){
+    setSyncDot('error');
+    console.error('saveS error:',e.code,e.message);
+    if(e.code==='permission-denied'||e.code==='PERMISSION_DENIED')showToast('⚠ Firestore rules expired — check Firebase console');
+    else showToast('Sync error: '+(e.code||e.message));
+  }
+}
+async function saveDoc(col,id,data){
+  if(!CU){console.warn('saveDoc: no user');return;}
+  setSyncDot('syncing');
+  try{await setDoc(uDoc(col,id),{...data,updatedAt:Date.now()});setSyncDot('online');}
+  catch(e){
+    setSyncDot('error');
+    console.error('saveDoc error:',e.code,e.message);
+    if(e.code==='permission-denied'||e.code==='PERMISSION_DENIED')showToast('⚠ Firestore rules expired — update Firebase console');
+    else showToast('Save failed: '+(e.code||e.message));
+  }
+}
+async function delDoc(col,id){
+  if(!CU)return;
+  try{await deleteDoc(uDoc(col,id));}
+  catch(e){setSyncDot('error');console.error('delDoc error:',e.code,e.message);}
+}
 
 // ── SYNC — single source of truth via onSnapshot ──
 // No separate getDocs call. onSnapshot fires immediately from local cache,

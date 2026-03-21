@@ -2333,9 +2333,9 @@ function initWidgetRoute(){
         <div style="font-size:10px;color:rgba(255,255,255,.2);margin-top:20px;">Add this page to your home screen for a widget-like experience</div>
       </div>`;
     // Load Firebase and show data
-    import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js').then(({initializeApp})=>{
+    import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js').then(({getApp})=>{
       import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js').then(({getAuth,onAuthStateChanged})=>{
-        const app=initializeApp({apiKey:"AIzaSyBuTkiDr-fB_woNrLqobALzYKX3gidq5TE",authDomain:"pocket-finance-cf7a7.firebaseapp.com",projectId:"pocket-finance-cf7a7",storageBucket:"pocket-finance-cf7a7.firebasestorage.app",messagingSenderId:"94342153271",appId:"1:94342153271:web:0f6b411a01d8a9c160abb2"});
+        const app=getApp();
         const auth=getAuth(app);
         onAuthStateChanged(auth,user=>{
           if(!user){document.getElementById('w-remaining').textContent='Sign in';return;}

@@ -930,8 +930,8 @@ async function initAuth(){
       // Start real-time sync — fires immediately from cache, then from server
       READY={profile:false,expenses:false,income:false,contributions:false};
       startSync(user.uid);
-      // Auto-log recurring after first full sync
-      setTimeout(()=>{if(checkReady()){autoLogRecurring();if(shouldShowOnboarding())showOnboarding();}},2000);
+      // Auto-log recurring and check onboarding after first full sync
+      setTimeout(()=>{if(checkReady()){autoLogRecurring();if(shouldShowOnboarding())showOnboarding();}},3500);
     }else{
       // Wait for redirect result before concluding no user
       // (covers the case where we just came back from Google redirect)
@@ -1618,19 +1618,23 @@ window.showToast=showToast;
 
 // ── ONBOARDING ──────────────────────────────────────────
 function shouldShowOnboarding(){
-  return!localStorage.getItem('pkt_onboarded')&&S.incomeSources.length===0;
+  // Never show if user has explicitly completed or skipped onboarding
+  if(localStorage.getItem('pkt_onboarded'))return false;
+  // Never show if user already has data — they're a returning user
+  if(S.incomeSources.length>0||S.expenses.length>0||S.budgets.length>0)return false;
+  return true;
 }
 function showOnboarding(){
   document.getElementById('onboarding-screen').classList.remove('hidden');
+  document.getElementById('onboarding-screen').style.display='flex';
   document.getElementById('app-shell').style.display='none';
-  // Pre-fill budget rows
   obRenderBudRows();
 }
 function hideOnboarding(){
   document.getElementById('onboarding-screen').classList.add('hidden');
-  document.getElementById('app-shell').style.display='flex';
+  document.getElementById('onboarding-screen').style.display='none';
   localStorage.setItem('pkt_onboarded','1');
-  initApp();
+  document.getElementById('app-shell').style.display='flex';
 }
 let obBudRows=[{cat:'Food & Dining',limit:''},{cat:'Transport',limit:''},{cat:'Rent & Housing',limit:''}];
 function obRenderBudRows(){
@@ -1687,8 +1691,9 @@ window.obFinish=async function(){
     await saveS();
   }
   hideOnboarding();
+  refreshPage();
 }
-window.obSkip=function(){hideOnboarding();}
+window.obSkip=function(){hideOnboarding();refreshPage();}
 
 // ── CSV IMPORT ───────────────────────────────────────────
 let csvData=[];let csvHeaders=[];let csvMapped=[];
@@ -1925,6 +1930,10 @@ window.exportPDF=function(){
 
 
 function initApp(){
+  // If user already has data, mark onboarding as done so it never shows
+  if(S.incomeSources.length>0||S.expenses.length>0||S.budgets.length>0){
+    localStorage.setItem('pkt_onboarded','1');
+  }
   document.getElementById('greeting').textContent=greet()+' ✦';
   {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0),_sv=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===_m&&d.getFullYear()===_y;}).reduce((s,c)=>s+parseFloat(c.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp-_sv);}
   document.getElementById('exp-date').value=tod();

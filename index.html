@@ -1318,8 +1318,7 @@ window.updateIncomeModalFields=function(){
   const labels={monthly:'Payment Day of Month',weekly:'Payment Day (1=Mon, 7=Sun)',biweekly:'First Pay Day',quarterly:'Payment Month Day',annual:'Payment Day of Year'};
   if(lbl)lbl.textContent=labels[freq]||'Payment Day';
   const notes={weekly:`Monthly equivalent: amount × 52 ÷ 12`,biweekly:`Monthly equivalent: amount × 26 ÷ 12`,quarterly:`Monthly equivalent: amount ÷ 3`,annual:`Monthly equivalent: amount ÷ 12`,onetime:`One-time payment — shown only in the month received`};
-  if(note){note.textContent=notes[freq]||'';
-ote.style.display=notes[freq]?'block':'none';}
+  if(note){note.textContent=notes[freq]||'';note.style.display=notes[freq]?'block':'none';}
 }
 window.openIncomeModal=function(id){
   IID=id||null;

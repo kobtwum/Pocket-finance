@@ -885,7 +885,6 @@ body.dark .fi.error{background:#2a0a0a;}
     <button class="more-item" id="more-insights" onclick="showPage('insights');closeMoreDrawer()"><span class="ti">✦</span>Insights</button>
     <button class="more-item" id="more-budget" onclick="showPage('budget');closeMoreDrawer()"><span class="ti">⊟</span>Budget</button>
     <button class="more-item" id="more-analytics" onclick="showPage('analytics');closeMoreDrawer()"><span class="ti">◻</span>Analytics</button>
-    <button class="more-item" id="more-income" onclick="showPage('income');closeMoreDrawer()"><span class="ti">＋</span>Income</button>
     <button class="more-item" id="more-recurring" onclick="showPage('recurring');closeMoreDrawer()"><span class="ti">↻</span>Recurring Expenses</button>
     <button class="more-item" id="more-import" onclick="showPage('import');closeMoreDrawer()"><span class="ti">⤓</span>Import</button>
     <button class="more-item" id="more-settings" onclick="showPage('settings');closeMoreDrawer()"><span class="ti">⚙</span>Settings</button>
@@ -1557,7 +1556,7 @@ window.closeMoreDrawer=function(){document.getElementById('more-drawer').classLi
 
 // ── NAV ──
 let CP='dashboard';
-function refreshPage(){({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{renderIncome();if(document.getElementById('inc-tab-statement')&&document.getElementById('inc-tab-statement').style.display!=='none')renderIncStatement();},recurring:renderRecurring,import:renderImportPage,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[CP]?.();}
+function refreshPage(){({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{renderIncStatement();renderIncome();},recurring:renderRecurring,import:renderImportPage,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[CP]?.();}
 const PRIMARY_TABS=['dashboard','expenses','income','savings'];
 const MORE_TABS=['analytics','savings','recurring','import','settings','health','networth','debt','insights'];
 
@@ -1582,7 +1581,7 @@ window.showPage=function(id){
   if(fb)fb.style.display=isDesk()?'none':(['dashboard','expenses','savings','recurring'].includes(id)?'flex':'none');
   const titles={dashboard:'Dashboard',expenses:'Expenses',budget:'Budget',savings:'Savings Goals',analytics:'Analytics',income:'Income',recurring:'Recurring Expenses',import:'Import CSV',settings:'Settings',networth:'Net Worth',debt:'Debt Tracker',health:'Health Score',insights:'Spending Insights'};
   const pt=document.getElementById('d-ptitle');if(pt)pt.textContent=titles[id]||id;
-  ({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:renderIncome,recurring:renderRecurring,import:renderImportPage,settings:updateLnInc,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[id]?.();
+  ({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{renderIncStatement();renderIncome();},recurring:renderRecurring,import:renderImportPage,settings:updateLnInc,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[id]?.();
 };
 window.fabAction=function(){if(CP==='dashboard'||CP==='expenses')openExpenseModal();else if(CP==='savings')openGoalModal();else if(CP==='recurring')openRecurModal();};
 
@@ -1661,6 +1660,23 @@ window.openExpenseModal=function(id){
   },50);
   openModal('expense-modal');
 };
+// ── FORM VALIDATION HELPERS ──────────────────────────────
+function setFieldError(id,msg){
+  const el=document.getElementById(id);if(!el)return;
+  el.classList.add('error');el.setAttribute('aria-invalid','true');
+  const existing=el.parentNode.querySelector('.field-error');if(existing)existing.remove();
+  if(msg){const err=document.createElement('div');err.className='field-error';err.setAttribute('role','alert');err.textContent=msg;el.parentNode.appendChild(err);}
+}
+function clearFieldError(id){
+  const el=document.getElementById(id);if(!el)return;
+  el.classList.remove('error');el.removeAttribute('aria-invalid');
+  const existing=el.parentNode.querySelector('.field-error');if(existing)existing.remove();
+}
+function clearAllErrors(ids){ids.forEach(clearFieldError);}
+window.setFieldError=setFieldError;
+window.clearFieldError=clearFieldError;
+window.clearAllErrors=clearAllErrors;
+
 window.saveExpense=async function(){
   const desc=document.getElementById('exp-desc').value.trim(),amount=parseFloat(document.getElementById('exp-amt').value),cat=document.getElementById('exp-cat').value,date=document.getElementById('exp-date').value,note=document.getElementById('exp-note').value.trim();
   clearAllErrors(['exp-desc','exp-amt','exp-date']);
@@ -2850,6 +2866,84 @@ window.calcLoanPreview=function(){
   const pmtEl=document.getElementById('ln2-pmt');
   if(pmtEl&&!pmtEl.value)pmtEl.value=monthly.toFixed(2);
 };
+
+// ── CASH FLOW TAB ─────────────────────────────────────────
+function renderAnCashFlow(){
+  const mwd=mwData();
+  if(!mwd.length){
+    const el=document.getElementById('cf-table');
+    if(el)el.innerHTML='<div class="empty"><div class="icon">💸</div><p>No data yet. Add income and expenses to see your cash flow.</p></div>';
+    ['cf-total','cf-earned','cf-spent','cf-saved'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent='₵0.00';});
+    return;
+  }
+  const rows=mwd.map(({month,year})=>{
+    const earned=incInMonth(month,year);
+    const spent=mExps(month,year).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
+    const saved=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0);
+    const net=earned-spent-saved;
+    return{month,year,earned,spent,saved,net,label:MOS[month].slice(0,3)+' '+year};
+  });
+  let runBal=0;
+  const runRows=rows.map(r=>{runBal+=r.net;return{...r,running:runBal};});
+  const totEarned=rows.reduce((s,r)=>s+r.earned,0);
+  const totSpent=rows.reduce((s,r)=>s+r.spent,0);
+  const totSaved=rows.reduce((s,r)=>s+r.saved,0);
+  const netPos=totEarned-totSpent-totSaved;
+  const cfTotal=document.getElementById('cf-total');
+  if(cfTotal){cfTotal.textContent=fmt(netPos);cfTotal.style.color=netPos>=0?'white':'#e88';}
+  const cfSub=document.getElementById('cf-sub');
+  if(cfSub)cfSub.textContent=netPos>=0?`Positive cash flow across ${rows.length} month${rows.length!==1?'s':''}`:`Negative cash flow — spending exceeds income`;
+  const cfE=document.getElementById('cf-earned');if(cfE)cfE.textContent=fmt(totEarned);
+  const cfSp=document.getElementById('cf-spent');if(cfSp)cfSp.textContent=fmt(totSpent);
+  const cfSv=document.getElementById('cf-saved');if(cfSv)cfSv.textContent=fmt(totSaved);
+  dChart('cf-chart');
+  const chartEl=document.getElementById('cf-chart');
+  if(chartEl&&runRows.length){
+    CI['cf-chart']=new Chart(chartEl.getContext('2d'),{
+      type:'bar',
+      data:{
+        labels:runRows.map(r=>r.label),
+        datasets:[
+          {label:'Running Balance',data:runRows.map(r=>r.running),
+            type:'line',borderColor:'#c9a84c',backgroundColor:'rgba(201,168,76,0.1)',
+            fill:true,tension:.4,pointRadius:4,pointBackgroundColor:runRows.map(r=>r.running>=0?'#c9a84c':'#c0392b'),borderWidth:2,order:1},
+          {label:'Monthly Net',data:runRows.map(r=>r.net),
+            backgroundColor:runRows.map(r=>r.net>=0?'rgba(45,122,95,0.6)':'rgba(192,57,43,0.6)'),
+            borderColor:runRows.map(r=>r.net>=0?'#2d7a5f':'#c0392b'),
+            borderWidth:1,borderRadius:4,order:2}
+        ]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},boxWidth:10,usePointStyle:true}}},
+        scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}
+    });
+  }
+  const tEl=document.getElementById('cf-table');
+  if(!tEl)return;
+  tEl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px;">
+    <thead><tr style="background:var(--paper-2);">${['Month','Earned','Spent','Saved','Net','Running'].map(h=>`<th style="padding:8px;text-align:${h==='Month'?'left':'right'};font-weight:600;color:var(--ink-3);">${h}</th>`).join('')}</tr></thead>
+    <tbody>${runRows.map(r=>{
+      const nc=r.net>=0?'var(--green)':'var(--red)';
+      const rc=r.running>=0?'var(--green)':'var(--red)';
+      return`<tr style="border-bottom:1px solid var(--paper-2);">
+        <td style="padding:8px;font-weight:500;">${r.label}</td>
+        <td style="padding:8px;text-align:right;color:var(--gold);">${fmt(r.earned)}</td>
+        <td style="padding:8px;text-align:right;color:var(--red);">${fmt(r.spent)}</td>
+        <td style="padding:8px;text-align:right;color:var(--green);">${fmt(r.saved)}</td>
+        <td style="padding:8px;text-align:right;color:${nc};font-weight:500;">${fmt(r.net)}</td>
+        <td style="padding:8px;text-align:right;color:${rc};font-weight:600;">${fmt(r.running)}</td>
+      </tr>`;
+    }).join('')}
+    <tr style="background:var(--paper-2);">
+      <td style="padding:8px;font-weight:700;">All Time</td>
+      <td style="padding:8px;text-align:right;color:var(--gold);font-weight:600;">${fmt(totEarned)}</td>
+      <td style="padding:8px;text-align:right;color:var(--red);font-weight:600;">${fmt(totSpent)}</td>
+      <td style="padding:8px;text-align:right;color:var(--green);font-weight:600;">${fmt(totSaved)}</td>
+      <td style="padding:8px;text-align:right;color:${netPos>=0?'var(--green)':'var(--red)'};font-weight:700;">${fmt(netPos)}</td>
+      <td style="padding:8px;text-align:right;color:${netPos>=0?'var(--green)':'var(--red)'};font-weight:700;">${fmt(netPos)}</td>
+    </tr>
+    </tbody></table>`;
+}
 
 // ── FIX 8: Analytics income section ─────────────
 function renderAnExpOverview(){

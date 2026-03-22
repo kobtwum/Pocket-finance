@@ -538,15 +538,40 @@ body.dark .modal{background:var(--paper-2);}
 
 <!-- INCOME -->
 <div id="page-income" class="page">
-  <div class="ar"><button class="btn btn-gold" onclick="openIncomeModal()">+ Add Source</button></div>
-  <div id="inc-wrap">
-    <div class="card"><div class="sh"><h2>Income Sources</h2></div><div id="inc-list"></div>
-      <div style="border-top:1px solid var(--paper-2);margin-top:12px;padding-top:12px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:13px;font-weight:500;">Total Monthly Income (cash)</span>
-        <span id="tot-inc" style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--green);"></span>
+  <div class="tabs" style="margin-bottom:12px;">
+    <button class="tab active" onclick="switchIncTab('statement')">Statement</button>
+    <button class="tab" onclick="switchIncTab('sources')">Sources</button>
+  </div>
+  <!-- INCOME STATEMENT TAB -->
+  <div id="inc-tab-statement">
+    <div class="mnav"><button onclick="changeIncMonth(-1)">←</button><div class="mdisp" id="inc-mdisp"></div><button onclick="changeIncMonth(1)">→</button></div>
+    <div id="inc-month-stats" class="g2" style="margin-bottom:12px;"></div>
+    <div class="card"><div class="sh"><h2>Income This Month</h2></div><div id="inc-statement-list"></div></div>
+    <div class="card"><div class="sh"><h2>Income Breakdown</h2></div><div style="position:relative;height:220px;"><canvas id="inc-chart"></canvas></div><div id="inc-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
+  </div>
+  <!-- SOURCES TAB -->
+  <div id="inc-tab-sources" style="display:none;">
+    <div class="ar"><button class="btn btn-gold" onclick="openIncomeModal()">+ Add Source</button></div>
+    <div id="inc-wrap">
+      <div class="card">
+        <div class="sh"><h2>Income Sources</h2><p>📌 = pinned to dashboard</p></div>
+        <div id="inc-list"></div>
+        <div style="border-top:1px solid var(--paper-2);margin-top:12px;padding-top:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:12px;color:var(--ink-3);">This Month (cash)</span>
+            <span id="tot-inc-month" style="font-family:'DM Serif Display',serif;font-size:16px;color:var(--green);"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-size:12px;color:var(--ink-3);">Monthly Baseline</span>
+            <span id="tot-inc" style="font-family:'DM Serif Display',serif;font-size:16px;color:var(--green);"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;color:var(--ink-3);">All-time Earned</span>
+            <span id="tot-inc-cum" style="font-family:'DM Serif Display',serif;font-size:16px;color:var(--gold);"></span>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="card"><div class="sh"><h2>Income Breakdown</h2></div><div style="position:relative;height:220px;"><canvas id="inc-chart"></canvas></div><div id="inc-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
   </div>
 </div>
 
@@ -1713,17 +1738,19 @@ window.switchATab=function(tab){document.querySelectorAll('.tab').forEach(t=>t.c
 function renderAnalytics(){
   renderAnIncomeOverview();renderAnExpOverview();renderAnOv();renderAnSav();renderAnMon();}
 function renderAnOv(){
-  const all=S.expenses,tot=all.reduce((s,e)=>s+parseFloat(e.amount),0);
+  // Exclude Savings Transfer from spending totals — it's not a real expense
+  const all=S.expenses.filter(e=>e.cat!=='Savings Transfer');
+  const tot=all.reduce((s,e)=>s+parseFloat(e.amount),0);
   const mwd=mwData(),avg=tot/Math.max(1,mwd.length);
-  const sr=totInc()>0?(allSaved()/Math.max(1,totInc()*mwd.length)*100).toFixed(1):0;
   const cumInc=calcCumulativeIncome();
-  document.getElementById('an-stats').innerHTML=`<div class="card" style="padding:12px;"><div class="ct">All-time Earned</div><div class="cv" style="font-size:18px;color:var(--gold)">${fmt(cumInc)}</div><div class="cs">${mwd.length} month${mwd.length!==1?'s':''}</div></div><div class="card" style="padding:12px;"><div class="ct">All-time Spent</div><div class="cv" style="font-size:18px">${fmt(tot)}</div><div class="cs">${all.length} transactions</div></div><div class="card" style="padding:12px;"><div class="ct">Total Saved</div><div class="cv" style="font-size:18px;color:var(--green)">${fmt(allSaved())}</div><div class="cs">${sr}% save rate</div></div>`;
-  const ct={};all.forEach(e=>{ct[e.cat]=(ct[e.cat]||0)+parseFloat(e.amount);});const sorted=Object.entries(ct).sort((a,b)=>b[1]-a[1]);
+  const sr=cumInc>0?(allSaved()/cumInc*100).toFixed(1):0;
+  document.getElementById('an-stats').innerHTML=`<div class="card" style="padding:12px;"><div class="ct">All-time Earned</div><div class="cv" style="font-size:18px;color:var(--gold)">${fmt(cumInc)}</div><div class="cs">${mwd.length} month${mwd.length!==1?'s':''}</div></div><div class="card" style="padding:12px;"><div class="ct">All-time Spent</div><div class="cv" style="font-size:18px">${fmt(tot)}</div><div class="cs">${all.length} transactions</div></div><div class="card" style="padding:12px;"><div class="ct">Total Saved</div><div class="cv" style="font-size:18px;color:var(--green)">${fmt(allSaved())}</div><div class="cs">${sr}% of all income</div></div>`;
+  const ct={};all.forEach(e=>{if(e.cat!=='Savings Transfer')ct[e.cat]=(ct[e.cat]||0)+parseFloat(e.amount);});const sorted=Object.entries(ct).sort((a,b)=>b[1]-a[1]);
   dChart('cat-pie');if(sorted.length){CI['cat-pie']=new Chart(document.getElementById('cat-pie').getContext('2d'),{type:'doughnut',data:{labels:sorted.map(x=>x[0]),datasets:[{data:sorted.map(x=>x[1]),backgroundColor:sorted.map(x=>gCat(x[0]).color+'cc'),borderColor:sorted.map(x=>gCat(x[0]).color),borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'55%'}});document.getElementById('cat-pie-leg').innerHTML=sorted.slice(0,6).map(([cat])=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${gCat(cat).color};display:inline-block;"></span>${cat}</span>`).join('');}
   document.getElementById('top-cats').innerHTML=sorted.slice(0,5).map(([cat,amt])=>{const p=(amt/Math.max(1,tot)*100).toFixed(1),c=gCat(cat);return`<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--paper-2);"><div style="width:30px;height:30px;border-radius:8px;background:${c.color}22;display:flex;align-items:center;justify-content:center;font-size:14px;">${c.icon}</div><div style="flex:1;"><div style="font-size:12.5px;font-weight:500;">${cat}</div><div class="pw" style="margin-top:4px;"><div class="pb pb-blue" style="width:${p}%"></div></div></div><div style="text-align:right;"><div style="font-size:12px;font-weight:500;">${fmt(amt)}</div><div style="font-size:10px;color:var(--ink-3);">${p}%</div></div></div>`;}).join('')||'<div class="empty"><div class="icon">📊</div><p>No expense data yet</p></div>';
 }
 function renderAnSav(){const mwd=mwData();if(!mwd.length)return;let cum=0;const cd=mwd.map(({month,year})=>{cum+=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0);return{label:MOS[month].slice(0,3)+' '+year,value:cum};});const md=mwd.map(({month,year})=>({label:MOS[month].slice(0,3)+' '+year,value:S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0)}));dChart('sav-cum');CI['sav-cum']=new Chart(document.getElementById('sav-cum').getContext('2d'),{type:'line',data:{labels:cd.map(d=>d.label),datasets:[{data:cd.map(d=>d.value),borderColor:'#2d7a5f',backgroundColor:'#2d7a5f22',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:'#2d7a5f'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}});dChart('sav-mon');CI['sav-mon']=new Chart(document.getElementById('sav-mon').getContext('2d'),{type:'bar',data:{labels:md.map(d=>d.label),datasets:[{data:md.map(d=>d.value),backgroundColor:'#2d7a5f99',borderColor:'#2d7a5f',borderWidth:2,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}});}
-function renderAnMon(){const mwd=mwData();if(!mwd.length)return;const lb=mwd.map(({month,year})=>MOS[month].slice(0,3)+' '+year);const id_=mwd.map(({month,year})=>incInMonth(month,year));const sd=mwd.map(({month,year})=>mSpent(month,year));const vd=mwd.map(({month,year})=>S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0));dChart('inc-exp');CI['inc-exp']=new Chart(document.getElementById('inc-exp').getContext('2d'),{type:'bar',data:{labels:lb,datasets:[{label:'Income',data:id_,type:'line',borderColor:'#1a1a2e',backgroundColor:'transparent',tension:.3,pointRadius:3,borderWidth:2},{label:'Spent',data:sd,backgroundColor:'#c0392b88',borderColor:'#c0392b',borderWidth:1,borderRadius:4},{label:'Saved',data:vd,backgroundColor:'#2d7a5f88',borderColor:'#2d7a5f',borderWidth:1,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},boxWidth:10}}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}});document.getElementById('mon-sum').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--paper-2);">${['Month','Income','Spent','Saved','Left','Rate'].map(h=>`<th style="padding:7px 8px;text-align:${h==='Month'?'left':'right'};font-weight:500;color:var(--ink-3);">${h}</th>`).join('')}</tr></thead><tbody>${mwd.map(({month,year},i)=>{const mInc=id_[i],sp=sd[i],sv=vd[i],rem=mInc-sp,rate=mInc>0?(sv/mInc*100).toFixed(1):0;return`<tr style="border-bottom:1px solid var(--paper-2);"><td style="padding:7px 8px;font-weight:500;">${lb[i]}</td><td style="padding:7px 8px;text-align:right;color:var(--green);">${fmt(mInc)}</td><td style="padding:7px 8px;text-align:right;color:var(--red);">${fmt(sp)}</td><td style="padding:7px 8px;text-align:right;color:var(--green);">${fmt(sv)}</td><td style="padding:7px 8px;text-align:right;color:${rem<0?'var(--red)':'var(--green)'};">${fmt(rem)}</td><td style="padding:7px 8px;text-align:right;"><span class="pill ${parseFloat(rate)>=15?'pill-g':'pill-r'}">${rate}%</span></td></tr>`;}).join('')}</tbody></table>`;}
+function renderAnMon(){const mwd=mwData();if(!mwd.length)return;const lb=mwd.map(({month,year})=>MOS[month].slice(0,3)+' '+year);const id_=mwd.map(({month,year})=>incInMonth(month,year));const sd=mwd.map(({month,year})=>mSpent(month,year));const vd=mwd.map(({month,year})=>S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0));dChart('inc-exp');CI['inc-exp']=new Chart(document.getElementById('inc-exp').getContext('2d'),{type:'bar',data:{labels:lb,datasets:[{label:'Income',data:id_,type:'line',borderColor:'#c9a84c',backgroundColor:'rgba(201,168,76,0.1)',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:'#c9a84c',borderWidth:2,order:1},{label:'Spent',data:sd,backgroundColor:'#c0392b88',borderColor:'#c0392b',borderWidth:1,borderRadius:4,order:2},{label:'Saved',data:vd,backgroundColor:'#2d7a5f88',borderColor:'#2d7a5f',borderWidth:1,borderRadius:4,order:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},boxWidth:10,usePointStyle:true}}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}});document.getElementById('mon-sum').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--paper-2);">${['Month','Income','Spent','Saved','Left','Rate'].map(h=>`<th style="padding:7px 8px;text-align:${h==='Month'?'left':'right'};font-weight:500;color:var(--ink-3);">${h}</th>`).join('')}</tr></thead><tbody>${mwd.map(({month,year},i)=>{const mInc=id_[i],sp=sd[i],sv=vd[i],rem=mInc-sp,rate=mInc>0?(sv/mInc*100).toFixed(1):0;return`<tr style="border-bottom:1px solid var(--paper-2);"><td style="padding:7px 8px;font-weight:500;">${lb[i]}</td><td style="padding:7px 8px;text-align:right;color:var(--green);">${fmt(mInc)}</td><td style="padding:7px 8px;text-align:right;color:var(--red);">${fmt(sp)}</td><td style="padding:7px 8px;text-align:right;color:var(--green);">${fmt(sv)}</td><td style="padding:7px 8px;text-align:right;color:${rem<0?'var(--red)':'var(--green)'};">${fmt(rem)}</td><td style="padding:7px 8px;text-align:right;"><span class="pill ${parseFloat(rate)>=15?'pill-g':'pill-r'}">${rate}%</span></td></tr>`;}).join('')}</tbody></table>`;}
 
 // ── INCOME ──
 let IID=null;
@@ -2067,6 +2094,17 @@ function renderDebt(){
         <div class="met"><div class="met-l">Payoff Date</div><div class="met-v" style="font-size:12px;">${payoff}</div><div class="met-s">${monthsLeft<9999?monthsLeft+' months':''}</div></div>
       </div>
       ${!isPaidOff?`<button class="btn btn-green btn-full" style="margin-top:10px;" onclick="openLoanPaymentModal('${l.id}')">💳 Make a Payment</button>`:''}
+      ${(l.payments&&l.payments.length)?`
+      <div style="margin-top:12px;">
+        <div style="font-size:11px;font-weight:500;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Payment History (${l.payments.length})</div>
+        <div style="max-height:160px;overflow-y:auto;">
+          ${[...l.payments].reverse().map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--paper-2);font-size:11px;">
+            <div><div style="font-weight:500;">${new Date(p.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}</div>
+            <div style="color:var(--ink-3);">Principal: ${fmt(p.principal)} · Interest: ${fmt(p.interest)}</div></div>
+            <div style="text-align:right;"><div style="color:var(--green);font-weight:500;">${fmt(p.amount)}</div><div style="color:var(--ink-3);">Bal: ${fmt(p.balanceAfter)}</div></div>
+          </div>`).join('')}
+        </div>
+      </div>`:''}
       <div style="display:flex;gap:7px;margin-top:8px;">
         <button class="btn btn-ghost btn-sm" onclick="openLoanModal('${l.id}')" style="flex:1;">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="delLoan('${l.id}')">Delete</button>
@@ -2117,10 +2155,15 @@ window.openLoanPaymentModal=function(id){
   const prev=document.getElementById('lp-preview');
   if(prev){
     const newBal=Math.max(0,parseFloat(l.balance)-calcPmt);
+    const totalPaid=(l.payments||[]).reduce((s,p)=>s+p.amount,0);
+    const rate=(parseFloat(l.rate)||0)/100/12;
+    const interestPortion=rate>0?Math.min(calcPmt,parseFloat(l.balance)*rate):0;
     prev.style.display='block';
     prev.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--ink-3);">Current balance</span><span>${fmt(l.balance)}</span></div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--ink-3);">Payment</span><span style="color:var(--green);">−${fmt(calcPmt)}</span></div>
-      <div style="display:flex;justify-content:space-between;font-weight:600;"><span>New balance</span><span style="color:${newBal<=0?'var(--green)':'var(--red)'};">${fmt(newBal)}</span></div>`;
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--ink-3);">Interest portion</span><span style="color:var(--red);">${fmt(interestPortion)}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--ink-3);">Principal portion</span><span style="color:var(--green);">${fmt(calcPmt-interestPortion)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-weight:600;border-top:1px solid var(--paper-3);padding-top:4px;"><span>New balance</span><span style="color:${newBal<=0?'var(--green)':'var(--red)'};">${fmt(newBal)}</span></div>
+      ${totalPaid>0?`<div style="font-size:10px;color:var(--ink-3);margin-top:4px;">${l.payments.length} payments made · ${fmt(totalPaid)} total paid</div>`:''}`;
   }
   openModal('loan-payment-modal');
 };
@@ -2129,9 +2172,16 @@ window.saveLoanPayment=async function(){
   const date=document.getElementById('lp-date').value;
   if(!amt||!date){showToast('Enter amount and date');return;}
   const l=(S.loans||[]).find(x=>x.id===payingLoanId);if(!l)return;
+  const rate=(parseFloat(l.rate)||0)/100/12;
+  const interestPortion=rate>0?Math.min(amt,parseFloat(l.balance)*rate):0;
+  const principalPortion=amt-interestPortion;
   const newBal=Math.max(0,parseFloat(l.balance)-amt);
   const i=S.loans.findIndex(x=>x.id===payingLoanId);
-  if(i>-1)S.loans[i]={...S.loans[i],balance:newBal};
+  const payment={id:'p'+Date.now(),amount:amt,date,principal:principalPortion,interest:interestPortion,balanceAfter:newBal};
+  if(i>-1){
+    const payments=[...(l.payments||[]),payment];
+    S.loans[i]={...S.loans[i],balance:newBal,payments};
+  }
   // Log as Loan Repayment expense
   const expId='e'+Date.now();
   const exp={desc:'Loan payment — '+l.name,amount:amt,cat:'Loan Repayment',date,note:'Payment on '+l.name};

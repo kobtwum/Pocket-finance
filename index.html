@@ -510,7 +510,17 @@ body.dark .modal{background:var(--paper-2);}
   </div>
   <div id="analytics-overview">
     <div class="g3" id="an-stats"></div>
-    <div class="card" style="margin-bottom:12px;"><div class="sh"><h2>Income Overview</h2></div><div class="g2" id="an-inc-stats" style="margin-bottom:10px;"></div><div style="position:relative;height:200px;"><canvas id="an-inc-chart"></canvas></div><div id="an-inc-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
+    <div class="card" style="margin-bottom:12px;">
+      <div class="sh"><h2>Income Overview</h2></div>
+      <div class="g3" id="an-inc-stats" style="margin-bottom:10px;"></div>
+      <div style="position:relative;height:180px;"><canvas id="an-inc-chart"></canvas></div>
+      <div id="an-inc-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+    </div>
+    <div class="card" style="margin-bottom:12px;">
+      <div class="sh"><h2>Expense Overview</h2></div>
+      <div class="g3" id="an-exp-stats" style="margin-bottom:10px;"></div>
+      <div style="position:relative;height:180px;margin-top:4px;"><canvas id="an-exp-trend"></canvas></div>
+    </div>
     <div id="an-charts">
       <div class="card"><div class="sh"><h2>By Category</h2></div><div style="position:relative;height:220px;"><canvas id="cat-pie"></canvas></div><div id="cat-pie-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
       <div class="card"><div class="sh"><h2>Top Categories</h2></div><div id="top-cats"></div></div>
@@ -1284,24 +1294,28 @@ function incInMonth(m,y){
     if(s.noncash)return false;
     const freq=s.freq||s.frequency||'monthly';
     if(freq==='onetime'){
-      if(!s.date)return false;
-      const d=new Date(s.date);
-      return d.getMonth()===m&&d.getFullYear()===y;
+      if(!s.date||s.date==='')return false;
+      try{const d=new Date(s.date);if(isNaN(d.getTime()))return false;return d.getMonth()===m&&d.getFullYear()===y;}catch{return false;}
     }
     return true;
   }).reduce((t,s)=>{
     const freq=s.freq||'monthly';
     const spread=s.spread||'spread';
-    // For quarterly/annual with 'received' — only count in payment month
+    const a=parseFloat(s.amount)||0;
+    // One-time: full amount in month received
+    if(freq==='onetime')return t+a;
+    // Quarterly/annual with 'received' — only count in payment month
     if((freq==='quarterly'||freq==='annual')&&spread==='received'){
-      const a=parseFloat(s.amount)||0;
-      if(!s.date)return t+0;
-      const startDate=new Date(s.date);
-      const sm=startDate.getMonth(),sy=startDate.getFullYear();
-      const monthsFromStart=(y-sy)*12+(m-sm);
-      if(monthsFromStart<0)return t+0;
-      if(freq==='quarterly')return monthsFromStart%3===0?t+a:t+0;
-      if(freq==='annual')return monthsFromStart%12===0?t+a:t+0;
+      if(!s.date||s.date==='')return t+0;
+      try{
+        const startDate=new Date(s.date);
+        if(isNaN(startDate.getTime()))return t+0;
+        const sm=startDate.getMonth(),sy=startDate.getFullYear();
+        const monthsFromStart=(y-sy)*12+(m-sm);
+        if(monthsFromStart<0)return t+0;
+        if(freq==='quarterly')return monthsFromStart%3===0?t+a:t+0;
+        if(freq==='annual')return monthsFromStart%12===0?t+a:t+0;
+      }catch{return t+0;}
     }
     return t+(monthlyEq(s,m,y)||0);
   },0);
@@ -1773,6 +1787,8 @@ window.updateIncomeModalFields=function(){
     dayRow.style.display='none';
     dateRow.style.display='block';
     if(dateLbl)dateLbl.textContent='Date Received';
+    // Force spread to 'spread' for one-time (irrelevant but avoid contamination)
+    const spEl=document.getElementById('in-spread');if(spEl&&spreadRow&&spreadRow.style.display==='none')spEl.value='spread';
   } else if((freq==='quarterly'||freq==='annual')&&spreadVal==='received'){
     dayRow.style.display='none';
     dateRow.style.display='block';

@@ -401,7 +401,7 @@ body.dark .modal{background:var(--paper-2);}
     <button class="sb-item" data-page="debt"><span class="si">⊗</span><span class="sl">Debt Tracker</span></button>
     <button class="sb-item" data-page="insights"><span class="si">✦</span><span class="sl">Insights</span></button>
     <button class="sb-item" data-page="analytics"><span class="si">◻</span><span class="sl">Analytics</span></button>
-    <button class="sb-item" data-page="recurring"><span class="si">↻</span><span class="sl">Recurring</span></button>
+    <button class="sb-item" data-page="recurring"><span class="si">↻</span><span class="sl">Recurring Expenses</span></button>
     <div class="sb-sec">Config</div>
     <button class="sb-item" data-page="import"><span class="si">⤓</span><span class="sl">Import CSV</span></button>
     <button class="sb-item" data-page="settings"><span class="si">⚙</span><span class="sl">Settings</span></button>
@@ -552,8 +552,8 @@ body.dark .modal{background:var(--paper-2);}
 
 <!-- RECURRING -->
 <div id="page-recurring" class="page">
-  <div class="ar"><button class="btn btn-gold" onclick="openRecurModal()">+ Add Recurring</button></div>
-  <div class="card"><div class="sh"><h2>Recurring Expenses</h2><p>Auto-logged monthly</p></div><div id="rec-list"></div></div>
+  <div class="ar"><button class="btn btn-gold" onclick="openRecurModal()">+ Add Recurring Expense</button></div>
+  <div class="card"><div class="sh"><h2>Recurring Expenses</h2><p>Auto-logged on set day each month</p></div><div id="rec-list"></div></div>
   <div class="card" style="background:var(--blue-light);border:none;">
     <div style="font-size:13px;font-weight:500;color:var(--blue);margin-bottom:6px;">How it works</div>
     <div style="font-size:12px;color:var(--blue);line-height:1.6;">Set up recurring expenses like rent, subscriptions, and loan repayments. They are automatically logged each month on the day you set. A ↻ badge appears on auto-logged expenses. You can pause or delete any time.</div>
@@ -740,7 +740,7 @@ body.dark .modal{background:var(--paper-2);}
     <button class="more-item" id="more-budget" onclick="showPage('budget');closeMoreDrawer()"><span class="ti">⊟</span>Budget</button>
     <button class="more-item" id="more-analytics" onclick="showPage('analytics');closeMoreDrawer()"><span class="ti">◻</span>Analytics</button>
     <button class="more-item" id="more-income" onclick="showPage('income');closeMoreDrawer()"><span class="ti">＋</span>Income</button>
-    <button class="more-item" id="more-recurring" onclick="showPage('recurring');closeMoreDrawer()"><span class="ti">↻</span>Recurring</button>
+    <button class="more-item" id="more-recurring" onclick="showPage('recurring');closeMoreDrawer()"><span class="ti">↻</span>Recurring Expenses</button>
     <button class="more-item" id="more-import" onclick="showPage('import');closeMoreDrawer()"><span class="ti">⤓</span>Import</button>
     <button class="more-item" id="more-settings" onclick="showPage('settings');closeMoreDrawer()"><span class="ti">⚙</span>Settings</button>
   </div>
@@ -955,6 +955,14 @@ body.dark .modal{background:var(--paper-2);}
     <div style="background:var(--blue-light);border-radius:var(--radius-sm);padding:8px 12px;font-size:11px;color:var(--blue);">Repayments logged under <strong>Loan Repayment</strong> category will be tracked automatically.</div>
   </div>
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('loan-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveLoan()">Save Loan</button></div>
+</div></div>
+
+<div class="mo" id="loan-payment-modal"><div class="modal"><div class="mh"></div>
+  <div class="mt" id="lp-title">Make a Payment</div>
+  <div class="fg"><label class="fl">Payment Amount</label><input class="fi" type="number" inputmode="decimal" id="lp-amt" placeholder="0.00"/></div>
+  <div class="fg"><label class="fl">Payment Date</label><input class="fi" type="date" id="lp-date"/></div>
+  <div id="lp-preview" style="background:var(--paper-2);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;margin-bottom:4px;display:none;"></div>
+  <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('loan-payment-modal')">Cancel</button><button class="btn btn-green btn-full" onclick="saveLoanPayment()">Confirm Payment</button></div>
 </div></div>
 
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
@@ -1426,7 +1434,7 @@ window.showPage=function(id){
   document.getElementById('main-content').scrollTop=0;
   const fb=document.getElementById('fab');
   if(fb)fb.style.display=isDesk()?'none':(['dashboard','expenses','savings','recurring'].includes(id)?'flex':'none');
-  const titles={dashboard:'Dashboard',expenses:'Expenses',budget:'Budget',savings:'Savings Goals',analytics:'Analytics',income:'Income',recurring:'Recurring',import:'Import CSV',settings:'Settings',networth:'Net Worth',debt:'Debt Tracker',health:'Health Score',insights:'Spending Insights'};
+  const titles={dashboard:'Dashboard',expenses:'Expenses',budget:'Budget',savings:'Savings Goals',analytics:'Analytics',income:'Income',recurring:'Recurring Expenses',import:'Import CSV',settings:'Settings',networth:'Net Worth',debt:'Debt Tracker',health:'Health Score',insights:'Spending Insights'};
   const pt=document.getElementById('d-ptitle');if(pt)pt.textContent=titles[id]||id;
   ({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:renderIncome,recurring:renderRecurring,import:renderImportPage,settings:updateLnInc,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[id]?.();
 };
@@ -1990,25 +1998,36 @@ window.saveLiability=async function(){
 window.delLiability=async function(id){if(!confirm('Delete this liability?'))return;S.liabilities=(S.liabilities||[]).filter(l=>l.id!==id);await saveS();renderNetWorth();showToast('Removed');};
 
 // ── DEBT TRACKER ─────────────────────────────────────────
-function loanPayoffDate(loan){
+function calcMonthlyPayment(bal,rate,term){
+  // rate = annual %, term = months
+  const r=(rate||0)/100/12;
+  if(!bal||bal<=0)return 0;
+  if(r===0)return bal/Math.max(1,term||60);
+  return bal*r*Math.pow(1+r,term)/(Math.pow(1+r,term)-1);
+}
+function loanMonthsLeft(loan){
   const bal=parseFloat(loan.balance),pmt=parseFloat(loan.monthly),rate=(parseFloat(loan.rate)||0)/100/12;
-  if(pmt<=0)return'—';
-  if(rate===0){const months=Math.ceil(bal/pmt);const d=new Date();d.setMonth(d.getMonth()+months);return d.toLocaleDateString('en-GH',{month:'short',year:'numeric'});}
-  if(pmt<=bal*rate)return'Payment too low';
-  const months=Math.ceil(-Math.log(1-bal*rate/pmt)/Math.log(1+rate));
+  if(bal<=0)return 0;
+  if(pmt<=0)return loan.term||60;
+  if(rate===0)return Math.ceil(bal/pmt);
+  if(pmt<=bal*rate)return 9999;
+  return Math.ceil(-Math.log(1-bal*rate/pmt)/Math.log(1+rate));
+}
+function loanPayoffDate(loan){
+  if(parseFloat(loan.balance)<=0)return'Paid off!';
+  const months=loanMonthsLeft(loan);
+  if(months>=9999)return'Payment too low';
+  if(months<=0)return'Paid off!';
   const d=new Date();d.setMonth(d.getMonth()+months);
   return d.toLocaleDateString('en-GH',{month:'short',year:'numeric'});
 }
 function latestDebtFreeDate(){
-  const dates=(S.loans||[]).filter(l=>parseFloat(l.balance)>0).map(l=>{
-    const bal=parseFloat(l.balance),pmt=parseFloat(l.monthly),rate=(parseFloat(l.rate)||0)/100/12;
-    if(pmt<=0||pmt<=bal*rate)return null;
-    const months=rate===0?Math.ceil(bal/pmt):Math.ceil(-Math.log(1-bal*rate/pmt)/Math.log(1+rate));
-    const d=new Date();d.setMonth(d.getMonth()+months);return d;
-  }).filter(Boolean);
-  if(!dates.length)return'—';
-  const latest=new Date(Math.max(...dates));
-  return latest.toLocaleDateString('en-GH',{month:'long',year:'numeric'});
+  const activeLoan=(S.loans||[]).filter(l=>parseFloat(l.balance)>0&&parseFloat(l.monthly)>0);
+  if(!activeLoan.length)return(S.loans||[]).length?'All paid off! 🎉':'—';
+  const maxMonths=Math.max(...activeLoan.map(l=>loanMonthsLeft(l)).filter(m=>m<9999));
+  if(!isFinite(maxMonths))return'Increase payments';
+  const d=new Date();d.setMonth(d.getMonth()+maxMonths);
+  return d.toLocaleDateString('en-GH',{month:'long',year:'numeric'});
 }
 
 function renderDebt(){
@@ -2021,22 +2040,34 @@ function renderDebt(){
 
   const el=document.getElementById('debt-list');
   el.innerHTML=loans.length?loans.map(l=>{
-    const bal=parseFloat(l.balance),orig=parseFloat(l.original),pct=orig>0?Math.min(100,((orig-bal)/orig*100)).toFixed(0):0;
-    const paidOff=orig-bal;
+    const bal=parseFloat(l.balance),orig=parseFloat(l.original);
+    const pct=orig>0?Math.min(100,((orig-bal)/orig*100)).toFixed(0):0;
+    const paidOff=Math.max(0,orig-bal);
     const payoff=loanPayoffDate(l);
-    return`<div class="card" style="padding:16px;margin-bottom:12px;">
+    const monthsLeft=loanMonthsLeft(l);
+    // Calculate actual monthly payment from term+rate if monthly is 0
+    const calcPmt=parseFloat(l.monthly)||calcMonthlyPayment(bal,(parseFloat(l.rate)||0),parseInt(l.term)||60);
+    const totalRemaining=calcPmt*Math.min(monthsLeft,600);
+    const totalInterest=Math.max(0,totalRemaining-bal);
+    const isPaidOff=bal<=0;
+    return`<div class="card" style="padding:16px;margin-bottom:12px;${isPaidOff?'opacity:.7':''}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
-        <div><div style="font-size:14px;font-weight:500;">${l.name}</div><div style="font-size:11px;color:var(--ink-3);">${l.type||'Loan'} · Started ${l.start||'—'}</div></div>
-        <div style="text-align:right;"><div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--red);">${fmt(bal)}</div><div style="font-size:11px;color:var(--ink-3);">remaining</div></div>
+        <div><div style="font-size:14px;font-weight:500;">${l.name} ${isPaidOff?'<span class="pill pill-g">Paid off</span>':''}</div>
+        <div style="font-size:11px;color:var(--ink-3);">${l.type||'Loan'} · Started ${l.start||'—'} · ${l.term?Math.round(l.term/12*10)/10+' yr term':''}</div></div>
+        <div style="text-align:right;"><div style="font-family:'DM Serif Display',serif;font-size:18px;color:${isPaidOff?'var(--green)':'var(--red)'};">${fmt(bal)}</div>
+        <div style="font-size:11px;color:var(--ink-3);">remaining</div></div>
       </div>
       <div class="pw"><div class="pb pb-green" style="width:${pct}%"></div></div>
-      <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:var(--ink-3);"><span>${pct}% paid off (${fmt(paidOff)} paid)</span><span>${fmt(orig)} original</span></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;">
-        <div class="met"><div class="met-l">Monthly Payment</div><div class="met-v" style="font-size:13px;">${fmt(l.monthly)}</div></div>
-        <div class="met"><div class="met-l">Interest Rate</div><div class="met-v" style="font-size:13px;">${l.rate||0}% / yr</div></div>
-        <div class="met"><div class="met-l">Payoff Date</div><div class="met-v" style="font-size:12px;">${payoff}</div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:var(--ink-3);">
+        <span>${pct}% paid (${fmt(paidOff)})</span><span>${fmt(orig)} original</span>
       </div>
-      <div style="display:flex;gap:7px;margin-top:10px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px;">
+        <div class="met"><div class="met-l">Monthly Payment</div><div class="met-v" style="font-size:13px;">${fmt(calcPmt)}</div><div class="met-s">${l.rate||0}% / yr</div></div>
+        <div class="met"><div class="met-l">Remaining Interest</div><div class="met-v" style="font-size:13px;color:var(--red);">${fmt(totalInterest)}</div><div class="met-s">Est. cost</div></div>
+        <div class="met"><div class="met-l">Payoff Date</div><div class="met-v" style="font-size:12px;">${payoff}</div><div class="met-s">${monthsLeft<9999?monthsLeft+' months':''}</div></div>
+      </div>
+      ${!isPaidOff?`<button class="btn btn-green btn-full" style="margin-top:10px;" onclick="openLoanPaymentModal('${l.id}')">💳 Make a Payment</button>`:''}
+      <div style="display:flex;gap:7px;margin-top:8px;">
         <button class="btn btn-ghost btn-sm" onclick="openLoanModal('${l.id}')" style="flex:1;">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="delLoan('${l.id}')">Delete</button>
       </div>
@@ -2065,13 +2096,52 @@ window.saveLoan=async function(){
   const start=document.getElementById('ln2-start').value;
   const type=document.getElementById('ln2-type').value;
   const term=parseInt(document.getElementById('ln2-term')?.value)||60;
-  if(!name||!original||!balance||!monthly){showToast('Fill in all required fields');return;}
+  // Auto-calc monthly from term+rate if not entered
+  const autoMonthly=monthly||calcMonthlyPayment(balance,rate,term);
+  if(!name||!original||!balance){showToast('Fill in name and loan amounts');return;}
   if(!S.loans)S.loans=[];
   const id=editLoanId||'ln'+Date.now();
-  const data={id,name,original,balance,monthly,rate,start,type,term};
+  const data={id,name,original,balance,monthly:autoMonthly,rate,start,type,term};
   if(editLoanId){const i=S.loans.findIndex(l=>l.id===editLoanId);if(i>-1)S.loans[i]=data;}else S.loans.push(data);
   // Loans show in net worth directly via S.loans — no duplicate in S.liabilities
   await saveS();closeModal('loan-modal');renderDebt();renderNetWorth();showToast('Loan saved ✓');editLoanId=null;
+};
+let payingLoanId=null;
+window.openLoanPaymentModal=function(id){
+  payingLoanId=id;
+  const l=(S.loans||[]).find(x=>x.id===id);if(!l)return;
+  document.getElementById('lp-title').textContent='Payment — '+l.name;
+  const calcPmt=parseFloat(l.monthly)||calcMonthlyPayment(parseFloat(l.balance),(parseFloat(l.rate)||0),parseInt(l.term)||60);
+  document.getElementById('lp-amt').value=calcPmt.toFixed(2);
+  document.getElementById('lp-date').value=new Date().toISOString().split('T')[0];
+  const prev=document.getElementById('lp-preview');
+  if(prev){
+    const newBal=Math.max(0,parseFloat(l.balance)-calcPmt);
+    prev.style.display='block';
+    prev.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--ink-3);">Current balance</span><span>${fmt(l.balance)}</span></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--ink-3);">Payment</span><span style="color:var(--green);">−${fmt(calcPmt)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-weight:600;"><span>New balance</span><span style="color:${newBal<=0?'var(--green)':'var(--red)'};">${fmt(newBal)}</span></div>`;
+  }
+  openModal('loan-payment-modal');
+};
+window.saveLoanPayment=async function(){
+  const amt=parseFloat(document.getElementById('lp-amt').value);
+  const date=document.getElementById('lp-date').value;
+  if(!amt||!date){showToast('Enter amount and date');return;}
+  const l=(S.loans||[]).find(x=>x.id===payingLoanId);if(!l)return;
+  const newBal=Math.max(0,parseFloat(l.balance)-amt);
+  const i=S.loans.findIndex(x=>x.id===payingLoanId);
+  if(i>-1)S.loans[i]={...S.loans[i],balance:newBal};
+  // Log as Loan Repayment expense
+  const expId='e'+Date.now();
+  const exp={desc:'Loan payment — '+l.name,amount:amt,cat:'Loan Repayment',date,note:'Payment on '+l.name};
+  S.expenses.push({id:expId,...exp});
+  await saveDoc('expenses',expId,exp);
+  await saveS();
+  closeModal('loan-payment-modal');
+  renderDebt();renderNetWorth();renderDash();
+  showToast(newBal<=0?'Loan fully paid off! 🎉':'Payment recorded ✓');
+  payingLoanId=null;
 };
 window.delLoan=async function(id){
   if(!confirm('Delete this loan?'))return;
@@ -2498,30 +2568,38 @@ function renderSavCumulative(){
 
 // ── FIX 6: Cumulative income calculation ─────────
 function calcCumulativeIncome(){
-  // Build a full date range from earliest income source or expense to now
-  const now=new Date();
-  const dates=[];
-  // Include months from expenses/contributions
+  // Only use months that actually have expense/contribution data
+  // This avoids counting hypothetical months from deleted sources
   const mwd=mwData();
-  mwd.forEach(({month,year})=>dates.push({month,year}));
-  // Include months from recurring income sources (from start date to now)
+  // Also include months where one-time income was received
+  const onetimeDates=S.incomeSources
+    .filter(s=>!s.noncash&&(s.freq||'monthly')==='onetime'&&s.date)
+    .map(s=>{const d=new Date(s.date);return{month:d.getMonth(),year:d.getFullYear()};});
+  const allDates=[...mwd];
+  onetimeDates.forEach(od=>{
+    if(!allDates.find(x=>x.month===od.month&&x.year===od.year))allDates.push(od);
+  });
+  // For recurring sources, only count months UP TO NOW from their start date
+  // and only if they're currently in S.incomeSources (not deleted)
+  const now=new Date();
+  const recurDates=[];
   S.incomeSources.filter(s=>!s.noncash&&(s.freq||'monthly')!=='onetime').forEach(s=>{
-    const start=s.date?new Date(s.date):new Date(now.getFullYear()-1,now.getMonth(),1);
+    // Start from the earlier of: first expense month or source start date
+    const srcStart=s.date?new Date(s.date):null;
+    const firstExpMonth=mwd.length?new Date(mwd[0].year,mwd[0].month,1):now;
+    const start=srcStart&&srcStart<firstExpMonth?srcStart:firstExpMonth;
     let d=new Date(start.getFullYear(),start.getMonth(),1);
     while(d<=now){
       const m=d.getMonth(),y=d.getFullYear();
-      if(!dates.find(x=>x.month===m&&x.year===y))dates.push({month:m,year:y});
+      if(!allDates.find(x=>x.month===m&&x.year===y)&&!recurDates.find(x=>x.month===m&&x.year===y)){
+        recurDates.push({month:m,year:y});
+      }
       d.setMonth(d.getMonth()+1);
     }
   });
-  // Include one-time payments
-  S.incomeSources.filter(s=>!s.noncash&&(s.freq||'monthly')==='onetime'&&s.date).forEach(s=>{
-    const d=new Date(s.date);
-    const m=d.getMonth(),y=d.getFullYear();
-    if(!dates.find(x=>x.month===m&&x.year===y))dates.push({month:m,year:y});
-  });
-  if(!dates.length)return 0;
-  return dates.reduce((t,{month,year})=>t+incInMonth(month,year),0);
+  const finalDates=[...allDates,...recurDates];
+  if(!finalDates.length)return 0;
+  return finalDates.reduce((t,{month,year})=>t+incInMonth(month,year),0);
 }
 
 // ── FIX 7: Loan modal term auto-calc + debt tracker enhanced ──

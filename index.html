@@ -28,6 +28,7 @@ window.addEventListener('load',()=>{
 </script>
 </head>
 <body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
 <style>
 :root{
   --ink:#1a1a2e;--ink-2:#3d3d5c;--ink-3:#7a7a9a;
@@ -284,6 +285,102 @@ body.dark .modal{background:var(--paper-2);}
 .s-sub{font-size:11px;color:var(--ink-3);margin-top:2px;}
 .ob-step{width:28px;height:4px;border-radius:100px;background:rgba(255,255,255,.2);transition:all .3s;}
 .ob-step.active{background:var(--gold);width:44px;}
+
+/* ── ACCESSIBILITY & CONSISTENCY IMPROVEMENTS ── */
+
+/* Raise minimum font sizes — nothing below 11px for readable text */
+.ct{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px;}
+.ct-g{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin-bottom:5px;}
+.cs{font-size:12px;color:var(--ink-3);margin-top:2px;}
+.tb-lbl{font-size:10px;color:var(--gold);letter-spacing:.06em;text-transform:uppercase;}
+.nav-tab{font-size:10px;}
+.more-item{font-size:11px;}
+.met-l{font-size:11px;color:var(--ink-3);margin-bottom:3px;}
+.met-s{font-size:11px;color:var(--ink-3);margin-top:2px;}
+.sb-sec{font-size:10px;letter-spacing:.08em;}
+.sb-urole{font-size:11px;color:rgba(255,255,255,.45);}
+.bc-n{font-size:13px;}
+.bc-a{font-size:12px;}
+.ii .lb{font-size:10px;}
+.ii .nt{font-size:10px;color:rgba(255,255,255,.45);}
+.rb{font-size:10px;}
+.tab{font-size:12px;padding:8px 6px;}
+.pill{font-size:11px;padding:2px 9px;}
+.empty p{font-size:13px;}
+.sh h2{font-size:18px;}
+.sh p{font-size:12px;}
+.s-lbl{font-size:14px;}
+.s-sub{font-size:12px;}
+.btn-sm{padding:8px 14px;font-size:12px;min-height:34px;}
+.btn{min-height:40px;}
+
+/* Fluid value sizing — prevents overflow on small phones */
+.cv{font-size:clamp(18px,5vw,26px);}
+.tb-inc{font-size:clamp(14px,4vw,18px);}
+
+/* ── IMPROVED INK-3 CONTRAST ── */
+/* Darker ink-3 for better contrast on light backgrounds */
+:root{--ink-3:#6b6b8a;}
+body.dark{--ink-3:#8a8aaa;}
+
+/* ── FORM IMPROVEMENTS ── */
+/* Required field indicator */
+.fl.req::after{content:' *';color:var(--red);font-weight:600;}
+/* Error state */
+.fi.error{border-color:var(--red);background:var(--red-light);}
+body.dark .fi.error{background:#2a0a0a;}
+.fi.error:focus{border-color:var(--red);}
+.field-error{font-size:12px;color:var(--red);margin-top:4px;display:flex;align-items:center;gap:4px;}
+.field-error::before{content:'⚠';font-size:11px;}
+/* Focus ring for keyboard navigation */
+.fi:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,.15);outline:none;}
+.btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+.nav-tab:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;}
+/* Placeholder contrast */
+.fi::placeholder{color:var(--ink-3);opacity:0.8;}
+
+/* ── TOUCH TARGETS ── */
+.mnav button{min-width:44px;min-height:44px;padding:6px 14px;}
+.nav-tab{min-height:52px;padding:8px 4px;}
+.nav-tab .ti{font-size:20px;}
+.more-item{min-height:64px;padding:14px 8px;}
+/* Ensure delete buttons are tappable */
+.btn-danger.btn-sm{min-width:44px;}
+
+/* ── CONSISTENT CARD PADDING ── */
+.card{padding:16px;}
+
+/* ── MODAL FOOTER — horizontal on desktop ── */
+@media(min-width:1024px){
+  .mf{flex-direction:row;justify-content:flex-end;gap:10px;}
+  .mf .btn-full{width:auto;flex:none;min-width:120px;}
+  .mf .btn-ghost{order:1;}
+  .mf .btn-gold,.mf .btn-green,.mf .btn-danger{order:2;}
+}
+
+/* ── COLOUR-BLIND FRIENDLY STATUS ── */
+/* Add icon alongside colour for status indicators */
+.status-ok::before{content:'✓ ';}
+.status-warn::before{content:'⚠ ';}
+.status-error::before{content:'✕ ';}
+
+/* ── MORE DRAWER — better grid on small screens ── */
+@media(max-width:380px){.more-grid{grid-template-columns:repeat(3,1fr);}}
+
+/* ── BUTTON HOVER STATES ── */
+.btn-gold:hover{background:#b8963e;color:var(--ink);}
+.btn-ghost:hover{background:var(--paper-3);}
+.btn-green:hover{background:#c0e8d8;color:var(--green);}
+.btn-danger:hover{background:#f5c6c2;color:var(--red);}
+
+/* ── PROGRESS BAR ACCESSIBILITY ── */
+/* Striped pattern for colour-blind users on budget progress */
+.pb-red{background:repeating-linear-gradient(45deg,var(--red),var(--red) 4px,#e57065 4px,#e57065 8px);}
+
+/* ── SKIP LINK ── */
+.skip-link{position:absolute;top:-100px;left:16px;background:var(--gold);color:var(--ink);padding:8px 16px;border-radius:8px;font-weight:600;z-index:9999;transition:top .15s;}
+.skip-link:focus{top:16px;}
+
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--paper-3);border-radius:10px;}
@@ -383,10 +480,10 @@ body.dark .modal{background:var(--paper-2);}
 <div class="app" id="app-shell" style="display:none;">
 
 <!-- DESKTOP SIDEBAR -->
-<nav class="sidebar" id="sidebar" style="display:none;">
+<nav class="sidebar" id="sidebar" aria-label="Sidebar navigation" style="display:none;">
   <div class="sb-head">
     <div class="sb-logo">Pocket</div>
-    <button class="sb-tog" id="sb-tog-btn">☰</button>
+    <button class="sb-tog" id="sb-tog-btn" aria-label="Toggle sidebar" aria-expanded="true">☰</button>
   </div>
   <div class="sb-nav">
     <div class="sb-sec">Main</div>
@@ -431,18 +528,18 @@ body.dark .modal{background:var(--paper-2);}
   <div class="tb-right">
     <div id="d-acts" class="d-actions" style="display:none;">
       <select class="fi" id="topbar-cur" onchange="setCur(this.value)" style="padding:5px 8px;font-size:11px;font-weight:500;border-radius:8px;width:auto;min-width:90px;cursor:pointer;"></select>
-      <button class="dk-tog" id="dk-btn" onclick="toggleDark()" title="Dark mode"></button>
+      <button class="dk-tog" id="dk-btn" onclick="toggleDark()" aria-label="Toggle dark mode" role="switch" aria-checked="false"></button>
     </div>
     <div style="text-align:right;">
       <div class="tb-lbl">Remaining</div>
       <div class="tb-inc" id="tb-inc">₵0.00</div>
     </div>
-    <div id="user-av" class="av-ph">?</div>
+    <button id="user-av" class="av-ph" aria-label="Account menu">?</button>
   </div>
 </div>
 
 <!-- CONTENT -->
-<div class="content" id="main-content">
+<main class="content" id="main-content" role="main" aria-label="Main content">
 <div id="inst-wrap"></div>
 
 <!-- DASHBOARD -->
@@ -461,7 +558,7 @@ body.dark .modal{background:var(--paper-2);}
 
 <!-- EXPENSES -->
 <div id="page-expenses" class="page">
-  <div class="mnav"><button onclick="changeMonth(-1)">←</button><div class="mdisp" id="mdisp"></div><button onclick="changeMonth(1)">→</button></div>
+  <div class="mnav"><button onclick="changeMonth(-1)" aria-label="Previous month">←</button><div class="mdisp" id="mdisp"></div><button onclick="changeMonth(1)" aria-label="Next month">→</button></div>
   <div class="ar" style="margin-bottom:10px;"><button class="btn btn-gold" style="flex:none;" onclick="openExpenseModal()">+ Add Expense</button></div>
   <div class="g2" id="exp-stats"></div>
   <div class="card">
@@ -481,7 +578,7 @@ body.dark .modal{background:var(--paper-2);}
   <div id="bud-sum" style="font-size:12px;color:var(--ink-3);margin-bottom:10px;"></div>
   <div id="bud-wrap">
     <div class="card"><div class="sh"><h2>Limits</h2></div><div id="bud-list"></div></div>
-    <div class="card"><div class="sh"><h2>Breakdown</h2></div><div style="position:relative;height:230px;"><canvas id="bud-chart"></canvas></div><div id="bud-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
+    <div class="card"><div class="sh"><h2>Breakdown</h2></div><div style="position:relative;height:230px;"><canvas role="img" aria-label="Budget spending breakdown chart" id="bud-chart"></canvas></div><div id="bud-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
   </div>
 </div>
 
@@ -507,32 +604,56 @@ body.dark .modal{background:var(--paper-2);}
     <button class="tab active" onclick="switchATab('overview')">Overview</button>
     <button class="tab" onclick="switchATab('savings-trend')">Savings</button>
     <button class="tab" onclick="switchATab('monthly')">Monthly</button>
+    <button class="tab" onclick="switchATab('cashflow')">Cash Flow</button>
   </div>
   <div id="analytics-overview">
     <div class="g3" id="an-stats"></div>
     <div class="card" style="margin-bottom:12px;">
       <div class="sh"><h2>Income Overview</h2></div>
       <div class="g3" id="an-inc-stats" style="margin-bottom:10px;"></div>
-      <div style="position:relative;height:180px;"><canvas id="an-inc-chart"></canvas></div>
+      <div style="position:relative;height:180px;"><canvas role="img" aria-label="Income overview chart" id="an-inc-chart"></canvas></div>
       <div id="an-inc-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
     </div>
     <div class="card" style="margin-bottom:12px;">
       <div class="sh"><h2>Expense Overview</h2></div>
       <div class="g3" id="an-exp-stats" style="margin-bottom:10px;"></div>
-      <div style="position:relative;height:180px;margin-top:4px;"><canvas id="an-exp-trend"></canvas></div>
+      <div style="position:relative;height:180px;margin-top:4px;"><canvas role="img" aria-label="Expense trend chart" id="an-exp-trend"></canvas></div>
     </div>
     <div id="an-charts">
-      <div class="card"><div class="sh"><h2>By Category</h2></div><div style="position:relative;height:220px;"><canvas id="cat-pie"></canvas></div><div id="cat-pie-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
+      <div class="card"><div class="sh"><h2>By Category</h2></div><div style="position:relative;height:220px;"><canvas role="img" aria-label="Expenses by category chart" id="cat-pie"></canvas></div><div id="cat-pie-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
       <div class="card"><div class="sh"><h2>Top Categories</h2></div><div id="top-cats"></div></div>
     </div>
   </div>
   <div id="analytics-savings-trend" style="display:none;">
-    <div class="card"><div class="sh"><h2>Cumulative Savings</h2></div><div style="position:relative;height:230px;"><canvas id="sav-cum"></canvas></div></div>
-    <div class="card"><div class="sh"><h2>Monthly Contributions</h2></div><div style="position:relative;height:200px;"><canvas id="sav-mon"></canvas></div></div>
+    <div class="card"><div class="sh"><h2>Cumulative Savings</h2></div><div style="position:relative;height:230px;"><canvas role="img" aria-label="Cumulative savings chart" id="sav-cum"></canvas></div></div>
+    <div class="card"><div class="sh"><h2>Monthly Contributions</h2></div><div style="position:relative;height:200px;"><canvas role="img" aria-label="Monthly savings contributions chart" id="sav-mon"></canvas></div></div>
   </div>
   <div id="analytics-monthly" style="display:none;">
-    <div class="card"><div class="sh"><h2>Income vs Expenses vs Savings</h2></div><div style="position:relative;height:230px;"><canvas id="inc-exp"></canvas></div></div>
+    <div class="card"><div class="sh"><h2>Income vs Expenses vs Savings</h2></div><div style="position:relative;height:230px;"><canvas role="img" aria-label="Income vs expenses vs savings chart" id="inc-exp"></canvas></div></div>
     <div class="card"><div class="sh"><h2>Monthly Summary</h2></div><div id="mon-sum" style="overflow-x:auto;"></div></div>
+  </div>
+  <div id="analytics-cashflow" style="display:none;">
+    <!-- Hero cash position -->
+    <div class="card-dark" style="margin-bottom:12px;">
+      <div class="ct-g">Net Cash Position</div>
+      <div id="cf-total" style="font-family:'DM Serif Display',serif;font-size:36px;color:white;margin:4px 0;"></div>
+      <div id="cf-sub" style="font-size:12px;color:rgba(255,255,255,.5);margin-bottom:12px;"></div>
+      <div class="g3" style="margin-bottom:0;">
+        <div class="ii"><div class="lb">Total Earned</div><div class="am" id="cf-earned" style="color:#c9a84c;"></div></div>
+        <div class="ii"><div class="lb">Total Spent</div><div class="am" id="cf-spent" style="color:#e88;"></div></div>
+        <div class="ii"><div class="lb">Total Saved</div><div class="am" id="cf-saved" style="color:#6dba99;"></div></div>
+      </div>
+    </div>
+    <!-- Running balance chart -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="sh"><h2>Cumulative Cash Flow</h2><p>Running balance over time</p></div>
+      <div style="position:relative;height:220px;"><canvas role="img" aria-label="Cash flow chart" id="cf-chart"></canvas></div>
+    </div>
+    <!-- Month by month table -->
+    <div class="card">
+      <div class="sh"><h2>Month by Month</h2></div>
+      <div id="cf-table" style="overflow-x:auto;"></div>
+    </div>
   </div>
 </div>
 
@@ -547,7 +668,7 @@ body.dark .modal{background:var(--paper-2);}
     <div class="mnav"><button onclick="changeIncMonth(-1)">←</button><div class="mdisp" id="inc-mdisp"></div><button onclick="changeIncMonth(1)">→</button></div>
     <div id="inc-month-stats" class="g2" style="margin-bottom:12px;"></div>
     <div class="card"><div class="sh"><h2>Income This Month</h2></div><div id="inc-statement-list"></div></div>
-    <div class="card"><div class="sh"><h2>Income Breakdown</h2></div><div style="position:relative;height:220px;"><canvas id="inc-chart"></canvas></div><div id="inc-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
+    <div class="card"><div class="sh"><h2>Income Breakdown</h2></div><div style="position:relative;height:220px;"><canvas role="img" aria-label="Income sources breakdown chart" id="inc-chart"></canvas></div><div id="inc-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
   </div>
   <!-- SOURCES TAB -->
   <div id="inc-tab-sources" style="display:none;">
@@ -604,7 +725,7 @@ body.dark .modal{background:var(--paper-2);}
     </div>
   </div>
   <!-- Trend chart -->
-  <div class="card"><div class="sh"><h2>Net Worth Trend</h2></div><div style="position:relative;height:200px;"><canvas id="nw-chart"></canvas></div></div>
+  <div class="card"><div class="sh"><h2>Net Worth Trend</h2></div><div style="position:relative;height:200px;"><canvas role="img" aria-label="Net worth trend chart" id="nw-chart"></canvas></div></div>
   <!-- Assets & Liabilities -->
   <div id="nw-wrap">
     <div class="card"><div class="sh"><h2>Assets</h2></div><div id="nw-asset-list"></div></div>
@@ -739,10 +860,10 @@ body.dark .modal{background:var(--paper-2);}
   </div>
 </div>
 
-</div><!-- end .content -->
+</main><!-- end main content -->
 
 <!-- MOBILE BOTTOM NAV - 5 tabs + More -->
-<nav class="bottomnav" id="bottomnav">
+<nav class="bottomnav" id="bottomnav" aria-label="Main navigation">
   <button class="nav-tab active" onclick="showPage('dashboard')" id="tab-dashboard"><span class="ti">◈</span><span class="tl">Home</span></button>
   <button class="nav-tab" onclick="showPage('expenses')" id="tab-expenses"><span class="ti">↕</span><span class="tl">Expenses</span></button>
   <button class="nav-tab" onclick="showPage('income')" id="tab-income-nav"><span class="ti">＋</span><span class="tl">Income</span></button>
@@ -778,10 +899,10 @@ body.dark .modal{background:var(--paper-2);}
 <!-- MODALS -->
 <div class="mo" id="expense-modal"><div class="modal"><div class="mh"></div>
   <div class="mt" id="exp-mt">Add Expense</div>
-  <div class="fg"><label class="fl">Description</label><input class="fi" id="exp-desc" placeholder="e.g. Groceries"/></div>
-  <div class="g2"><div class="fg"><label class="fl">Amount</label><input class="fi" type="number" inputmode="decimal" id="exp-amt" placeholder="0.00"/></div><div class="fg"><label class="fl">Date</label><input class="fi" type="date" id="exp-date"/></div></div>
-  <div class="fg"><label class="fl">Category</label><select class="fi" id="exp-cat"></select></div>
-  <div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="exp-note" placeholder="Any detail..."/></div>
+  <div class="fg"><label class="fl req" for="exp-desc">Description</label><input class="fi" id="exp-desc" placeholder="e.g. Groceries" aria-required="true"/></div>
+  <div class="g2"><div class="fg"><label class="fl req" for="exp-amt">Amount</label><input class="fi" type="number" inputmode="decimal" id="exp-amt" placeholder="0.00" aria-required="true"/></div><div class="fg"><label class="fl req" for="exp-date">Date</label><input class="fi" type="date" id="exp-date" aria-required="true"/></div></div>
+  <div class="fg"><label class="fl req" for="exp-cat">Category</label><select class="fi" id="exp-cat" aria-required="true"></select></div>
+  <div class="fg"><label class="fl" for="exp-note">Note <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label><input class="fi" id="exp-note" placeholder="Any detail..."/></div>
   <div id="bud-warn-hint" style="display:none;border-radius:var(--radius-sm);padding:9px 12px;font-size:11px;margin-bottom:4px;"></div>
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('expense-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveExpense()">Save Expense</button></div>
 </div></div>
@@ -821,8 +942,8 @@ body.dark .modal{background:var(--paper-2);}
 
 <div class="mo" id="goal-modal"><div class="modal"><div class="mh"></div>
   <div class="mt" id="goal-mt">New Savings Goal</div>
-  <div class="fg"><label class="fl">Goal Name</label><input class="fi" id="g-name" placeholder="e.g. Emergency Fund"/></div>
-  <div class="g2"><div class="fg"><label class="fl">Target Amount</label><input class="fi" type="number" inputmode="decimal" id="g-target" placeholder="0.00"/></div><div class="fg"><label class="fl">Target Date</label><input class="fi" type="date" id="g-date"/></div></div>
+  <div class="fg"><label class="fl req" for="g-name">Goal Name</label><input class="fi" id="g-name" placeholder="e.g. Emergency Fund" aria-required="true"/></div>
+  <div class="g2"><div class="fg"><label class="fl req" for="g-target">Target Amount</label><input class="fi" type="number" inputmode="decimal" id="g-target" placeholder="0.00" aria-required="true"/></div><div class="fg"><label class="fl">Target Date</label><input class="fi" type="date" id="g-date"/></div></div>
   <div class="fg"><label class="fl">Monthly Contribution</label><input class="fi" type="number" inputmode="decimal" id="g-mon" placeholder="0.00"/></div>
   <div class="fg"><label class="fl">Icon</label>
     <select class="fi" id="g-icon">
@@ -845,9 +966,9 @@ body.dark .modal{background:var(--paper-2);}
 
 <div class="mo" id="income-modal"><div class="modal"><div class="mh"></div>
   <div class="mt" id="inc-mt">Add Income Source</div>
-  <div class="fg"><label class="fl">Source Name</label><input class="fi" id="in-name" placeholder="e.g. Salary, Dividend, Gift..."/></div>
+  <div class="fg"><label class="fl req" for="in-name">Source Name</label><input class="fi" id="in-name" placeholder="e.g. Salary, Dividend, Gift..." aria-required="true"/></div>
   <div class="g2">
-    <div class="fg"><label class="fl">Amount</label><input class="fi" type="number" inputmode="decimal" id="in-amt" placeholder="0.00"/></div>
+    <div class="fg"><label class="fl req" for="in-amt">Amount</label><input class="fi" type="number" inputmode="decimal" id="in-amt" placeholder="0.00" aria-required="true"/></div>
     <div class="fg"><label class="fl">Frequency</label>
       <select class="fi" id="in-freq" onchange="updateIncomeModalFields()">
         <option value="monthly">Monthly</option>
@@ -942,10 +1063,10 @@ body.dark .modal{background:var(--paper-2);}
 
 <div class="mo" id="loan-modal"><div class="modal"><div class="mh"></div>
   <div class="mt" id="loan-mt">Add Loan</div>
-  <div class="fg"><label class="fl">Loan Name</label><input class="fi" id="ln2-name" placeholder="e.g. GCB Car Loan, Staff Loan..."/></div>
+  <div class="fg"><label class="fl req" for="ln2-name">Loan Name</label><input class="fi" id="ln2-name" placeholder="e.g. GCB Car Loan, Staff Loan..." aria-required="true"/></div>
   <div class="g2">
-    <div class="fg"><label class="fl">Original Amount</label><input class="fi" type="number" inputmode="decimal" id="ln2-orig" placeholder="0.00"/></div>
-    <div class="fg"><label class="fl">Current Balance</label><input class="fi" type="number" inputmode="decimal" id="ln2-bal" placeholder="0.00"/></div>
+    <div class="fg"><label class="fl req" for="ln2-orig">Original Amount</label><input class="fi" type="number" inputmode="decimal" id="ln2-orig" placeholder="0.00" aria-required="true"/></div>
+    <div class="fg"><label class="fl req" for="ln2-bal">Current Balance</label><input class="fi" type="number" inputmode="decimal" id="ln2-bal" placeholder="0.00" aria-required="true"/></div>
   </div>
   <div class="g2">
     <div class="fg"><label class="fl">Monthly Payment</label><input class="fi" type="number" inputmode="decimal" id="ln2-pmt" placeholder="0.00"/></div>
@@ -1542,7 +1663,12 @@ window.openExpenseModal=function(id){
 };
 window.saveExpense=async function(){
   const desc=document.getElementById('exp-desc').value.trim(),amount=parseFloat(document.getElementById('exp-amt').value),cat=document.getElementById('exp-cat').value,date=document.getElementById('exp-date').value,note=document.getElementById('exp-note').value.trim();
-  if(!desc||!amount||!date){showToast('Fill in all fields');return;}
+  clearAllErrors(['exp-desc','exp-amt','exp-date']);
+  let hasErr=false;
+  if(!desc){setFieldError('exp-desc','Description is required');hasErr=true;}
+  if(!amount||amount<=0){setFieldError('exp-amt','Enter a valid amount');hasErr=true;}
+  if(!date){setFieldError('exp-date','Date is required');hasErr=true;}
+  if(hasErr)return;
   const id=EID||'e'+Date.now();
   const data={desc,amount,cat,date,note};
   // Auto-create/update a contribution when category is Savings Transfer
@@ -1574,6 +1700,7 @@ window.saveExpense=async function(){
   if(EID){const i=S.expenses.findIndex(e=>e.id===EID);if(i>-1)S.expenses[i]={...S.expenses[i],...data};}
   else S.expenses.push({id,...data});
   await saveDoc('expenses',id,data);
+  clearAllErrors(['exp-desc','exp-amt','exp-date']);
   closeModal('expense-modal');renderExp();renderDash();
   showToast(EID?'Updated ✓':'Expense added ✓');EID=null;
 };
@@ -1734,7 +1861,7 @@ window.delRecur=async function(id){if(!confirm('Delete this recurring expense?')
 async function autoLogRecurring(){if(!(S.recurringExpenses||[]).length)return;const now=new Date(),m=now.getMonth(),y=now.getFullYear(),td=now.getDate(),lk=`pkt_rc_${y}_${m}`,logged=JSON.parse(localStorage.getItem(lk)||'[]');for(const r of S.recurringExpenses){if(r.paused||logged.includes(r.id))continue;if(td>=r.day){const exists=S.expenses.some(e=>e.recurId===r.id&&new Date(e.date).getMonth()===m&&new Date(e.date).getFullYear()===y);if(!exists){const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(r.day).padStart(2,'0')}`;const eId='e'+Date.now()+Math.random().toString(36).slice(2,6);const exp={desc:r.desc,amount:r.amount,cat:r.cat,date:ds,note:r.note||'',recurring:true,recurId:r.id};S.expenses.push({id:eId,...exp});await saveDoc('expenses',eId,exp);logged.push(r.id);showToast(`Auto-logged: ${r.desc}`);}}}localStorage.setItem(lk,JSON.stringify(logged));}
 
 // ── ANALYTICS ──
-window.switchATab=function(tab){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));['overview','savings-trend','monthly'].forEach(t=>document.getElementById('analytics-'+t).style.display='none');document.getElementById('analytics-'+tab).style.display='block';document.querySelectorAll('.tab').forEach(t=>{if(t.getAttribute('onclick')?.includes("'"+tab+"'"))t.classList.add('active');});};
+window.switchATab=function(tab){document.querySelectorAll('#page-analytics .tab').forEach(t=>t.classList.remove('active'));['overview','savings-trend','monthly','cashflow'].forEach(t=>{const el=document.getElementById('analytics-'+t);if(el)el.style.display='none';});const el=document.getElementById('analytics-'+tab);if(el)el.style.display='block';document.querySelectorAll('#page-analytics .tab').forEach(t=>{if(t.getAttribute('onclick')?.includes("'"+tab+"'"))t.classList.add('active');});if(tab==='cashflow')renderAnCashFlow();};
 function renderAnalytics(){
   renderAnIncomeOverview();renderAnExpOverview();renderAnOv();renderAnSav();renderAnMon();}
 function renderAnOv(){
@@ -1923,8 +2050,12 @@ window.saveIncome=async function(){
   const needsDate=freq==='onetime'||((freq==='quarterly'||freq==='annual')&&spread==='received');
   const day=needsDate?null:(parseInt(document.getElementById('in-day').value)||null);
   const date=needsDate?document.getElementById('in-date').value:null;
-  if(!name||!amount){showToast('Fill in name and amount');return;}
-  if(needsDate&&!date){showToast('Enter the date received/payment date');return;}
+  clearAllErrors(['in-name','in-amt','in-date']);
+  let hasErrI=false;
+  if(!name){setFieldError('in-name','Source name is required');hasErrI=true;}
+  if(!amount||amount<=0){setFieldError('in-amt','Enter a valid amount');hasErrI=true;}
+  if(needsDate&&!date){setFieldError('in-date','Payment date is required');hasErrI=true;}
+  if(hasErrI)return;
   const id=IID||'i'+Date.now();
   const data={name,amount,freq,type,day,date,note,noncash,pinned,spread};
   if(IID){const i=S.incomeSources.findIndex(s=>s.id===IID);if(i>-1)S.incomeSources[i]={...S.incomeSources[i],...data};}
@@ -2172,7 +2303,12 @@ window.saveLoan=async function(){
   const term=parseInt(document.getElementById('ln2-term')?.value)||60;
   // Auto-calc monthly from term+rate if not entered
   const autoMonthly=monthly||calcMonthlyPayment(balance,rate,term);
-  if(!name||!original||!balance){showToast('Fill in name and loan amounts');return;}
+  clearAllErrors(['ln2-name','ln2-orig','ln2-bal']);
+  let hasErrL=false;
+  if(!name){setFieldError('ln2-name','Loan name is required');hasErrL=true;}
+  if(!original||original<=0){setFieldError('ln2-orig','Enter the original amount');hasErrL=true;}
+  if(!balance||balance<=0){setFieldError('ln2-bal','Enter current balance');hasErrL=true;}
+  if(hasErrL)return;
   if(!S.loans)S.loans=[];
   const id=editLoanId||'ln'+Date.now();
   const data={id,name,original,balance,monthly:autoMonthly,rate,start,type,term};
@@ -2777,6 +2913,17 @@ function renderAnIncomeOverview(){
 // ── INIT ──
 // All functions and state declared — now safe to start auth
 if(!initWidgetRoute())initAuth();
+
+// ── ESCAPE KEY CLOSES MODALS ────────────────────────────
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){
+    document.querySelectorAll('.mo.open').forEach(function(m){
+      const id=m.id;
+      m.classList.remove('open');
+      clearAllErrors(['exp-desc','exp-amt','exp-date','g-name','g-target','in-name','in-amt','ln2-name','ln2-orig','ln2-bal']);
+    });
+  }
+});
 
 // ── ONBOARDING ──────────────────────────────────────────
 function shouldShowOnboarding(){

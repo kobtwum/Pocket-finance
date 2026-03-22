@@ -393,14 +393,14 @@ body.dark .modal{background:var(--paper-2);}
     <button class="sb-item active" data-page="dashboard"><span class="si">◈</span><span class="sl">Dashboard</span></button>
     <button class="sb-item" data-page="expenses"><span class="si">↕</span><span class="sl">Expenses</span></button>
     <button class="sb-item" data-page="budget"><span class="si">⊟</span><span class="sl">Budget</span></button>
-    <button class="sb-item" data-page="savings"><span class="si">◎</span><span class="sl">Savings Goals</span></button>
+    <button class="sb-item" data-page="income"><span class="si">＋</span><span class="sl">Income</span></button>
     <div class="sb-sec">Insights</div>
+    <button class="sb-item" data-page="savings"><span class="si">◎</span><span class="sl">Savings Goals</span></button>
     <button class="sb-item" data-page="health"><span class="si">❤</span><span class="sl">Health Score</span></button>
     <button class="sb-item" data-page="networth"><span class="si">◑</span><span class="sl">Net Worth</span></button>
     <button class="sb-item" data-page="debt"><span class="si">⊗</span><span class="sl">Debt Tracker</span></button>
     <button class="sb-item" data-page="insights"><span class="si">✦</span><span class="sl">Insights</span></button>
     <button class="sb-item" data-page="analytics"><span class="si">◻</span><span class="sl">Analytics</span></button>
-    <button class="sb-item" data-page="income"><span class="si">＋</span><span class="sl">Income Sources</span></button>
     <button class="sb-item" data-page="recurring"><span class="si">↻</span><span class="sl">Recurring</span></button>
     <div class="sb-sec">Config</div>
     <button class="sb-item" data-page="import"><span class="si">⤓</span><span class="sl">Import CSV</span></button>
@@ -489,7 +489,16 @@ body.dark .modal{background:var(--paper-2);}
 <div id="page-savings" class="page">
   <div class="ar"><button class="btn btn-gold" onclick="openGoalModal()">+ Goal</button><button class="btn btn-green" onclick="openContributeModal()">↑ Contribute</button></div>
   <div id="goals-list"></div>
-  <div class="card"><div class="sh"><h2>All Contributions</h2></div><div id="sav-hist"></div></div>
+  <div class="card">
+    <div class="tabs" style="margin-bottom:12px;">
+      <button class="tab active" onclick="switchSavTab('month')">This Month</button>
+      <button class="tab" onclick="switchSavTab('cumulative')">Cumulative</button>
+      <button class="tab" onclick="switchSavTab('all')">All</button>
+    </div>
+    <div id="sav-tab-month"></div>
+    <div id="sav-tab-cumulative" style="display:none;"></div>
+    <div id="sav-tab-all" style="display:none;"><div id="sav-hist"></div></div>
+  </div>
 </div>
 
 <!-- ANALYTICS -->
@@ -501,6 +510,7 @@ body.dark .modal{background:var(--paper-2);}
   </div>
   <div id="analytics-overview">
     <div class="g3" id="an-stats"></div>
+    <div class="card" style="margin-bottom:12px;"><div class="sh"><h2>Income Overview</h2></div><div class="g2" id="an-inc-stats" style="margin-bottom:10px;"></div><div style="position:relative;height:200px;"><canvas id="an-inc-chart"></canvas></div><div id="an-inc-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
     <div id="an-charts">
       <div class="card"><div class="sh"><h2>By Category</h2></div><div style="position:relative;height:220px;"><canvas id="cat-pie"></canvas></div><div id="cat-pie-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
       <div class="card"><div class="sh"><h2>Top Categories</h2></div><div id="top-cats"></div></div>
@@ -689,34 +699,7 @@ body.dark .modal{background:var(--paper-2);}
       </div>
     </div>
     <div>
-      <div class="card">
-        <div class="sh"><h2>Loan Calculator</h2><p>Any loan type</p></div>
-        <div class="fg"><label class="fl">Loan Label</label><input class="fi" id="ln-lbl" placeholder="e.g. Car, Mortgage..."/></div>
-        <div class="g2">
-          <div class="fg"><label class="fl">Total Amount</label><input class="fi" type="number" inputmode="decimal" id="ln-price" placeholder="0.00"/></div>
-          <div class="fg"><label class="fl">Deposit</label><input class="fi" type="number" inputmode="decimal" id="ln-dep" placeholder="0.00"/></div>
-        </div>
-        <div class="g2">
-          <div class="fg"><label class="fl">Term</label>
-            <select class="fi" id="ln-term">
-              <option value="0.5">6 months</option><option value="1">1 year</option><option value="2">2 years</option>
-              <option value="3">3 years</option><option value="4">4 years</option><option value="5">5 years</option>
-              <option value="7">7 years</option><option value="10">10 years</option><option value="15">15 years</option>
-              <option value="20">20 years</option><option value="25">25 years</option><option value="30">30 years</option>
-            </select>
-          </div>
-          <div class="fg"><label class="fl">Rate (% / year)</label><input class="fi" type="number" inputmode="decimal" id="ln-rate" placeholder="e.g. 5"/></div>
-        </div>
-        <div class="fg">
-          <label class="fl">Gearing (% of income) <span style="color:var(--ink-3);font-weight:400;">— optional</span></label>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <input class="fi" type="number" inputmode="decimal" id="ln-gear" placeholder="e.g. 33" style="flex:1;"/>
-            <span style="font-size:12px;color:var(--ink-3);white-space:nowrap;">% of <strong style="color:var(--green)" id="ln-inc">₵0.00</strong></span>
-          </div>
-        </div>
-        <button class="btn btn-dark btn-full" onclick="calcLoan()">Calculate</button>
-        <div id="ln-res"></div>
-      </div>
+<!-- Loan calculator moved to Debt Tracker -->
     </div>
   </div>
 </div>
@@ -728,7 +711,7 @@ body.dark .modal{background:var(--paper-2);}
   <button class="nav-tab active" onclick="showPage('dashboard')" id="tab-dashboard"><span class="ti">◈</span><span class="tl">Home</span></button>
   <button class="nav-tab" onclick="showPage('expenses')" id="tab-expenses"><span class="ti">↕</span><span class="tl">Expenses</span></button>
   <button class="nav-tab" onclick="showPage('budget')" id="tab-budget"><span class="ti">⊟</span><span class="tl">Budget</span></button>
-  <button class="nav-tab" onclick="showPage('savings')" id="tab-savings"><span class="ti">◎</span><span class="tl">Savings</span></button>
+  <button class="nav-tab" onclick="showPage('income')" id="tab-income-nav"><span class="ti">＋</span><span class="tl">Income</span></button>
   <button class="nav-tab" id="tab-more" onclick="toggleMoreDrawer()"><span class="ti">⋯</span><span class="tl">More</span></button>
 </nav>
 
@@ -933,7 +916,18 @@ body.dark .modal{background:var(--paper-2);}
     <div class="fg"><label class="fl">Interest Rate (% / year)</label><input class="fi" type="number" inputmode="decimal" id="ln2-rate" placeholder="e.g. 5"/></div>
   </div>
   <div class="g2">
+    <div class="fg"><label class="fl">Loan Term</label>
+      <select class="fi" id="ln2-term">
+        <option value="6">6 months</option><option value="12">1 year</option><option value="18">18 months</option>
+        <option value="24">2 years</option><option value="36">3 years</option><option value="48">4 years</option>
+        <option value="60">5 years</option><option value="84">7 years</option><option value="120">10 years</option>
+        <option value="180">15 years</option><option value="240">20 years</option><option value="300">25 years</option>
+        <option value="360">30 years</option>
+      </select>
+    </div>
     <div class="fg"><label class="fl">Start Date</label><input class="fi" type="date" id="ln2-start"/></div>
+  </div>
+  <div class="g2">
     <div class="fg"><label class="fl">Type</label>
       <select class="fi" id="ln2-type">
         <option value="personal">Personal Loan</option>
@@ -945,6 +939,7 @@ body.dark .modal{background:var(--paper-2);}
       </select>
     </div>
   </div>
+  <div id="ln2-calc-preview" style="display:none;background:var(--paper-2);border-radius:var(--radius-sm);padding:10px 12px;font-size:11px;margin-bottom:4px;"></div>
   <div class="fg"><label class="fl">Link to expense category</label>
     <div style="background:var(--blue-light);border-radius:var(--radius-sm);padding:8px 12px;font-size:11px;color:var(--blue);">Repayments logged under <strong>Loan Repayment</strong> category will be tracked automatically.</div>
   </div>
@@ -1221,7 +1216,7 @@ function startSync(uid){
         if(c.type==='removed')S.incomeSources=S.incomeSources.filter(s=>s.id!==c.doc.id);
       });
     }
-    {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
+    {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=incInMonth(_m,_y),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
     if(checkReady()){refreshPage();setSyncDot('online');}
   },()=>setSyncDot('offline'));
 
@@ -1271,14 +1266,39 @@ function monthlyEq(src,forMonth,forYear){
     default:return a;
   }
 }
-function totInc(){return S.incomeSources.filter(s=>!s.noncash&&(s.freq||'monthly')!=='onetime').reduce((t,s)=>t+monthlyEq(s),0);}
+function totInc(m,y){
+  // If month/year provided, use incInMonth (includes one-time + spread-aware)
+  if(m!==undefined&&y!==undefined)return incInMonth(m,y);
+  // Default: monthly equivalent baseline (excludes one-time)
+  return S.incomeSources.filter(s=>!s.noncash&&(s.freq||'monthly')!=='onetime').reduce((t,s)=>t+monthlyEq(s),0);
+}
 function incInMonth(m,y){
   return S.incomeSources.filter(s=>{
     if(s.noncash)return false;
     const freq=s.freq||s.frequency||'monthly';
-    if(freq==='onetime'){if(!s.date)return false;const d=new Date(s.date);return d.getMonth()===m&&d.getFullYear()===y;}
+    if(freq==='onetime'){
+      if(!s.date)return false;
+      const d=new Date(s.date);
+      return d.getMonth()===m&&d.getFullYear()===y;
+    }
     return true;
-  }).reduce((t,s)=>t+(monthlyEq(s,m,y)||0),0);
+  }).reduce((t,s)=>{
+    const freq=s.freq||'monthly';
+    const spread=s.spread||'spread';
+    // For quarterly/annual with 'received' — only count in payment month
+    if((freq==='quarterly'||freq==='annual')&&spread==='received'){
+      const a=parseFloat(s.amount)||0;
+      if(!s.date&&!s.day)return t+0;
+      // Determine payment months based on start date
+      const startDate=s.date?new Date(s.date):new Date(new Date().getFullYear(),0,(s.day||1));
+      const sm=startDate.getMonth(),sy=startDate.getFullYear();
+      const monthsFromStart=(y-sy)*12+(m-sm);
+      if(monthsFromStart<0)return t+0;
+      if(freq==='quarterly')return monthsFromStart%3===0?t+a:t+0;
+      if(freq==='annual')return monthsFromStart%12===0?t+a:t+0;
+    }
+    return t+(monthlyEq(s,m,y)||0);
+  },0);
 }
 function totIncThisMonth(){return incInMonth(new Date().getMonth(),new Date().getFullYear());}
 const mExps=(m,y)=>S.expenses.filter(e=>{const d=new Date(e.date);return d.getMonth()===m&&d.getFullYear()===y;});
@@ -1364,8 +1384,8 @@ window.closeMoreDrawer=function(){document.getElementById('more-drawer').classLi
 // ── NAV ──
 let CP='dashboard';
 function refreshPage(){({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{renderIncome();if(document.getElementById('inc-tab-statement')&&document.getElementById('inc-tab-statement').style.display!=='none')renderIncStatement();},recurring:renderRecurring,import:renderImportPage,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[CP]?.();}
-const PRIMARY_TABS=['dashboard','expenses','budget','savings'];
-const MORE_TABS=['analytics','income','recurring','import','settings','health','networth','debt','insights'];
+const PRIMARY_TABS=['dashboard','expenses','budget','income'];
+const MORE_TABS=['analytics','savings','recurring','import','settings','health','networth','debt','insights'];
 
 window.showPage=function(id){
   CP=id;
@@ -1375,7 +1395,8 @@ window.showPage=function(id){
   document.getElementById('page-'+id).classList.add('active');
   // Highlight correct nav item
   if(PRIMARY_TABS.includes(id)){
-    const mt=document.getElementById('tab-'+id);if(mt)mt.classList.add('active');
+    const tabId=id==='income'?'tab-income-nav':'tab-'+id;
+    const mt=document.getElementById(tabId);if(mt)mt.classList.add('active');
   } else {
     // Highlight More button and the specific drawer item
     const moreBtn=document.getElementById('tab-more');if(moreBtn)moreBtn.classList.add('active');
@@ -1385,7 +1406,7 @@ window.showPage=function(id){
   document.getElementById('main-content').scrollTop=0;
   const fb=document.getElementById('fab');
   if(fb)fb.style.display=isDesk()?'none':(['dashboard','expenses','savings','recurring'].includes(id)?'flex':'none');
-  const titles={dashboard:'Dashboard',expenses:'Expenses',budget:'Budget',savings:'Savings Goals',analytics:'Analytics',income:'Income Sources',recurring:'Recurring',import:'Import CSV',settings:'Settings',networth:'Net Worth',debt:'Debt Tracker',health:'Health Score',insights:'Spending Insights'};
+  const titles={dashboard:'Dashboard',expenses:'Expenses',budget:'Budget',savings:'Savings Goals',analytics:'Analytics',income:'Income',recurring:'Recurring',import:'Import CSV',settings:'Settings',networth:'Net Worth',debt:'Debt Tracker',health:'Health Score',insights:'Spending Insights'};
   const pt=document.getElementById('d-ptitle');if(pt)pt.textContent=titles[id]||id;
   ({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:renderIncome,recurring:renderRecurring,import:renderImportPage,settings:updateLnInc,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[id]?.();
 };
@@ -1401,13 +1422,14 @@ window.addEventListener('appinstalled',()=>{document.getElementById('inst-wrap')
 function renderDash(){
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
   document.getElementById('greeting').textContent=greet()+' ✦';
-  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
+  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=incInMonth(_m,_y),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
   const sbInc=document.getElementById('sb-inc');if(sbInc)sbInc.textContent=fmt(totInc())+' / month';
   // Dashboard strip: show pinned sources + total
   const pinned=S.incomeSources.filter(s=>s.pinned&&!s.noncash);
-  const pinnedHTML=pinned.map(s=>`<div class="ii"><div class="lb">${s.name}</div><div class="am">${fmt(monthlyEq(s)||parseFloat(s.amount))}</div><div class="nt">${(s.freq||'monthly').charAt(0).toUpperCase()+(s.freq||'monthly').slice(1)}</div></div>`).join('');
-  document.getElementById('inc-strip').innerHTML=pinnedHTML+`<div class="ii"><div class="lb">Total Income</div><div class="am">${fmt(totInc())}</div><div class="nt">Monthly equiv.</div></div>`;
-  const spent=mSpent(m,y),inc=totInc(),rem=inc-spent,pct=Math.min(100,inc>0?spent/inc*100:0).toFixed(0);
+  const incThisMonth=incInMonth(m,y);
+  const pinnedHTML=pinned.map(s=>{const freq=s.freq||'monthly';const amt=freq==='onetime'?((s.date&&new Date(s.date).getMonth()===m&&new Date(s.date).getFullYear()===y)?parseFloat(s.amount):0):monthlyEq(s,m,y);return`<div class="ii"><div class="lb">${s.name}</div><div class="am">${fmt(amt)}</div><div class="nt">${freq==='onetime'?'One-time':freq.charAt(0).toUpperCase()+freq.slice(1)}</div></div>`;}).join('');
+  document.getElementById('inc-strip').innerHTML=pinnedHTML+`<div class="ii"><div class="lb">This Month</div><div class="am">${fmt(incThisMonth)}</div><div class="nt">${MOS[m]}</div></div>`;
+  const spent=mSpent(m,y),inc=incThisMonth,rem=inc-spent,pct=Math.min(100,inc>0?spent/inc*100:0).toFixed(0);
   const savM=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,c)=>s+parseFloat(c.amount),0);
   const nonSavSpent=mExps(m,y).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
   const allSpentM=mExps(m,y).reduce((s,e)=>s+parseFloat(e.amount),0);
@@ -1415,7 +1437,7 @@ function renderDash(){
   document.getElementById('dash-stats').innerHTML=`
     <div class="card" style="padding:14px;"><div class="ct">Total Income</div><div class="cv">${fmt(inc)}</div><div class="cs">${MOS[m]}</div></div>
     <div class="card" style="padding:14px;"><div class="ct">Spent</div><div class="cv" style="color:var(--red)">${fmt(nonSavSpent)}</div><div class="cs">${pct}% of income</div></div>
-    <div class="card" style="padding:14px;"><div class="ct">Saved</div><div class="cv" style="color:var(--green)">${fmt(savM)}</div><div class="cs">Total: ${fmt(allSaved())}</div></div>
+    <div class="card" style="padding:14px;"><div class="ct">Saved</div><div class="cv" style="color:var(--green)">${fmt(savM)}</div><div class="cs">Since ${fmt(allSaved())} all time</div></div>
     <div class="card" style="padding:14px;"><div class="ct">Remaining</div><div class="cv" style="color:${remAfterAll<0?'var(--red)':'var(--green)'}">${fmt(remAfterAll)}</div><div class="cs">${remAfterAll>=0?'Available':'Over budget'}</div></div>`;
   const rec=mExps(m,y).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('dash-rec').innerHTML=rec.length?rec.map(e=>eRow(e,true)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses yet this month</p></div>';
@@ -1633,6 +1655,7 @@ window.delBudget=async function(cat){if(!confirm('Remove budget for '+cat+'?'))r
 let GID=null;
 function renderSavings(){
   document.getElementById('goals-list').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),pct=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1),rem=g.target-sv;const tgt=new Date(g.date),now=new Date();const mL=Math.max(0,(tgt.getFullYear()-now.getFullYear())*12+tgt.getMonth()-now.getMonth());const nd=mL>0?rem/mL:0;return`<div class="card" style="padding:16px;margin-bottom:12px;"><div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;"><span style="font-size:28px">${g.icon}</span><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${g.name}</div><div style="font-size:11px;color:var(--ink-3)">Target: ${new Date(g.date).toLocaleDateString('en-GH',{month:'short',year:'numeric'})}</div></div><div style="text-align:right;"><div style="font-family:'DM Serif Display',serif;font-size:18px;">${fmt(g.target)}</div><div style="font-size:11px;color:var(--green);">${fmt(sv)} saved</div></div></div><div class="pw"><div class="pb pb-green" style="width:${pct}%"></div></div><div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:var(--ink-3);"><span>${pct}% complete</span><span>${fmt(rem)} to go</span></div>${mL>0?`<div style="background:var(--paper-2);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;"><span style="color:var(--ink-3)">Planned: <strong style="color:var(--ink)">${fmt(g.monthly)}/mo</strong></span><span style="color:var(--ink-3)">Needed: <strong style="color:${nd>g.monthly?'var(--red)':'var(--green)'}">${fmt(nd)}/mo</strong></span><span style="color:var(--ink-3)">${mL} months left</span></div>`:`<div style="margin-top:6px;"><span class="pill pill-g">🎉 Goal reached!</span></div>`}<div style="display:flex;gap:7px;margin-top:10px;"><button class="btn btn-green btn-sm" style="flex:1" onclick="quickContrib('${g.id}')">+ Contribute</button><button class="btn btn-ghost btn-sm" onclick="editGoal('${g.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delGoal('${g.id}')">Del</button></div></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No goals yet. Tap + to create one.</p></div>';
+  renderSavMonth();
   const all=[...S.contributions].sort((a,b)=>new Date(b.date)-new Date(a.date));
   document.getElementById('sav-hist').innerHTML=all.length?all.map(c=>{const g=S.goals.find(x=>x.id===c.goalId);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green)">${g?g.icon:'💰'}</div><div class="li-nm"><div class="p">${g?g.name:'Unknown Goal'}</div><div class="s">${new Date(c.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}</div></div><div class="li-am crd" style="margin-right:6px">+${fmt(c.amount)}</div><button class="btn btn-danger btn-sm" onclick="delContrib('${c.id}')">✕</button></div>`;}).join(''):'<div class="empty"><div class="icon">📜</div><p>No contributions yet</p></div>';
 }
@@ -1659,7 +1682,8 @@ async function autoLogRecurring(){if(!(S.recurringExpenses||[]).length)return;co
 
 // ── ANALYTICS ──
 window.switchATab=function(tab){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));['overview','savings-trend','monthly'].forEach(t=>document.getElementById('analytics-'+t).style.display='none');document.getElementById('analytics-'+tab).style.display='block';document.querySelectorAll('.tab').forEach(t=>{if(t.getAttribute('onclick')?.includes("'"+tab+"'"))t.classList.add('active');});};
-function renderAnalytics(){renderAnOv();renderAnSav();renderAnMon();}
+function renderAnalytics(){
+  renderAnIncomeOverview();renderAnOv();renderAnSav();renderAnMon();}
 function renderAnOv(){
   const all=S.expenses,tot=all.reduce((s,e)=>s+parseFloat(e.amount),0);
   const mwd=mwData(),avg=tot/Math.max(1,mwd.length);
@@ -1714,9 +1738,10 @@ function renderIncStatement(){
 }
 
 function renderIncome(){
-  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
+  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=incInMonth(_m,_y),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
   document.getElementById('inc-list').innerHTML=S.incomeSources.length?S.incomeSources.map(s=>{const freq=s.freq||'monthly';const mEq=monthlyEq(s);return`<div class="li"><div class="li-ic" style="background:${s.noncash?'var(--blue-light)':'var(--green-light)'};color:${s.noncash?'var(--blue)':'var(--green)'}">💰</div><div class="li-nm"><div class="p">${s.name}${s.noncash?' <span class="pill pill-b" style="font-size:9px">non-cash</span>':''}${s.pinned?' <span class="pill pill-gold" style="font-size:9px">📌</span>':''}</div><div class="s">${freq} · ${s.type||'income'}${s.day?' · Day '+s.day:''}${s.note?' · '+s.note:''}</div></div><div style="text-align:right;margin-right:8px;"><div style="font-family:'DM Serif Display',serif;font-size:14px;">${fmt(s.noncash?parseFloat(s.amount):mEq)}</div>${freq!=='monthly'&&freq!=='onetime'&&!s.noncash?`<div style="font-size:9px;color:var(--ink-3);">~${fmt(mEq)}/mo</div>`:''}</div><button class="btn btn-ghost btn-sm" onclick="openIncomeModal('${s.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delInc('${s.id}')">✕</button></div>`;}).join(''):'<div class="empty"><div class="icon">💰</div><p>No income sources yet</p></div>';
   document.getElementById('tot-inc').textContent=fmt(totInc());
+  const cumEl=document.getElementById('cum-inc');if(cumEl)cumEl.textContent=fmt(calcCumulativeIncome());
   dChart('inc-chart');if(S.incomeSources.length){const clrs=['#c9a84c','#2d7a5f','#2471a3','#8e44ad','#c0392b','#e67e22'];const cashSrc=S.incomeSources.filter(s=>!s.noncash);CI['inc-chart']=new Chart(document.getElementById('inc-chart').getContext('2d'),{type:'doughnut',data:{labels:cashSrc.map(s=>s.name),datasets:[{data:cashSrc.map(s=>monthlyEq(s)),backgroundColor:clrs.map((c,i)=>clrs[i%clrs.length]+'cc'),borderColor:clrs,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'60%'}});document.getElementById('inc-leg').innerHTML=cashSrc.map((s,i)=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${clrs[i%clrs.length]};display:inline-block;"></span>${s.name}</span>`).join('');}
 
 }
@@ -1970,8 +1995,12 @@ function renderDebt(){
 window.openLoanModal=function(id){
   editLoanId=id||null;
   document.getElementById('loan-mt').textContent=id?'Edit Loan':'Add Loan';
+  // Wire up calc preview on input change
+  setTimeout(()=>{
+    ['ln2-orig','ln2-bal','ln2-rate','ln2-term'].forEach(fid=>{const el=document.getElementById(fid);if(el)el.oninput=calcLoanPreview;});
+  },100);
   const today=new Date().toISOString().split('T')[0];
-  if(id){const l=(S.loans||[]).find(x=>x.id===id);if(l){document.getElementById('ln2-name').value=l.name;document.getElementById('ln2-orig').value=l.original;document.getElementById('ln2-bal').value=l.balance;document.getElementById('ln2-pmt').value=l.monthly;document.getElementById('ln2-rate').value=l.rate||0;document.getElementById('ln2-start').value=l.start||today;document.getElementById('ln2-type').value=l.type||'personal';}}
+  if(id){const l=(S.loans||[]).find(x=>x.id===id);if(l){document.getElementById('ln2-name').value=l.name;document.getElementById('ln2-orig').value=l.original;document.getElementById('ln2-bal').value=l.balance;document.getElementById('ln2-pmt').value=l.monthly;document.getElementById('ln2-rate').value=l.rate||0;document.getElementById('ln2-start').value=l.start||today;document.getElementById('ln2-type').value=l.type||'personal';if(document.getElementById('ln2-term'))document.getElementById('ln2-term').value=l.term||60;}}
   else{['ln2-name','ln2-orig','ln2-bal','ln2-pmt','ln2-rate'].forEach(i=>document.getElementById(i).value='');document.getElementById('ln2-start').value=today;document.getElementById('ln2-type').value='personal';}
   openModal('loan-modal');
 };
@@ -1983,10 +2012,11 @@ window.saveLoan=async function(){
   const rate=parseFloat(document.getElementById('ln2-rate').value)||0;
   const start=document.getElementById('ln2-start').value;
   const type=document.getElementById('ln2-type').value;
+  const term=parseInt(document.getElementById('ln2-term')?.value)||60;
   if(!name||!original||!balance||!monthly){showToast('Fill in all required fields');return;}
   if(!S.loans)S.loans=[];
   const id=editLoanId||'ln'+Date.now();
-  const data={id,name,original,balance,monthly,rate,start,type};
+  const data={id,name,original,balance,monthly,rate,start,type,term};
   if(editLoanId){const i=S.loans.findIndex(l=>l.id===editLoanId);if(i>-1)S.loans[i]=data;}else S.loans.push(data);
   // Also add as liability in net worth
   const liabIdx=(S.liabilities||[]).findIndex(l=>l.id==='ll_'+id);
@@ -2379,6 +2409,107 @@ function initWidgetRoute(){
 }
 
 
+
+// ── FIX 5: Savings tabs ─────────────────────────
+window.switchSavTab=function(tab){
+  document.querySelectorAll('#page-savings .tab').forEach(t=>t.classList.remove('active'));
+  ['month','cumulative','all'].forEach(t=>{const el=document.getElementById('sav-tab-'+t);if(el)el.style.display=t===tab?'block':'none';});
+  const btn=document.querySelector(`#page-savings .tab[onclick*="${tab}"]`);if(btn)btn.classList.add('active');
+  if(tab==='month')renderSavMonth();
+  if(tab==='cumulative')renderSavCumulative();
+};
+
+function renderSavMonth(){
+  const now=new Date(),m=now.getMonth(),y=now.getFullYear();
+  const contribs=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===m&&d.getFullYear()===y;});
+  const total=contribs.reduce((s,c)=>s+parseFloat(c.amount),0);
+  const el=document.getElementById('sav-tab-month');if(!el)return;
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--paper-2);">
+    <span style="font-size:13px;font-weight:500;">${MOS[m]} contributions</span>
+    <span style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--green);">${fmt(total)}</span>
+  </div>`+
+  (contribs.length?contribs.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(c=>{const g=S.goals.find(x=>x.id===c.goalId);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green)">${g?g.icon:'💰'}</div><div class="li-nm"><div class="p">${g?g.name:'Manual Savings'}</div><div class="s">${new Date(c.date).toLocaleDateString('en-GH',{day:'numeric',month:'short'})}</div></div><div class="li-am crd" style="margin-right:6px">+${fmt(c.amount)}</div></div>`;}).join('')
+  :'<div class="empty"><div class="icon">💰</div><p>No contributions this month</p></div>');
+}
+
+function renderSavCumulative(){
+  const el=document.getElementById('sav-tab-cumulative');if(!el)return;
+  const mwd=mwData();
+  if(!mwd.length){el.innerHTML='<div class="empty"><p>No data yet</p></div>';return;}
+  let cum=0;
+  const rows=mwd.map(({month,year})=>{
+    const mv=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0);
+    cum+=mv;
+    return{label:MOS[month].slice(0,3)+' '+year,monthly:mv,cumulative:cum};
+  });
+  el.innerHTML=`<div style="font-size:13px;font-weight:500;margin-bottom:10px;">Running total: <span style="color:var(--green);font-family:'DM Serif Display',serif;">${fmt(cum)}</span></div>`+
+  `<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--paper-2);">${['Month','This Month','Cumulative'].map(h=>`<th style="padding:6px 8px;text-align:${h==='Month'?'left':'right'};font-weight:500;color:var(--ink-3);">${h}</th>`).join('')}</tr></thead><tbody>`+
+  rows.reverse().map(r=>`<tr style="border-bottom:1px solid var(--paper-2);"><td style="padding:6px 8px;font-weight:500;">${r.label}</td><td style="padding:6px 8px;text-align:right;color:var(--green);">${fmt(r.monthly)}</td><td style="padding:6px 8px;text-align:right;font-weight:500;">${fmt(r.cumulative)}</td></tr>`).join('')+
+  '</tbody></table>';
+}
+
+// ── FIX 6: Cumulative income calculation ─────────
+function calcCumulativeIncome(){
+  const mwd=mwData();
+  if(!mwd.length)return 0;
+  // Sum incInMonth for each month we have data
+  return mwd.reduce((t,{month,year})=>t+incInMonth(month,year),0);
+}
+
+// ── FIX 7: Loan modal term auto-calc + debt tracker enhanced ──
+window.calcLoanPreview=function(){
+  const orig=parseFloat(document.getElementById('ln2-orig')?.value)||0;
+  const bal=parseFloat(document.getElementById('ln2-bal')?.value)||orig;
+  const rate=(parseFloat(document.getElementById('ln2-rate')?.value)||0)/100/12;
+  const termMonths=parseInt(document.getElementById('ln2-term')?.value)||60;
+  const prev=document.getElementById('ln2-calc-preview');
+  if(!prev||!bal)return;
+  let monthly;
+  if(rate===0){monthly=bal/termMonths;}
+  else{monthly=bal*rate*Math.pow(1+rate,termMonths)/(Math.pow(1+rate,termMonths)-1);}
+  if(isNaN(monthly)||!isFinite(monthly)){prev.style.display='none';return;}
+  const totalPmt=monthly*termMonths;
+  const totalInt=totalPmt-bal;
+  prev.style.display='block';
+  prev.style.background='var(--paper-2)';
+  prev.innerHTML=`<div style="font-weight:500;color:var(--ink);margin-bottom:6px;">Payment Preview</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      <div><div style="color:var(--ink-3);font-size:10px;">Monthly</div><div style="font-weight:600;color:var(--ink);font-size:13px;">${fmt(monthly)}</div></div>
+      <div><div style="color:var(--ink-3);font-size:10px;">Total Interest</div><div style="font-weight:600;color:var(--red);font-size:13px;">${fmt(totalInt)}</div></div>
+      <div><div style="color:var(--ink-3);font-size:10px;">Total Repayment</div><div style="font-weight:600;color:var(--ink);font-size:13px;">${fmt(totalPmt)}</div></div>
+    </div>`;
+  // Auto-fill monthly payment if empty
+  const pmtEl=document.getElementById('ln2-pmt');
+  if(pmtEl&&!pmtEl.value)pmtEl.value=monthly.toFixed(2);
+};
+
+// ── FIX 8: Analytics income section ─────────────
+function renderAnIncomeOverview(){
+  const now=new Date(),m=now.getMonth(),y=now.getFullYear();
+  const mwd=mwData().slice(-6);
+  // Stats
+  const monthlyBase=totInc();
+  const cumInc=calcCumulativeIncome();
+  const cashSources=S.incomeSources.filter(s=>!s.noncash);
+  const statsEl=document.getElementById('an-inc-stats');
+  if(statsEl)statsEl.innerHTML=`
+    <div class="card" style="padding:12px;"><div class="ct">Monthly Baseline</div><div class="cv" style="font-size:18px;color:var(--green);">${fmt(monthlyBase)}</div><div class="cs">${cashSources.length} source${cashSources.length!==1?'s':''}</div></div>
+    <div class="card" style="padding:12px;"><div class="ct">Cumulative Income</div><div class="cv" style="font-size:18px;color:var(--gold);">${fmt(cumInc)}</div><div class="cs">All recorded months</div></div>`;
+  // Income by source chart
+  if(cashSources.length){
+    dChart('an-inc-chart');
+    const clrs=['#c9a84c','#2d7a5f','#2471a3','#8e44ad','#c0392b','#e67e22'];
+    CI['an-inc-chart']=new Chart(document.getElementById('an-inc-chart').getContext('2d'),{
+      type:'doughnut',
+      data:{labels:cashSources.map(s=>s.name),datasets:[{data:cashSources.map(s=>monthlyEq(s)||parseFloat(s.amount)),backgroundColor:clrs.map((c,i)=>clrs[i%clrs.length]+'cc'),borderColor:clrs,borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'60%'}
+    });
+    const legEl=document.getElementById('an-inc-leg');
+    if(legEl)legEl.innerHTML=cashSources.map((s,i)=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${clrs[i%clrs.length]};display:inline-block;"></span>${s.name}</span>`).join('');
+  }
+}
+
+
 // ── INIT ──
 // All functions and state declared — now safe to start auth
 if(!initWidgetRoute())initAuth();
@@ -2766,7 +2897,7 @@ function initApp(){
     localStorage.setItem('pkt_onboarded','1');
   }
   document.getElementById('greeting').textContent=greet()+' ✦';
-  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=totInc(),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
+  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=incInMonth(_m,_y),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
   document.getElementById('exp-date').value=tod();
   document.getElementById('co-date').value=tod();
   applyLayout();

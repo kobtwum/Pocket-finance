@@ -912,7 +912,8 @@ body.dark .fi.error{background:#2a0a0a;}
   <div class="fg"><label class="fl">Monthly Limit</label><input class="fi" type="number" inputmode="decimal" id="bud-lim" placeholder="0.00"/></div>
   <div class="s-row" style="padding:10px 0 4px;">
     <div><div class="s-lbl" style="font-size:12px;">Roll over unspent amount</div><div class="s-sub">Carry unused budget to next month</div></div>
-    <label style="position:relative;display:inline-block;width:44px;height:24px;"><input type="checkbox" id="bud-rollover" style="opacity:0;width:0;height:0;"><span id="bud-rollover-track" style="position:absolute;cursor:pointer;inset:0;background:var(--paper-3);border-radius:24px;transition:.2s;" onclick="this.previousElementSibling.click();this.style.background=this.previousElementSibling.checked?'var(--green)':'var(--paper-3)'"><span style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s;" id="bud-rollover-thumb"></span></span></label>
+    <button class="dk-tog" id="bud-rollover-btn" onclick="toggleRolloverBtn()" aria-label="Toggle budget rollover" role="switch" aria-checked="false"></button>
+    <input type="hidden" id="bud-rollover" value="false"/>
   </div>
   <div id="bud-rollover-info" style="display:none;background:var(--green-light);border-radius:var(--radius-sm);padding:8px 12px;font-size:11px;color:var(--green);margin-bottom:4px;"></div>
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('budget-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveBudget()">Save</button></div>
@@ -1615,7 +1616,7 @@ function renderDash(){
   const rec=mExps(m,y).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('dash-rec').innerHTML=rec.length?rec.map(e=>eRow(e,true)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses yet this month</p></div>';
   const bc=byCat(m,y);
-  document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,p2=Math.min(100,b.limit>0?sp/b.limit*100:0).toFixed(0);const c=gCat(b.cat);return`<div class="bc"><div class="bc-h"><div class="bc-n">${c.icon} ${b.cat}</div><div class="bc-a"><strong>${fmt(sp)}</strong>/${fmt(b.limit)}</div></div><div class="pw"><div class="pb ${p2>90?'pb-red':p2>70?'pb-gold':'pb-green'}" style="width:${p2}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
+  document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,rawP=b.limit>0?sp/b.limit*100:0,p2=rawP.toFixed(0),barP=Math.min(100,rawP);const c=gCat(b.cat);return`<div class="bc"><div class="bc-h"><div class="bc-n">${c.icon} ${b.cat}</div><div class="bc-a"><strong>${fmt(sp)}</strong>/${fmt(b.limit)}${rawP>100?` <span style="color:var(--red);font-size:11px;">${p2}%</span>`:''}</div></div><div class="pw"><div class="pb ${rawP>100?'pb-red':rawP>70?'pb-gold':'pb-green'}" style="width:${barP}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
   renderBudgetAlerts();renderDashHealth();renderDashInsights();
   document.getElementById('dash-sav').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),p3=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green);font-size:18px">${g.icon}</div><div class="li-nm"><div class="p">${g.name}</div><div class="s">${fmt(sv)} of ${fmt(g.target)}</div></div><span class="pill pill-g">${p3}%</span></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No savings goals yet</p></div>';
 }
@@ -1814,23 +1815,34 @@ window.dismissBudgetAlert=function(cat){
   renderBudgetAlerts();
 };
 
+window.toggleRolloverBtn=function(){
+  const btn=document.getElementById('bud-rollover-btn');
+  const val=document.getElementById('bud-rollover');
+  if(!btn||!val)return;
+  const isOn=btn.classList.toggle('on');
+  val.value=isOn?'true':'false';
+  btn.setAttribute('aria-checked',isOn?'true':'false');
+};
 window.openBudgetModal=function(cat){
   popCatSel('bud-cat');
-  const ro=document.getElementById('bud-rollover');
-  const roTrack=document.getElementById('bud-rollover-track');
+  const btn=document.getElementById('bud-rollover-btn');
+  const val=document.getElementById('bud-rollover');
   const roInfo=document.getElementById('bud-rollover-info');
   if(cat){
     document.getElementById('bud-cat').value=cat;
     const b=S.budgets.find(x=>x.cat===cat);
     if(b){
       document.getElementById('bud-lim').value=b.limit;
-      if(ro){ro.checked=b.rollover||false;if(roTrack)roTrack.style.background=b.rollover?'var(--green)':'var(--paper-3)';}
+      const isOn=b.rollover||false;
+      if(btn){btn.classList.toggle('on',isOn);btn.setAttribute('aria-checked',isOn?'true':'false');}
+      if(val)val.value=isOn?'true':'false';
       const carried=getRollover(cat);
-      if(roInfo){roInfo.style.display=carried>0?'block':'none';roInfo.textContent=carried>0?`₵${carried.toFixed(2)} carried over from last month will be added to this month's limit.`:''}
+      if(roInfo){roInfo.style.display=carried>0?'block':'none';roInfo.textContent=carried>0?`${fmt(carried)} carried over from last month will be added to this month's limit.`:'';}
     }
   }else{
     document.getElementById('bud-lim').value='';
-    if(ro){ro.checked=false;if(roTrack)roTrack.style.background='var(--paper-3)';}
+    if(btn){btn.classList.remove('on');btn.setAttribute('aria-checked','false');}
+    if(val)val.value='false';
     if(roInfo)roInfo.style.display='none';
   }
   openModal('budget-modal');
@@ -1838,7 +1850,7 @@ window.openBudgetModal=function(cat){
 window.saveBudget=async function(){
   const cat=document.getElementById('bud-cat').value;
   const limit=parseFloat(document.getElementById('bud-lim').value);
-  const rollover=document.getElementById('bud-rollover')?.checked||false;
+  const rollover=document.getElementById('bud-rollover')?.value==='true';
   if(!limit){showToast('Enter a limit');return;}
   const i=S.budgets.findIndex(b=>b.cat===cat);
   if(i>-1){S.budgets[i].limit=limit;S.budgets[i].rollover=rollover;}
@@ -2684,18 +2696,23 @@ function renderBudget(){
     const sp=bc[b.cat]||0;
     const effLimit=effectiveBudgetLimit(b.cat);
     const carried=getRollover(b.cat);
-    const pct=Math.min(100,effLimit>0?sp/effLimit*100:0).toFixed(0);
-    const c=gCat(b.cat),cl=pct>90?'pb-red':pct>70?'pb-gold':'pb-green',pl=pct>90?'pill-r':pct>70?'pill-gold':'pill-g';
+    const rawPct=effLimit>0?sp/effLimit*100:0;
+    const pct=rawPct.toFixed(0);
+    const barPct=Math.min(100,rawPct); // bar capped at 100 visually
+    const isOver=rawPct>100;
+    const c=gCat(b.cat);
+    const cl=isOver?'pb-red':rawPct>70?'pb-gold':'pb-green';
+    const pl=isOver?'pill-r':rawPct>70?'pill-gold':'pill-g';
     return`<div class="bc">
       <div class="bc-h">
-        <div class="bc-n">${c.icon} ${b.cat} <span class="pill ${pl}">${pct}%</span>${b.rollover?'<span class="pill pill-b" style="font-size:11px">↻ rollover</span>':''}</div>
+        <div class="bc-n">${c.icon} ${b.cat} <span class="pill ${pl}">${pct}%${isOver?' ⚠':''}</span>${b.rollover?'<span class="pill pill-b" style="font-size:11px">↻ rollover</span>':''}</div>
         <div style="display:flex;gap:5px;align-items:center;">
           <div class="bc-a">${fmt(sp)}/${fmt(effLimit)}</div>
           <button class="btn btn-ghost btn-sm" onclick="openBudgetModal('${b.cat}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="delBudget('${b.cat}')">✕</button>
         </div>
       </div>
-      <div class="pw"><div class="pb ${cl}" style="width:${pct}%"></div></div>
+      <div class="pw"><div class="pb ${cl}" style="width:${barPct}%"></div></div>
       <div style="font-size:10px;color:var(--ink-3);margin-top:3px;">
         ${effLimit-sp>=0?fmt(effLimit-sp)+' remaining':fmt(sp-effLimit)+' over'}
         ${carried>0?`<span style="color:var(--blue);"> · ${fmt(carried)} rolled over from last month</span>`:''}

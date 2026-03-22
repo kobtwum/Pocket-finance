@@ -1776,7 +1776,7 @@ function renderIncStatement(){
     if(freq==='onetime'){if(!s.date)return false;const d=new Date(s.date);return d.getMonth()===m&&d.getFullYear()===y;}
     return true;
   });
-  const cashM=activeSources.reduce((t,s)=>t+monthlyEq(s,m,y),0);
+  const cashM=incInMonth(m,y); // use the single source of truth
   const nonCash=S.incomeSources.filter(s=>s.noncash);
   const stats=document.getElementById('inc-month-stats');
   if(stats)stats.innerHTML=`
@@ -1785,9 +1785,23 @@ function renderIncStatement(){
   const list=document.getElementById('inc-statement-list');
   if(!list)return;
   list.innerHTML=activeSources.length?activeSources.map(s=>{
-    const freq=s.freq||'monthly';const mEq=monthlyEq(s);
+    const freq=s.freq||'monthly';
+    // Use the same logic as incInMonth — correct amount for this specific month
+    const a=parseFloat(s.amount)||0;
+    let mAmt=a; // default for monthly/weekly/biweekly
+    if(freq==='onetime') mAmt=a; // already filtered to correct month above
+    else if((freq==='quarterly'||freq==='annual')&&(s.spread||'spread')==='received'){
+      if(!s.date)mAmt=0;
+      else{const sd=new Date(s.date),sm=sd.getMonth(),sy=sd.getFullYear();
+        const mfs=(y-sy)*12+(m-sm);
+        if(mfs<0)mAmt=0;
+        else if(freq==='quarterly')mAmt=mfs%3===0?a:0;
+        else mAmt=mfs%12===0?a:0;
+      }
+    } else mAmt=monthlyEq(s,m,y);
     const freqLabel={monthly:'Monthly',weekly:'Weekly',biweekly:'Bi-weekly',quarterly:'Quarterly',annual:'Annual',onetime:'One-time'}[freq]||freq;
-    return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green)">💰</div><div class="li-nm"><div class="p">${s.name}${s.pinned?' 📌':''}</div><div class="s">${s.type||'income'} · ${freqLabel}${freq!=='monthly'&&freq!=='onetime'?` · ${fmt(s.amount)} per period`:''}</div></div><div class="li-am crd">+${fmt(mEq)}</div></div>`;
+    const spreadNote=(freq==='quarterly'||freq==='annual')?(s.spread==='received'?' · on receipt':' · spread'):'';
+    return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green)">💰</div><div class="li-nm"><div class="p">${s.name}${s.pinned?' 📌':''}</div><div class="s">${s.type||'income'} · ${freqLabel}${spreadNote}${freq!=='monthly'&&freq!=='onetime'?` · ${fmt(a)} per period`:''}</div></div><div class="li-am crd">+${fmt(mAmt)}</div></div>`;
   }).join('')+`<div style="border-top:1px solid var(--paper-2);margin-top:8px;padding-top:10px;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:13px;font-weight:600;">Total Cash Income</span><span style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--green);">${fmt(cashM)}</span></div>`
   :'<div class="empty"><div class="icon">💰</div><p>No income recorded for this month</p></div>';
   if(nonCash.length)list.innerHTML+=`<div style="margin-top:10px;padding:10px;background:var(--blue-light);border-radius:var(--radius-sm);"><div style="font-size:11px;font-weight:500;color:var(--blue);margin-bottom:6px;">Non-cash Benefits (not in totals)</div>${nonCash.map(s=>`<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--blue);padding:3px 0;"><span>${s.name}</span><span>${fmt(s.amount)}</span></div>`).join('')}</div>`;
@@ -1795,8 +1809,30 @@ function renderIncStatement(){
 
 function renderIncome(){
   {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=incInMonth(_m,_y),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
-  document.getElementById('inc-list').innerHTML=S.incomeSources.length?S.incomeSources.map(s=>{const freq=s.freq||'monthly';const mEq=monthlyEq(s);return`<div class="li"><div class="li-ic" style="background:${s.noncash?'var(--blue-light)':'var(--green-light)'};color:${s.noncash?'var(--blue)':'var(--green)'}">💰</div><div class="li-nm"><div class="p">${s.name}${s.noncash?' <span class="pill pill-b" style="font-size:9px">non-cash</span>':''}${s.pinned?' <span class="pill pill-gold" style="font-size:9px">📌</span>':''}</div><div class="s">${freq} · ${s.type||'income'}${s.day?' · Day '+s.day:''}${s.note?' · '+s.note:''}</div></div><div style="text-align:right;margin-right:8px;"><div style="font-family:'DM Serif Display',serif;font-size:14px;">${fmt(s.noncash?parseFloat(s.amount):mEq)}</div>${freq!=='monthly'&&freq!=='onetime'&&!s.noncash?`<div style="font-size:9px;color:var(--ink-3);">~${fmt(mEq)}/mo</div>`:''}</div><button class="btn btn-ghost btn-sm" onclick="openIncomeModal('${s.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delInc('${s.id}')">✕</button></div>`;}).join(''):'<div class="empty"><div class="icon">💰</div><p>No income sources yet</p></div>';
-  const nowR=new Date();document.getElementById('tot-inc').textContent=fmt(monthlyBaseline());if(document.getElementById('tot-inc-month'))document.getElementById('tot-inc-month').textContent=fmt(incInMonth(nowR.getMonth(),nowR.getFullYear()));if(document.getElementById('tot-inc-cum'))document.getElementById('tot-inc-cum').textContent=fmt(calcCumulativeIncome());
+  const nowR=new Date(),mNow=nowR.getMonth(),yNow=nowR.getFullYear();
+  document.getElementById('inc-list').innerHTML=S.incomeSources.length?S.incomeSources.map(s=>{
+    const freq=s.freq||'monthly';
+    const a=parseFloat(s.amount)||0;
+    // Monthly equivalent for planning (baseline)
+    const mEq=monthlyEq(s,mNow,yNow);
+    // Actual amount this month using same logic as incInMonth
+    let thisMonth=0;
+    if(!s.noncash){
+      if(freq==='onetime'){thisMonth=s.date&&new Date(s.date).getMonth()===mNow&&new Date(s.date).getFullYear()===yNow?a:0;}
+      else if((freq==='quarterly'||freq==='annual')&&(s.spread||'spread')==='received'){
+        if(s.date){const sd=new Date(s.date),sm=sd.getMonth(),sy=sd.getFullYear();
+          const mfs=(yNow-sy)*12+(mNow-sm);
+          thisMonth=mfs>=0&&((freq==='quarterly'?mfs%3:mfs%12)===0)?a:0;
+        }
+      } else thisMonth=mEq;
+    }
+    const freqLabel={monthly:'Monthly',weekly:'Weekly',biweekly:'Bi-weekly',quarterly:'Quarterly',annual:'Annual',onetime:'One-time'}[freq]||freq;
+    const spreadNote=(freq==='quarterly'||freq==='annual')?(s.spread==='received'?' · on receipt':' · spread'):'';
+    return`<div class="li"><div class="li-ic" style="background:${s.noncash?'var(--blue-light)':'var(--green-light)'};color:${s.noncash?'var(--blue)':'var(--green)'}">💰</div><div class="li-nm"><div class="p">${s.name}${s.noncash?' <span class="pill pill-b" style="font-size:9px">non-cash</span>':''}${s.pinned?' <span class="pill pill-gold" style="font-size:9px">📌</span>':''}</div><div class="s">${freqLabel}${spreadNote} · ${s.type||'income'}${s.day?' · Day '+s.day:''}${s.date&&freq==='onetime'?' · '+new Date(s.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'}):''}</div></div><div style="text-align:right;margin-right:8px;"><div style="font-family:'DM Serif Display',serif;font-size:14px;">${fmt(s.noncash?a:mEq)}</div>${!s.noncash&&freq!=='monthly'?`<div style="font-size:9px;color:var(--ink-3);">this month: ${fmt(thisMonth)}</div>`:''}</div><button class="btn btn-ghost btn-sm" onclick="openIncomeModal('${s.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delInc('${s.id}')">✕</button></div>`;
+  }).join(''):'<div class="empty"><div class="icon">💰</div><p>No income sources yet</p></div>';
+  document.getElementById('tot-inc').textContent=fmt(monthlyBaseline());
+  if(document.getElementById('tot-inc-month'))document.getElementById('tot-inc-month').textContent=fmt(incInMonth(mNow,yNow));
+  if(document.getElementById('tot-inc-cum'))document.getElementById('tot-inc-cum').textContent=fmt(calcCumulativeIncome());
   const cumEl=document.getElementById('cum-inc');if(cumEl)cumEl.textContent=fmt(calcCumulativeIncome());
   dChart('inc-chart');if(S.incomeSources.length){const clrs=['#c9a84c','#2d7a5f','#2471a3','#8e44ad','#c0392b','#e67e22'];const cashSrc=S.incomeSources.filter(s=>!s.noncash);CI['inc-chart']=new Chart(document.getElementById('inc-chart').getContext('2d'),{type:'doughnut',data:{labels:cashSrc.map(s=>s.name),datasets:[{data:cashSrc.map(s=>monthlyEq(s)),backgroundColor:clrs.map((c,i)=>clrs[i%clrs.length]+'cc'),borderColor:clrs,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'60%'}});document.getElementById('inc-leg').innerHTML=cashSrc.map((s,i)=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${clrs[i%clrs.length]};display:inline-block;"></span>${s.name}</span>`).join('');}
 

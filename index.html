@@ -825,7 +825,7 @@ body.dark .modal{background:var(--paper-2);}
     </div>
   </div>
   <div class="fg" id="in-day-row"><label class="fl" id="in-day-lbl">Payment Day of Month</label><input class="fi" type="number" id="in-day" placeholder="e.g. 24" min="1" max="31"/></div>
-  <div class="fg" id="in-date-row" style="display:none;"><label class="fl">Date Received</label><input class="fi" type="date" id="in-date"/></div>
+  <div class="fg" id="in-date-row" style="display:none;"><label class="fl" id="in-date-lbl">Date Received</label><input class="fi" type="date" id="in-date"/></div>
   <div class="g2">
     <div class="fg"><label class="fl">Type</label><select class="fi" id="in-type"><option value="salary">Salary</option><option value="allowance">Allowance</option><option value="benefit">Benefit</option><option value="side">Side Income</option><option value="investment">Investment/Dividend</option><option value="gift">Gift/Bonus</option><option value="other">Other</option></select></div>
     <div class="fg" style="display:flex;align-items:flex-end;padding-bottom:2px;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:500;color:var(--ink-2);"><input type="checkbox" id="in-nc" style="width:16px;height:16px;cursor:pointer;"/> Non-cash benefit</label></div>
@@ -836,7 +836,7 @@ body.dark .modal{background:var(--paper-2);}
   </div>
   <div id="in-spread-row" style="display:none;" class="s-row" style="padding:8px 0;">
     <div><div class="s-lbl" style="font-size:12px;">Recording method</div><div class="s-sub">How to show this in your monthly income</div></div>
-    <select class="fi" id="in-spread" style="width:auto;padding:6px 8px;font-size:12px;">
+    <select class="fi" id="in-spread" style="width:auto;padding:6px 8px;font-size:12px;" onchange="onSpreadChange()">
       <option value="spread">Spread across all months</option>
       <option value="received">Record in month received</option>
     </select>
@@ -1249,14 +1249,14 @@ function monthlyEq(src,forMonth,forYear){
   const spread=src.spread||'spread';
   // For quarterly/annual with 'received' mode, only show in payment month
   if((freq==='quarterly'||freq==='annual')&&spread==='received'){
-    if(forMonth===undefined)return freq==='quarterly'?a/3:a/12; // default for totInc
-    // Check if this month is a payment month
-    const payDay=src.day||1;
-    const startDate=src.date?new Date(src.date):new Date(new Date().getFullYear(),0,payDay);
+    if(forMonth===undefined)return freq==='quarterly'?a/3:a/12;
+    if(!src.date)return 0; // no date = can't determine payment month
+    const startDate=new Date(src.date);
     const sm=startDate.getMonth(),sy=startDate.getFullYear();
     const monthsFromStart=(forYear-sy)*12+(forMonth-sm);
-    if(freq==='quarterly')return monthsFromStart>=0&&monthsFromStart%3===0?a:0;
-    if(freq==='annual')return monthsFromStart>=0&&monthsFromStart%12===0?a:0;
+    if(monthsFromStart<0)return 0;
+    if(freq==='quarterly')return monthsFromStart%3===0?a:0;
+    if(freq==='annual')return monthsFromStart%12===0?a:0;
   }
   switch(freq){
     case'weekly':return a*52/12;
@@ -1295,9 +1295,8 @@ function incInMonth(m,y){
     // For quarterly/annual with 'received' — only count in payment month
     if((freq==='quarterly'||freq==='annual')&&spread==='received'){
       const a=parseFloat(s.amount)||0;
-      if(!s.date&&!s.day)return t+0;
-      // Determine payment months based on start date
-      const startDate=s.date?new Date(s.date):new Date(new Date().getFullYear(),0,(s.day||1));
+      if(!s.date)return t+0;
+      const startDate=new Date(s.date);
       const sm=startDate.getMonth(),sy=startDate.getFullYear();
       const monthsFromStart=(y-sy)*12+(m-sm);
       if(monthsFromStart<0)return t+0;
@@ -1690,7 +1689,7 @@ async function autoLogRecurring(){if(!(S.recurringExpenses||[]).length)return;co
 // ── ANALYTICS ──
 window.switchATab=function(tab){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));['overview','savings-trend','monthly'].forEach(t=>document.getElementById('analytics-'+t).style.display='none');document.getElementById('analytics-'+tab).style.display='block';document.querySelectorAll('.tab').forEach(t=>{if(t.getAttribute('onclick')?.includes("'"+tab+"'"))t.classList.add('active');});};
 function renderAnalytics(){
-  renderAnIncomeOverview();renderAnOv();renderAnSav();renderAnMon();}
+  renderAnIncomeOverview();renderAnExpOverview();renderAnOv();renderAnSav();renderAnMon();}
 function renderAnOv(){
   const all=S.expenses,tot=all.reduce((s,e)=>s+parseFloat(e.amount),0);
   const mwd=mwData(),avg=tot/Math.max(1,mwd.length);
@@ -1755,20 +1754,48 @@ function renderIncome(){
 }
 window.updateIncomeModalFields=function(){
   const freq=document.getElementById('in-freq').value;
+  const spread=document.getElementById('in-spread')?.value||'spread';
   const dayRow=document.getElementById('in-day-row');
   const dateRow=document.getElementById('in-date-row');
-  const lbl=document.getElementById('in-day-lbl');
+  const dayLbl=document.getElementById('in-day-lbl');
+  const dateLbl=document.getElementById('in-date-lbl');
   const note=document.getElementById('in-freq-note');
-  if(freq==='onetime'){dayRow.style.display='none';dateRow.style.display='block';}
-  else{dayRow.style.display='block';dateRow.style.display='none';}
-  const labels={monthly:'Payment Day of Month',weekly:'Payment Day (1=Mon, 7=Sun)',biweekly:'First Pay Day',quarterly:'Payment Month Day',annual:'Payment Day of Year'};
-  if(lbl)lbl.textContent=labels[freq]||'Payment Day';
-  // Show spread option for quarterly/annual
   const spreadRow=document.getElementById('in-spread-row');
+
+  // Show/hide spread row for quarterly/annual
   if(spreadRow)spreadRow.style.display=(freq==='quarterly'||freq==='annual')?'flex':'none';
-  const notes={weekly:`Monthly equivalent: amount × 52 ÷ 12`,biweekly:`Monthly equivalent: amount × 26 ÷ 12`,quarterly:`Choose: spread evenly (÷3/mo) or record full amount in payment month`,annual:`Choose: spread evenly (÷12/mo) or record full amount in payment month`,onetime:`One-time payment — shown only in the month received`};
+
+  // Re-read spread value after showing the row
+  const spreadVal=document.getElementById('in-spread')?.value||'spread';
+  const needsDate=freq==='onetime'||(( freq==='quarterly'||freq==='annual')&&spreadVal==='received');
+
+  if(freq==='onetime'){
+    dayRow.style.display='none';
+    dateRow.style.display='block';
+    if(dateLbl)dateLbl.textContent='Date Received';
+  } else if((freq==='quarterly'||freq==='annual')&&spreadVal==='received'){
+    dayRow.style.display='none';
+    dateRow.style.display='block';
+    if(dateLbl)dateLbl.textContent=freq==='quarterly'?'First Payment Date':'Payment Date (most recent or next)';
+  } else {
+    dayRow.style.display='block';
+    dateRow.style.display='none';
+  }
+
+  const dayLabels={monthly:'Payment Day of Month',weekly:'Payment Day (1=Mon,7=Sun)',biweekly:'First Pay Day',quarterly:'Payment Day of Month',annual:'Payment Day of Year'};
+  if(dayLbl)dayLbl.textContent=dayLabels[freq]||'Payment Day';
+
+  const notes={
+    weekly:'Monthly equivalent: amount × 52 ÷ 12',
+    biweekly:'Monthly equivalent: amount × 26 ÷ 12',
+    quarterly:spreadVal==='received'?'Full amount will appear only in the payment month (every 3 months from start date)':'Spread evenly — '+String.fromCharCode(8378)+' ÷ 3 shown each month',
+    annual:spreadVal==='received'?'Full amount will appear only in the payment month (every 12 months from start date)':'Spread evenly — '+String.fromCharCode(8378)+' ÷ 12 shown each month',
+    onetime:'Shown only in the month received — does not recur'
+  };
   if(note){note.textContent=notes[freq]||'';note.style.display=notes[freq]?'block':'none';}
 }
+// Re-run fields update when spread selection changes
+window.onSpreadChange=function(){updateIncomeModalFields();}
 window.openIncomeModal=function(id){
   IID=id||null;
   document.getElementById('inc-mt').textContent=id?'Edit Income Source':'Add Income Source';
@@ -1805,11 +1832,12 @@ window.saveIncome=async function(){
   const note=document.getElementById('in-note').value.trim();
   const noncash=document.getElementById('in-nc').checked;
   const pinned=document.getElementById('in-pin').checked;
-  const day=freq==='onetime'?null:(parseInt(document.getElementById('in-day').value)||null);
-  const date=freq==='onetime'?document.getElementById('in-date').value:null;
   const spread=document.getElementById('in-spread')?.value||'spread';
+  const needsDate=freq==='onetime'||((freq==='quarterly'||freq==='annual')&&spread==='received');
+  const day=needsDate?null:(parseInt(document.getElementById('in-day').value)||null);
+  const date=needsDate?document.getElementById('in-date').value:null;
   if(!name||!amount){showToast('Fill in name and amount');return;}
-  if(freq==='onetime'&&!date){showToast('Enter the date received');return;}
+  if(needsDate&&!date){showToast('Enter the date received/payment date');return;}
   const id=IID||'i'+Date.now();
   const data={name,amount,freq,type,day,date,note,noncash,pinned,spread};
   if(IID){const i=S.incomeSources.findIndex(s=>s.id===IID);if(i>-1)S.incomeSources[i]={...S.incomeSources[i],...data};}
@@ -2508,6 +2536,36 @@ window.calcLoanPreview=function(){
 };
 
 // ── FIX 8: Analytics income section ─────────────
+function renderAnExpOverview(){
+  const mwd=mwData().slice(-6);
+  const now=new Date(),m=now.getMonth(),y=now.getFullYear();
+  const allExp=S.expenses.filter(e=>e.cat!=='Savings Transfer');
+  const thisMonthExp=allExp.filter(e=>{const d=new Date(e.date);return d.getMonth()===m&&d.getFullYear()===y;});
+  const allTimeSpent=allExp.reduce((s,e)=>s+parseFloat(e.amount),0);
+  const thisMonthSpent=thisMonthExp.reduce((s,e)=>s+parseFloat(e.amount),0);
+  const avgMonthSpent=mwd.length?mwd.reduce((s,{month,year})=>s+mExps(month,year).filter(e=>e.cat!=='Savings Transfer').reduce((t,e)=>t+parseFloat(e.amount),0),0)/mwd.length:0;
+  // Biggest category this month
+  const bc=byCat(m,y);delete bc['Savings Transfer'];
+  const topCat=Object.entries(bc).sort((a,b)=>b[1]-a[1])[0];
+  const el=document.getElementById('an-exp-stats');
+  if(el)el.innerHTML=`
+    <div class="card" style="padding:12px;"><div class="ct">This Month</div><div class="cv" style="font-size:18px;color:var(--red);">${fmt(thisMonthSpent)}</div><div class="cs">${thisMonthExp.length} transactions</div></div>
+    <div class="card" style="padding:12px;"><div class="ct">Avg / Month</div><div class="cv" style="font-size:18px;">${fmt(avgMonthSpent)}</div><div class="cs">Last ${mwd.length} months</div></div>
+    <div class="card" style="padding:12px;"><div class="ct">All-time Spent</div><div class="cv" style="font-size:18px;">${fmt(allTimeSpent)}</div><div class="cs">${allExp.length} transactions</div></div>
+    ${topCat?`<div class="card" style="padding:12px;"><div class="ct">Top Category</div><div class="cv" style="font-size:16px;">${gCat(topCat[0]).icon} ${topCat[0]}</div><div class="cs">${fmt(topCat[1])} this month</div></div>`:''}`;
+  // Monthly spending trend chart
+  dChart('an-exp-trend');
+  if(mwd.length){
+    const labels=mwd.map(({month,year})=>MOS[month].slice(0,3)+' '+year);
+    const data=mwd.map(({month,year})=>mExps(month,year).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0));
+    CI['an-exp-trend']=new Chart(document.getElementById('an-exp-trend').getContext('2d'),{
+      type:'bar',
+      data:{labels,datasets:[{data,backgroundColor:'#c0392b88',borderColor:'#c0392b',borderWidth:2,borderRadius:6}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}
+    });
+  }
+}
+
 function renderAnIncomeOverview(){
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
   const mwd=mwData().slice(-6);

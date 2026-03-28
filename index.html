@@ -1010,6 +1010,15 @@ body.dark .fi.error{background:#2a0a0a;}
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('contrib-modal')">Cancel</button><button class="btn btn-green btn-full" onclick="saveContrib()">Save Contribution</button></div>
 </div></div>
 
+<div class="mo" id="withdraw-modal"><div class="modal"><div class="mh"></div>
+  <div class="mt" id="wd-title">Withdraw from Goal</div>
+  <div style="background:var(--gold-pale);border-radius:var(--radius-sm);padding:9px 12px;font-size:11px;color:#8a6a1f;margin-bottom:12px;" id="wd-balance-info"></div>
+  <div class="fg"><label class="fl req">Amount to Withdraw</label><input class="fi" type="number" inputmode="decimal" id="wd-amt" placeholder="0.00"/></div>
+  <div class="fg"><label class="fl req">Date</label><input class="fi" type="date" id="wd-date"/></div>
+  <div class="fg"><label class="fl">Reason <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label><input class="fi" id="wd-note" placeholder="e.g. Used for car purchase"/></div>
+  <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('withdraw-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveWithdrawal()">Confirm Withdrawal</button></div>
+</div></div>
+
 <div class="mo" id="income-modal"><div class="modal"><div class="mh"></div>
   <div class="mt" id="inc-mt">Add Income Source</div>
   <div class="fg"><label class="fl req" for="in-name">Source Name</label><input class="fi" id="in-name" placeholder="e.g. Salary, Dividend, Gift..." aria-required="true"/></div>
@@ -1528,7 +1537,9 @@ function totIncThisMonth(){return incInMonth(new Date().getMonth(),new Date().ge
 const mExps=(m,y)=>S.expenses.filter(e=>{const d=new Date(e.date);return d.getMonth()===m&&d.getFullYear()===y;});
 const mSpent=(m,y)=>mExps(m,y).reduce((s,e)=>s+parseFloat(e.amount),0);
 const byCat=(m,y)=>{const r={};mExps(m,y).forEach(e=>{r[e.cat]=(r[e.cat]||0)+parseFloat(e.amount);});return r;};
-const gSaved=id=>S.contributions.filter(c=>c.goalId===id).reduce((s,c)=>s+parseFloat(c.amount),0);
+const gContributed=id=>S.contributions.filter(c=>c.goalId===id).reduce((s,c)=>s+parseFloat(c.amount),0);
+const gWithdrawn=id=>{const g=S.goals.find(x=>x.id===id);return(g?.withdrawals||[]).reduce((s,w)=>s+parseFloat(w.amount),0);};
+const gSaved=id=>Math.max(0,gContributed(id)-gWithdrawn(id));
 const allSaved=()=>S.contributions.reduce((s,c)=>s+parseFloat(c.amount),0);
 function greet(){const h=new Date().getHours();if(h<5)return'Good night';if(h<12)return'Good morning';if(h<17)return'Good afternoon';if(h<21)return'Good evening';return'Good night';}
 function mwData(){const s=new Set();S.expenses.forEach(e=>{const d=new Date(e.date);s.add(d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'));});S.contributions.forEach(c=>{const d=new Date(c.date);s.add(d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'));});return[...s].sort().map(k=>{const[y,m]=k.split('-');return{year:parseInt(y),month:parseInt(m)};});}
@@ -1969,11 +1980,43 @@ window.delBudget=async function(cat){if(!confirm('Remove budget for '+cat+'?'))r
 // ── SAVINGS ──
 let GID=null;
 function renderSavings(){
-  document.getElementById('goals-list').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),pct=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1),rem=g.target-sv;const tgt=new Date(g.date),now=new Date();const mL=Math.max(0,(tgt.getFullYear()-now.getFullYear())*12+tgt.getMonth()-now.getMonth());const nd=mL>0?rem/mL:0;return`<div class="card" style="padding:16px;margin-bottom:12px;"><div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;"><span style="font-size:28px">${g.icon}</span><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${g.name}</div><div style="font-size:11px;color:var(--ink-3)">Target: ${new Date(g.date).toLocaleDateString('en-GH',{month:'short',year:'numeric'})}</div></div><div style="text-align:right;"><div style="font-family:'DM Serif Display',serif;font-size:18px;">${fmt(g.target)}</div><div style="font-size:11px;color:var(--green);">${fmt(sv)} saved</div></div></div><div class="pw"><div class="pb pb-green" style="width:${pct}%"></div></div><div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:var(--ink-3);"><span>${pct}% complete</span><span>${fmt(rem)} to go</span></div>${mL>0?`<div style="background:var(--paper-2);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;"><span style="color:var(--ink-3)">Planned: <strong style="color:var(--ink)">${fmt(g.monthly)}/mo</strong></span><span style="color:var(--ink-3)">Needed: <strong style="color:${nd>g.monthly?'var(--red)':'var(--green)'}">${fmt(nd)}/mo</strong></span><span style="color:var(--ink-3)">${mL} months left</span></div>`:`<div style="margin-top:6px;"><span class="pill pill-g">🎉 Goal reached!</span></div>`}<div style="display:flex;gap:7px;margin-top:10px;"><button class="btn btn-green btn-sm" style="flex:1" onclick="quickContrib('${g.id}')">+ Contribute</button><button class="btn btn-ghost btn-sm" onclick="editGoal('${g.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delGoal('${g.id}')">Del</button></div></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No goals yet. Tap + to create one.</p></div>';
+  document.getElementById('goals-list').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),pct=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1),rem=g.target-sv;const tgt=new Date(g.date),now=new Date();const mL=Math.max(0,(tgt.getFullYear()-now.getFullYear())*12+tgt.getMonth()-now.getMonth());const nd=mL>0?rem/mL:0;return`<div class="card" style="padding:16px;margin-bottom:12px;"><div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;"><span style="font-size:28px">${g.icon}</span><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${g.name}</div><div style="font-size:11px;color:var(--ink-3)">Target: ${new Date(g.date).toLocaleDateString('en-GH',{month:'short',year:'numeric'})}</div></div><div style="text-align:right;"><div style="font-family:'DM Serif Display',serif;font-size:18px;">${fmt(g.target)}</div><div style="font-size:11px;color:var(--green);">${fmt(sv)} saved</div></div></div><div class="pw"><div class="pb pb-green" style="width:${pct}%"></div></div><div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:var(--ink-3);"><span>${pct}% complete</span><span>${fmt(rem)} to go</span></div>${mL>0?`<div style="background:var(--paper-2);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;"><span style="color:var(--ink-3)">Planned: <strong style="color:var(--ink)">${fmt(g.monthly)}/mo</strong></span><span style="color:var(--ink-3)">Needed: <strong style="color:${nd>g.monthly?'var(--red)':'var(--green)'}">${fmt(nd)}/mo</strong></span><span style="color:var(--ink-3)">${mL} months left</span></div>`:`<div style="margin-top:6px;"><span class="pill pill-g">🎉 Goal reached!</span></div>`}${(g.withdrawals&&g.withdrawals.length)?`<div style="margin-top:8px;padding:8px 10px;background:var(--gold-pale);border-radius:8px;"><div style="font-size:10px;font-weight:600;color:#8a6a1f;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;">Withdrawals (${g.withdrawals.length})</div>${g.withdrawals.slice(-3).reverse().map(w=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;"><span style="color:var(--ink-2);">${new Date(w.date).toLocaleDateString('en-GH',{day:'numeric',month:'short'})}${w.note ? ' · ' + w.note : ''}</span><span style="color:#8a6a1f;font-weight:500;">−${fmt(w.amount)}</span></div>`).join('')}${g.withdrawals.length>3?`<div style="font-size:10px;color:var(--ink-3);margin-top:2px;">${g.withdrawals.length-3} more…</div>`:''}</div>`:''}<div style="display:flex;gap:7px;margin-top:10px;"><button class="btn btn-green btn-sm" style="flex:1" onclick="quickContrib('${g.id}')">+ Contribute</button><button class="btn btn-ghost btn-sm" onclick="openWithdrawModal('${g.id}')">Withdraw</button><button class="btn btn-ghost btn-sm" onclick="editGoal('${g.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delGoal('${g.id}')">Del</button></div></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No goals yet. Tap + to create one.</p></div>';
   renderSavMonth();
   const all=[...S.contributions].sort((a,b)=>new Date(b.date)-new Date(a.date));
   document.getElementById('sav-hist').innerHTML=all.length?all.map(c=>{const g=S.goals.find(x=>x.id===c.goalId);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green)">${g?g.icon:'💰'}</div><div class="li-nm"><div class="p">${g?g.name:'Unknown Goal'}</div><div class="s">${new Date(c.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}</div></div><div class="li-am crd" style="margin-right:6px">+${fmt(c.amount)}</div><button class="btn btn-danger btn-sm" onclick="delContrib('${c.id}')">✕</button></div>`;}).join(''):'<div class="empty"><div class="icon">📜</div><p>No contributions yet</p></div>';
 }
+let withdrawingGoalId=null;
+window.openWithdrawModal=function(goalId){
+  withdrawingGoalId=goalId;
+  const g=S.goals.find(x=>x.id===goalId);if(!g)return;
+  const saved=gSaved(goalId);
+  document.getElementById('wd-title').textContent='Withdraw from '+g.name;
+  document.getElementById('wd-balance-info').textContent=
+    'Current balance: '+fmt(saved)+' saved · '+fmt(gContributed(goalId))+' contributed · '+fmt(gWithdrawn(goalId))+' previously withdrawn';
+  document.getElementById('wd-amt').value='';
+  document.getElementById('wd-date').value=tod();
+  document.getElementById('wd-note').value='';
+  openModal('withdraw-modal');
+};
+window.saveWithdrawal=async function(){
+  const amount=parseFloat(document.getElementById('wd-amt').value);
+  const date=document.getElementById('wd-date').value;
+  const note=document.getElementById('wd-note').value.trim();
+  if(!amount||amount<=0){showToast('Enter a valid amount');return;}
+  if(!date){showToast('Enter a date');return;}
+  const g=S.goals.find(x=>x.id===withdrawingGoalId);if(!g)return;
+  const currentSaved=gSaved(withdrawingGoalId);
+  if(amount>currentSaved){showToast('Cannot withdraw more than saved balance ('+fmt(currentSaved)+')');return;}
+  const withdrawal={id:'w'+Date.now(),amount,date,note};
+  if(!g.withdrawals)g.withdrawals=[];
+  g.withdrawals.push(withdrawal);
+  await saveS();
+  closeModal('withdraw-modal');
+  renderSavings();renderNetWorth();renderDash();
+  showToast(fmt(amount)+' withdrawn from '+g.name+' ✓');
+  withdrawingGoalId=null;
+};
+
 window.openGoalModal=function(){GID=null;document.getElementById('goal-mt').textContent='New Savings Goal';['g-name','g-target','g-date','g-mon'].forEach(id=>document.getElementById(id).value='');document.getElementById('g-icon').value='🎯';openModal('goal-modal');};
 window.editGoal=function(id){GID=id;const g=S.goals.find(x=>x.id===id);if(!g)return;document.getElementById('goal-mt').textContent='Edit Savings Goal';document.getElementById('g-name').value=g.name;document.getElementById('g-target').value=g.target;document.getElementById('g-date').value=g.date;document.getElementById('g-mon').value=g.monthly;document.getElementById('g-icon').value=g.icon;openModal('goal-modal');};
 window.saveGoal=async function(){const name=document.getElementById('g-name').value.trim(),target=parseFloat(document.getElementById('g-target').value),date=document.getElementById('g-date').value,monthly=parseFloat(document.getElementById('g-mon').value)||0,icon=document.getElementById('g-icon').value;if(!name||!target||!date){showToast('Fill in all required fields');return;}if(GID){const i=S.goals.findIndex(g=>g.id===GID);if(i>-1)S.goals[i]={...S.goals[i],name,target,date,monthly,icon};}else S.goals.push({id:'g'+Date.now(),name,target,date,monthly,icon});closeModal('goal-modal');renderSavings();showToast('Goal saved ✓');GID=null;saveS();};
@@ -2373,7 +2416,7 @@ function totalAssets(){
   const cash=netCashPosition();
   return manual+savings+cash;
 }
-function totalLiab(){return(S.liabilities||[]).reduce((t,l)=>t+parseFloat(l.value),0)+totalDebtBal();}
+function totalLiab(){return(S.liabilities||[]).filter(l=>!l.clearedAt).reduce((t,l)=>t+parseFloat(l.value),0)+totalDebtBal();}
 function netWorth(){return totalAssets()-totalLiab();}
 function totalDebtBal(){return(S.loans||[]).reduce((t,l)=>t+parseFloat(l.balance),0);}
 
@@ -2435,19 +2478,50 @@ function renderNetWorth(){
     ${!allManual.length&&liquidAssets.length<=2?'<div style="font-size:11px;color:var(--ink-3);margin-top:8px;padding:8px;background:var(--paper-2);border-radius:var(--radius-sm);">Add properties, vehicles or investments via + Asset above</div>':''}
   `;
 
-  // Liability list
+  // Liability list — split active vs cleared
   const liabEl=document.getElementById('nw-liab-list');
-  const liabList=[...(S.liabilities||[]).map(l=>({...l,_type:'liability'})),
-    ...(S.loans||[]).map(l=>({id:l.id,name:l.name,value:l.balance,cat:'loan',_type:'loan',note:l.type}))
-  ];
-  liabEl.innerHTML=liabList.length?liabList.map(l=>`<div class="li">
-    <div class="li-ic" style="background:var(--red-light);color:var(--red)">${LIAB_ICONS[l.cat]||'📦'}</div>
-    <div class="li-nm"><div class="p">${l.name}${l._type==='loan'?' <span class="pill pill-r" style="font-size:11px">loan</span>':''}</div><div class="s">${l.cat}${l.note?' · '+l.note:''}</div></div>
-    <div style="font-family:'DM Serif Display',serif;font-size:14px;color:var(--red);margin-right:8px;">${fmt(l.value)}</div>
-    ${l._type==='liability'?`<button class="btn btn-ghost btn-sm" onclick="openLiabilityModal('${l.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delLiability('${l.id}')">✕</button>`:''}
-    ${l._type==='loan'?`<button class="btn btn-ghost btn-sm" onclick="showPage('debt')">View →</button>`:''}
-  </div>`).join(''):'<div class="empty"><div class="icon">📦</div><p>No liabilities added yet</p></div>';
+  const activeLibs=(S.liabilities||[]).filter(l=>!l.clearedAt).map(l=>({...l,_type:'liability'}));
+  const clearedLibs=(S.liabilities||[]).filter(l=>l.clearedAt).map(l=>({...l,_type:'liability'}));
+  const loanLibs=(S.loans||[]).map(l=>({id:l.id,name:l.name,value:l.balance,cat:'loan',_type:'loan',note:l.type}));
+  const activeLiabList=[...activeLibs,...loanLibs];
+  function liabRow(l){
+    const cleared=l.clearedAt;
+    return`<div class="li" style="${cleared?'opacity:0.6;':''}">
+      <div class="li-ic" style="background:${cleared?'var(--green-light)':'var(--red-light)'};color:${cleared?'var(--green)':'var(--red)'}">${cleared?'✓':LIAB_ICONS[l.cat]||'📦'}</div>
+      <div class="li-nm">
+        <div class="p">${l.name}${l._type==='loan'?' <span class="pill pill-r" style="font-size:11px">loan</span>':''}
+          ${cleared?'<span class="pill pill-g" style="font-size:11px">cleared</span>':''}</div>
+        <div class="s">${l.cat}${l.note?' · '+l.note:''}
+          ${cleared?'<span style="color:var(--green);"> · Cleared '+new Date(cleared).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})+'</span>':''}
+        </div>
+      </div>
+      <div style="font-family:'DM Serif Display',serif;font-size:14px;color:${cleared?'var(--green)':'var(--red)'};margin-right:8px;">${cleared?'✓ '+fmt(l.value):fmt(l.value)}</div>
+      ${!cleared&&l._type==='liability'?`<button class="btn btn-green btn-sm" onclick="clearLiability('${l.id}')">Clear</button>`+
+        `<button class="btn btn-ghost btn-sm" onclick="openLiabilityModal('${l.id}')">Edit</button>`+
+        `<button class="btn btn-danger btn-sm" onclick="delLiability('${l.id}')">✕</button>`:''}
+      ${l._type==='loan'?`<button class="btn btn-ghost btn-sm" onclick="showPage('debt')">View →</button>`:''}
+    </div>`;
+  }
+  liabEl.innerHTML=activeLiabList.length?
+    activeLiabList.map(liabRow).join('')+
+    (clearedLibs.length?
+      `<div style="font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;margin:12px 0 6px;padding:4px 0;border-top:1px solid var(--paper-2);">✓ Cleared (${clearedLibs.length})</div>`+
+      clearedLibs.map(liabRow).join('')
+    :'')
+  :'<div class="empty"><div class="icon">📦</div><p>No liabilities added yet</p></div>';
 }
+
+// ── Clear a liability (mark as settled, remove from net worth) ──
+window.clearLiability=async function(id){
+  const l=(S.liabilities||[]).find(x=>x.id===id);if(!l)return;
+  const note=prompt(`Mark "${l.name}" as cleared?\nOptional: add a note (e.g. Paid in full, Settled)`);
+  if(note===null)return; // user cancelled
+  const i=S.liabilities.findIndex(x=>x.id===id);
+  if(i>-1)S.liabilities[i]={...S.liabilities[i],clearedAt:new Date().toISOString(),clearedNote:note||'Cleared'};
+  await saveS();
+  renderNetWorth();renderDash();
+  showToast('"'+l.name+'" marked as cleared ✓');
+};
 
 window.openAssetModal=function(id){
   editAstId=id||null;

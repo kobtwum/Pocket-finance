@@ -916,7 +916,7 @@ body.dark .fi.error{background:#2a0a0a;}
     <div class="fg">
       <label class="fl req" for="exp-amt">Amount</label>
       <div style="position:relative;">
-        <input class="fi" type="text" inputmode="decimal" id="exp-amt" placeholder="0.00 or 450+230" aria-required="true" autocomplete="off"
+        <input class="fi" type="text" inputmode="text" id="exp-amt" placeholder="0.00 or 450+230" aria-required="true" autocomplete="off"
           style="padding-right:36px;"
           onkeydown="if(event.key==='Enter'){event.preventDefault();evalExpAmt();}"
           onblur="evalExpAmt()"/>
@@ -927,7 +927,12 @@ body.dark .fi.error{background:#2a0a0a;}
     </div>
     <div class="fg"><label class="fl req" for="exp-date">Date</label><input class="fi" type="date" id="exp-date" aria-required="true"/></div>
   </div>
-  <div class="fg"><label class="fl req" for="exp-cat">Category</label><select class="fi" id="exp-cat" aria-required="true"></select></div>
+  <div class="fg"><label class="fl req" for="exp-cat">Category</label><select class="fi" id="exp-cat" aria-required="true" onchange="onExpCatChange()"></select></div>
+  <div class="fg" id="exp-goal-row" style="display:none;">
+    <label class="fl" for="exp-goal">Link to Savings Goal <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label>
+    <select class="fi" id="exp-goal"><option value="">No specific goal (general savings)</option></select>
+    <div style="font-size:11px;color:var(--blue);margin-top:4px;background:var(--blue-light);padding:7px 10px;border-radius:8px;">This will be recorded as a contribution to the selected goal.</div>
+  </div>
   <div class="fg"><label class="fl" for="exp-note">Note <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label><input class="fi" id="exp-note" placeholder="Any detail..."/></div>
   <div id="bud-warn-hint" style="display:none;border-radius:var(--radius-sm);padding:9px 12px;font-size:11px;margin-bottom:4px;"></div>
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('expense-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveExpense()">Save Expense</button></div>
@@ -1046,7 +1051,11 @@ body.dark .fi.error{background:#2a0a0a;}
   <div class="mt" id="rec-mt">Add Recurring Expense</div>
   <div class="fg"><label class="fl">Description</label><input class="fi" id="rc-desc" placeholder="e.g. Rent, Netflix, Loan..."/></div>
   <div class="g2"><div class="fg"><label class="fl">Amount</label><input class="fi" type="number" inputmode="decimal" id="rc-amt" placeholder="0.00"/></div><div class="fg"><label class="fl">Day of month (1-28)</label><input class="fi" type="number" id="rc-day" placeholder="e.g. 1" min="1" max="28"/></div></div>
-  <div class="fg"><label class="fl">Category</label><select class="fi" id="rc-cat"></select></div>
+  <div class="fg"><label class="fl">Category</label><select class="fi" id="rc-cat" onchange="onRecCatChange()"></select></div>
+  <div class="fg" id="rc-goal-row" style="display:none;">
+    <label class="fl" for="rc-goal">Link to Savings Goal <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label>
+    <select class="fi" id="rc-goal"><option value="">No specific goal (general savings)</option></select>
+  </div>
   <div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="rc-note" placeholder="Any detail..."/></div>
   <div style="background:var(--green-light);border-radius:var(--radius-sm);padding:9px 12px;font-size:11px;color:var(--green);margin-bottom:4px;">✓ Auto-logged on the selected day every month until paused.</div>
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('recur-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveRecur()">Save</button></div>
@@ -1704,13 +1713,13 @@ window.openExpenseModal=function(id){
   popCatSel('exp-cat');
   if(id){const e=S.expenses.find(x=>x.id===id);if(e){document.getElementById('exp-desc').value=e.desc;document.getElementById('exp-amt').value=e.amount;document.getElementById('exp-cat').value=e.cat;document.getElementById('exp-date').value=e.date;document.getElementById('exp-note').value=e.note||'';}}
   else{document.getElementById('exp-desc').value='';document.getElementById('exp-amt').value='';document.getElementById('exp-cat').value='Food & Dining';document.getElementById('exp-date').value=tod();document.getElementById('exp-note').value='';}
-  // Wire up budget warning on input change
+  // Wire up budget warning + savings goal row visibility
   setTimeout(()=>{
     const catEl=document.getElementById('exp-cat');
     const amtEl=document.getElementById('exp-amt');
-    if(catEl)catEl.onchange=checkExpenseModalBudget;
+    if(catEl)catEl.onchange=onExpCatChange;
     if(amtEl)amtEl.oninput=checkExpenseModalBudget;
-    checkExpenseModalBudget();
+    onExpCatChange(); // show/hide goal row based on current category
   },50);
   openModal('expense-modal');
 };
@@ -1730,6 +1739,26 @@ function clearAllErrors(ids){ids.forEach(clearFieldError);}
 window.setFieldError=setFieldError;
 window.clearFieldError=clearFieldError;
 window.clearAllErrors=clearAllErrors;
+
+// ── Savings goal selector helpers ──
+function populateGoalSel(selId){
+  const el=document.getElementById(selId);if(!el)return;
+  el.innerHTML='<option value="">No specific goal (general savings)</option>'+
+    S.goals.map(g=>`<option value="${g.id}">${g.icon} ${g.name}</option>`).join('');
+}
+window.onExpCatChange=function(){
+  const cat=document.getElementById('exp-cat')?.value;
+  const row=document.getElementById('exp-goal-row');
+  if(row){row.style.display=cat==='Savings Transfer'?'block':'none';}
+  if(cat==='Savings Transfer')populateGoalSel('exp-goal');
+  checkExpenseModalBudget();
+};
+window.onRecCatChange=function(){
+  const cat=document.getElementById('rc-cat')?.value;
+  const row=document.getElementById('rc-goal-row');
+  if(row){row.style.display=cat==='Savings Transfer'?'block':'none';}
+  if(cat==='Savings Transfer')populateGoalSel('rc-goal');
+};
 
 // ── Inline calculator for expense amount field ──
 window.evalExpAmt=function(){
@@ -1768,25 +1797,25 @@ window.saveExpense=async function(){
   const data={desc,amount,cat,date,note};
   // Auto-create/update a contribution when category is Savings Transfer
   if(cat==='Savings Transfer'){
+    const goalId=document.getElementById('exp-goal')?.value||null;
     if(EID){
       const existing=S.expenses.find(e=>e.id===EID);
       const lcid=existing?.linkedContrib;
       if(lcid){
         const ci=S.contributions.findIndex(c=>c.id===lcid);
-        if(ci>-1)S.contributions[ci]={...S.contributions[ci],amount,date};
-        await saveDoc('contributions',lcid,{goalId:null,amount,date,linkedExpense:EID,manual:true});
+        if(ci>-1)S.contributions[ci]={...S.contributions[ci],amount,date,goalId:goalId||null};
+        await saveDoc('contributions',lcid,{goalId:goalId||null,amount,date,linkedExpense:EID,manual:true});
         data.linkedContrib=lcid;
       } else {
-        // editing old expense that didn't have a contribution yet — create one now
         const cId='c'+Date.now();
-        const contrib={goalId:null,amount,date,linkedExpense:id,manual:true};
+        const contrib={goalId:goalId||null,amount,date,linkedExpense:id,manual:true};
         S.contributions.push({id:cId,...contrib});
         await saveDoc('contributions',cId,contrib);
         data.linkedContrib=cId;
       }
     } else {
       const cId='c'+Date.now();
-      const contrib={goalId:null,amount,date,linkedExpense:id,manual:true};
+      const contrib={goalId:goalId||null,amount,date,linkedExpense:id,manual:true};
       S.contributions.push({id:cId,...contrib});
       await saveDoc('contributions',cId,contrib);
       data.linkedContrib=cId;
@@ -1960,7 +1989,7 @@ function renderRecurring(){
   const el=document.getElementById('rec-list');
   el.innerHTML=(S.recurringExpenses||[]).length?(S.recurringExpenses).map(r=>{const c=gCat(r.cat);return`<div class="li"><div class="li-ic" style="background:${c.color}22;color:${c.color}">${c.icon}</div><div class="li-nm"><div class="p">${r.desc} <span class="rb">↻ day ${r.day}</span>${r.paused?' <span class="pill pill-gray">paused</span>':''}</div><div class="s">${r.cat}${r.note?' · '+r.note:''}</div></div><div class="li-am dbt" style="margin-right:8px">−${fmt(r.amount)}</div><button class="btn btn-ghost btn-sm" onclick="togRecur('${r.id}')">${r.paused?'Resume':'Pause'}</button><button class="btn btn-danger btn-sm" onclick="delRecur('${r.id}')">✕</button></div>`;}).join(''):'<div class="empty"><div class="icon">↻</div><p>No recurring expenses yet.<br>Add rent, subscriptions, loan repayments...</p></div>';
 }
-window.openRecurModal=function(id){RCID=id||null;document.getElementById('rec-mt').textContent=id?'Edit Recurring':'Add Recurring Expense';popCatSel('rc-cat');if(id){const r=(S.recurringExpenses||[]).find(x=>x.id===id);if(r){document.getElementById('rc-desc').value=r.desc;document.getElementById('rc-amt').value=r.amount;document.getElementById('rc-day').value=r.day;document.getElementById('rc-cat').value=r.cat;document.getElementById('rc-note').value=r.note||'';}}else{['rc-desc','rc-amt','rc-day','rc-note'].forEach(id=>document.getElementById(id).value='');document.getElementById('rc-cat').value='Rent & Housing';}openModal('recur-modal');};
+window.openRecurModal=function(id){RCID=id||null;document.getElementById('rec-mt').textContent=id?'Edit Recurring':'Add Recurring Expense';popCatSel('rc-cat');if(id){const r=(S.recurringExpenses||[]).find(x=>x.id===id);if(r){document.getElementById('rc-desc').value=r.desc;document.getElementById('rc-amt').value=r.amount;document.getElementById('rc-day').value=r.day;document.getElementById('rc-cat').value=r.cat;document.getElementById('rc-note').value=r.note||'';populateGoalSel('rc-goal');if(document.getElementById('rc-goal'))document.getElementById('rc-goal').value=r.goalId||'';}}else{['rc-desc','rc-amt','rc-day','rc-note'].forEach(id=>document.getElementById(id).value='');document.getElementById('rc-cat').value='Rent & Housing';}onRecCatChange();openModal('recur-modal');};
 window.saveRecur=async function(){const desc=document.getElementById('rc-desc').value.trim(),amount=parseFloat(document.getElementById('rc-amt').value),day=parseInt(document.getElementById('rc-day').value),cat=document.getElementById('rc-cat').value,note=document.getElementById('rc-note').value.trim();if(!desc||!amount||!day||day<1||day>28){showToast('Fill in all fields (day must be 1-28)');return;}if(!S.recurringExpenses)S.recurringExpenses=[];const id=RCID||'r'+Date.now();const rec={id,desc,amount,day,cat,note,paused:false};if(RCID){const i=S.recurringExpenses.findIndex(r=>r.id===RCID);if(i>-1)S.recurringExpenses[i]=rec;}else S.recurringExpenses.push(rec);await saveS();closeModal('recur-modal');renderRecurring();showToast('Recurring saved ✓');RCID=null;};
 window.togRecur=async function(id){const r=(S.recurringExpenses||[]).find(x=>x.id===id);if(!r)return;r.paused=!r.paused;await saveS();renderRecurring();showToast(r.paused?'Paused':'Resumed');};
 window.delRecur=async function(id){if(!confirm('Delete this recurring expense?'))return;S.recurringExpenses=(S.recurringExpenses||[]).filter(r=>r.id!==id);await saveS();renderRecurring();showToast('Deleted');};
@@ -2330,17 +2359,18 @@ const LIAB_ICONS={loan:'🏦',mortgage:'🏠',credit:'💳',personal:'🤝',othe
 let editAstId=null,editLiabId=null,editLoanId=null;
 
 function netCashPosition(){
-  // All-time earned minus all-time actual expenses (excl savings transfers)
+  // Unallocated liquid cash: all-time earned minus ALL actual spending
+  // (includes savings transfers — savings are tracked separately via allSaved())
   const earned=calcCumulativeIncome();
-  const spent=S.expenses.filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
-  return Math.max(0,earned-spent); // floor at 0 — can't have negative cash from this calc
+  const spent=S.expenses.filter(e=>!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
+  return Math.max(0,earned-spent);
 }
 function totalAssets(){
+  // manual assets + savings goal balance (what you've set aside) + net cash (unallocated remainder)
+  // No double-counting: savings transfers reduce net cash AND appear in allSaved()
   const manual=(S.assets||[]).reduce((t,a)=>t+parseFloat(a.value),0);
   const savings=allSaved();
   const cash=netCashPosition();
-  // Avoid double-counting: net cash already includes savings outflows as expenses,
-  // so we add savings balance separately only if it exceeds what net cash captured
   return manual+savings+cash;
 }
 function totalLiab(){return(S.liabilities||[]).reduce((t,l)=>t+parseFloat(l.value),0)+totalDebtBal();}
@@ -3333,8 +3363,8 @@ function hideOnboarding(){
   localStorage.setItem('pkt_onboarded','1');
   document.getElementById('app-shell').style.display='flex';
 }
-let obBudRows=[{cat:'Food & Dining',limit:''},{cat:'Transport',limit:''},{cat:'Rent & Housing',limit:''}];
-function obRenderBudRows(){
+window.obBudRows=[{cat:'Food & Dining',limit:''},{cat:'Transport',limit:''},{cat:'Rent & Housing',limit:''}];
+window.obRenderBudRows=function obRenderBudRows(){
   const el=document.getElementById('ob-bud-list');if(!el)return;
   el.innerHTML=obBudRows.map((r,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
     <select class="fi" style="flex:2;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:white;" onchange="obBudRows[${i}].cat=this.value">${S.categories.map(c=>`<option value="${c.name}" ${c.name===r.cat?'selected':''}>${c.icon} ${c.name}</option>`).join('')}</select>
@@ -3343,7 +3373,7 @@ function obRenderBudRows(){
   </div>`).join('');
 }
 window.obAddBudRow=function(){obBudRows.push({cat:'Other',limit:''});obRenderBudRows();}
-function obSetStep(n){
+window.obSetStep=function obSetStep(n){
   [1,2,3].forEach(i=>{
     document.getElementById('ob-'+i).style.display=i===n?'block':'none';
     const dot=document.getElementById('ob-dot-'+i);

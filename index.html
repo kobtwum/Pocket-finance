@@ -1276,7 +1276,14 @@ function monthlyEq(src,forMonth,forYear){
     case'biweekly':return a*26/12;
     case'quarterly':return a/3;
     case'annual':return a/12;
-    case'onetime':return 0;
+    case'onetime':{
+      // If a specific month/year is requested, return the amount only in the matching month
+      if(forMonth!==undefined&&forYear!==undefined&&src.date){
+        const d=new Date(src.date);
+        return d.getMonth()===forMonth&&d.getFullYear()===forYear?a:0;
+      }
+      return 0; // default: one-time not included in baseline monthly total
+    }
     default:return a;
   }
 }

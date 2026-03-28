@@ -662,6 +662,19 @@ body.dark .fi.error{background:#2a0a0a;}
   <div class="tabs" style="margin-bottom:12px;">
     <button class="tab active" onclick="switchIncTab('statement')">Statement</button>
     <button class="tab" onclick="switchIncTab('sources')">Sources</button>
+    <button class="tab" onclick="switchIncTab('alltime')">All-time</button>
+  </div>
+  <!-- ALL-TIME INCOME TAB -->
+  <div id="inc-tab-alltime" style="display:none;">
+    <div class="card">
+      <div class="sh"><h2>All-time Income</h2></div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <input class="fi" type="text" id="inc-at-search" placeholder="Search e.g. March 2025…" oninput="renderIncAllTime()" style="flex:1;min-width:160px;"/>
+        <select class="fi" id="inc-at-src" onchange="renderIncAllTime()" style="flex:1;min-width:140px;"><option value="">All Sources</option></select>
+      </div>
+      <div id="inc-at-summary" class="g2" style="margin-bottom:12px;"></div>
+      <div id="inc-at-list"></div>
+    </div>
   </div>
   <!-- INCOME STATEMENT TAB -->
   <div id="inc-tab-statement">
@@ -899,7 +912,21 @@ body.dark .fi.error{background:#2a0a0a;}
 <div class="mo" id="expense-modal"><div class="modal"><div class="mh"></div>
   <div class="mt" id="exp-mt">Add Expense</div>
   <div class="fg"><label class="fl req" for="exp-desc">Description</label><input class="fi" id="exp-desc" placeholder="e.g. Groceries" aria-required="true"/></div>
-  <div class="g2"><div class="fg"><label class="fl req" for="exp-amt">Amount</label><input class="fi" type="number" inputmode="decimal" id="exp-amt" placeholder="0.00" aria-required="true"/></div><div class="fg"><label class="fl req" for="exp-date">Date</label><input class="fi" type="date" id="exp-date" aria-required="true"/></div></div>
+  <div class="g2">
+    <div class="fg">
+      <label class="fl req" for="exp-amt">Amount</label>
+      <div style="position:relative;">
+        <input class="fi" type="text" inputmode="decimal" id="exp-amt" placeholder="0.00 or 450+230" aria-required="true" autocomplete="off"
+          style="padding-right:36px;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();evalExpAmt();}"
+          onblur="evalExpAmt()"/>
+        <button type="button" onclick="evalExpAmt()" title="Calculate"
+          style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--gold);color:var(--ink);border:none;border-radius:6px;width:24px;height:24px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">=</button>
+      </div>
+      <div id="exp-amt-preview" style="font-size:11px;color:var(--green);margin-top:3px;min-height:16px;"></div>
+    </div>
+    <div class="fg"><label class="fl req" for="exp-date">Date</label><input class="fi" type="date" id="exp-date" aria-required="true"/></div>
+  </div>
   <div class="fg"><label class="fl req" for="exp-cat">Category</label><select class="fi" id="exp-cat" aria-required="true"></select></div>
   <div class="fg"><label class="fl" for="exp-note">Note <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label><input class="fi" id="exp-note" placeholder="Any detail..."/></div>
   <div id="bud-warn-hint" style="display:none;border-radius:var(--radius-sm);padding:9px 12px;font-size:11px;margin-bottom:4px;"></div>
@@ -1571,7 +1598,7 @@ window.closeMoreDrawer=function(){document.getElementById('more-drawer').classLi
 
 // ── NAV ──
 let CP='dashboard';
-function refreshPage(){({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{renderIncStatement();renderIncome();},recurring:renderRecurring,import:renderImportPage,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[CP]?.();}
+function refreshPage(){({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{const _at=document.getElementById('inc-tab-alltime');const _st=document.getElementById('inc-tab-statement');if(_at&&_at.style.display!=='none')renderIncAllTime();else if(_st&&_st.style.display!=='none')renderIncStatement();else renderIncome();},recurring:renderRecurring,import:renderImportPage,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[CP]?.();}
 const PRIMARY_TABS=['dashboard','expenses','income','savings'];
 const MORE_TABS=['analytics','savings','recurring','import','settings','health','networth','debt','insights'];
 
@@ -1596,7 +1623,7 @@ window.showPage=function(id){
   if(fb)fb.style.display=isDesk()?'none':(['dashboard','expenses','savings','recurring'].includes(id)?'flex':'none');
   const titles={dashboard:'Dashboard',expenses:'Expenses',budget:'Budget',savings:'Savings Goals',analytics:'Analytics',income:'Income',recurring:'Recurring Expenses',import:'Import CSV',settings:'Settings',networth:'Net Worth',debt:'Debt Tracker',health:'Health Score',insights:'Spending Insights'};
   const pt=document.getElementById('d-ptitle');if(pt)pt.textContent=titles[id]||id;
-  ({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{renderIncStatement();renderIncome();},recurring:renderRecurring,import:renderImportPage,settings:updateLnInc,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[id]?.();
+  ({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{const _at=document.getElementById('inc-tab-alltime');const _st=document.getElementById('inc-tab-statement');if(_at&&_at.style.display!=='none')renderIncAllTime();else if(_st&&_st.style.display!=='none')renderIncStatement();else renderIncome();},recurring:renderRecurring,import:renderImportPage,settings:updateLnInc,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[id]?.();
 };
 window.fabAction=function(){if(CP==='dashboard'||CP==='expenses')openExpenseModal();else if(CP==='savings')openGoalModal();else if(CP==='recurring')openRecurModal();};
 
@@ -1704,6 +1731,31 @@ window.setFieldError=setFieldError;
 window.clearFieldError=clearFieldError;
 window.clearAllErrors=clearAllErrors;
 
+// ── Inline calculator for expense amount field ──
+window.evalExpAmt=function(){
+  const el=document.getElementById('exp-amt');
+  const prev=document.getElementById('exp-amt-preview');
+  if(!el)return;
+  const raw=el.value.trim();
+  if(!raw){if(prev)prev.textContent='';return;}
+  // Only evaluate if it looks like an expression (contains operators)
+  if(!/[+\-*/]/.test(raw)){if(prev)prev.textContent='';return;}
+  try{
+    // Safe eval: only allow numbers, operators, spaces, dots, parentheses
+    const sanitised=raw.replace(/[^0-9+\-*/().\s]/g,'');
+    if(!sanitised){if(prev)prev.textContent='';return;}
+    // eslint-disable-next-line no-new-func
+    const result=Function('"use strict";return ('+sanitised+')')();
+    if(typeof result==='number'&&isFinite(result)&&result>=0){
+      el.value=result.toFixed(2);
+      if(prev){prev.textContent='= '+result.toFixed(2);setTimeout(()=>{prev.textContent='';},2000);}
+    }else{
+      if(prev)prev.textContent='';
+    }
+  }catch(e){
+    if(prev)prev.textContent='';
+  }
+};
 window.saveExpense=async function(){
   const desc=document.getElementById('exp-desc').value.trim(),amount=parseFloat(document.getElementById('exp-amt').value),cat=document.getElementById('exp-cat').value,date=document.getElementById('exp-date').value,note=document.getElementById('exp-note').value.trim();
   clearAllErrors(['exp-desc','exp-amt','exp-date']);
@@ -1940,9 +1992,10 @@ let incStmtYear=new Date().getFullYear();
 
 window.switchIncTab=function(tab){
   document.querySelectorAll('#page-income .tab').forEach(t=>t.classList.remove('active'));
-  ['statement','sources'].forEach(t=>{const el=document.getElementById('inc-tab-'+t);if(el)el.style.display=t===tab?'block':'none';});
+  ['statement','sources','alltime'].forEach(t=>{const el=document.getElementById('inc-tab-'+t);if(el)el.style.display=t===tab?'block':'none';});
   const btn=document.querySelector(`#page-income .tab[onclick*="${tab}"]`);if(btn)btn.classList.add('active');
   if(tab==='statement')renderIncStatement();
+  else if(tab==='alltime')renderIncAllTime();
   else renderIncome();
 };
 
@@ -2057,6 +2110,89 @@ function renderIncome(){
   }
 
 }
+window.renderIncAllTime=function(){
+  // Populate source filter
+  const srcSel=document.getElementById('inc-at-src');
+  if(srcSel){
+    const cur=srcSel.value;
+    srcSel.innerHTML='<option value="">All Sources</option>'+
+      S.incomeSources.filter(s=>!s.noncash).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+    if(cur)srcSel.value=cur;
+  }
+  const search=(document.getElementById('inc-at-search')?.value||'').toLowerCase().trim();
+  const srcFilter=document.getElementById('inc-at-src')?.value||'';
+
+  // Build complete month list — all months from earliest income activity to now
+  const now=new Date();
+  const monthSet=new Set();
+  // Add months with expenses or contributions
+  S.expenses.forEach(e=>{const d=new Date(e.date);monthSet.add(d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'));});
+  S.contributions.forEach(c=>{const d=new Date(c.date);monthSet.add(d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'));});
+  // Add one-time income months
+  S.incomeSources.filter(s=>!s.noncash&&s.freq==='onetime'&&s.date).forEach(s=>{
+    const d=new Date(s.date);monthSet.add(d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'));
+  });
+  // Add all months from first recurring source start to now
+  const recurSrcs=S.incomeSources.filter(s=>!s.noncash&&s.freq!=='onetime');
+  if(recurSrcs.length){
+    const earliest=monthSet.size?[...monthSet].sort()[0]:null;
+    const startKey=earliest||`${now.getFullYear()-1}-${String(now.getMonth()).padStart(2,'0')}`;
+    const[sy,sm]=startKey.split('-').map(Number);
+    let d=new Date(sy,sm,1);
+    while(d<=now){monthSet.add(d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'));d.setMonth(d.getMonth()+1);}
+  }
+
+  let months=[...monthSet].sort().reverse().map(k=>{const[y,m]=k.split('-');return{year:parseInt(y),month:parseInt(m)};});
+
+  // Apply search
+  if(search)months=months.filter(({month,year})=>(MOS[month]+' '+year).toLowerCase().includes(search));
+
+  // Summary
+  const grandTotal=months.reduce((t,{month,year})=>t+incInMonth(month,year),0);
+  const sumEl=document.getElementById('inc-at-summary');
+  if(sumEl)sumEl.innerHTML=`
+    <div class="card" style="padding:13px;"><div class="ct">Total Earned</div><div class="cv" style="font-size:18px;color:var(--gold)">${fmt(grandTotal)}</div><div class="cs">${months.length} month${months.length!==1?'s':''}</div></div>
+    <div class="card" style="padding:13px;"><div class="ct">Monthly Average</div><div class="cv" style="font-size:18px">${fmt(months.length?grandTotal/months.length:0)}</div><div class="cs">Per month</div></div>`;
+
+  // Month list
+  const listEl=document.getElementById('inc-at-list');
+  if(!listEl)return;
+  if(!months.length){listEl.innerHTML='<div class="empty"><div class="icon">💰</div><p>No income found</p></div>';return;}
+
+  listEl.innerHTML=months.map(({month,year})=>{
+    const sources=S.incomeSources.filter(s=>{
+      if(s.noncash)return false;
+      if(srcFilter&&s.id!==srcFilter)return false;
+      const freq=s.freq||'monthly';
+      if(freq==='onetime'){if(!s.date)return false;const d=new Date(s.date);return d.getMonth()===month&&d.getFullYear()===year;}
+      const amt=monthlyEq(s,month,year);
+      return amt>0;
+    });
+    const total=sources.reduce((t,s)=>{
+      const freq=s.freq||'monthly';
+      if(freq==='onetime')return t+parseFloat(s.amount);
+      return t+monthlyEq(s,month,year);
+    },0);
+    if(srcFilter&&total===0)return'';
+    if(!srcFilter&&total===0)return'';
+    const rows=sources.map(s=>{
+      const freq=s.freq||'monthly';
+      const amt=freq==='onetime'?parseFloat(s.amount):monthlyEq(s,month,year);
+      const freqLabel={monthly:'Monthly',weekly:'Weekly',biweekly:'Bi-weekly',quarterly:'Quarterly',annual:'Annual',onetime:'One-time'}[freq]||freq;
+      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--paper-3);font-size:12px;">
+        <span style="color:var(--ink-2);">${s.name}<span style="font-size:10px;color:var(--ink-3);margin-left:4px;">${freqLabel}</span></span>
+        <span style="color:var(--green);font-weight:500;">+${fmt(amt)}</span>
+      </div>`;
+    }).join('');
+    return`<div style="margin-bottom:10px;padding:12px;background:var(--paper-2);border-radius:var(--radius-sm);">
+      <div style="display:flex;justify-content:space-between;align-items:center;${rows?'margin-bottom:8px;':''}">
+        <span style="font-family:'DM Serif Display',serif;font-size:15px;">${MOS[month]} ${year}</span>
+        <span style="font-family:'DM Serif Display',serif;font-size:16px;color:var(--green);">+${fmt(total)}</span>
+      </div>${rows}
+    </div>`;
+  }).filter(Boolean).join('')||'<div class="empty"><div class="icon">💰</div><p>No income found for this filter</p></div>';
+};
+
 window.updateIncomeModalFields=function(){
   const freq=document.getElementById('in-freq').value;
   const spread=document.getElementById('in-spread')?.value||'spread';
@@ -2192,7 +2328,20 @@ const ASSET_ICONS={cash:'💵',investment:'📈',property:'🏠',vehicle:'🚗',
 const LIAB_ICONS={loan:'🏦',mortgage:'🏠',credit:'💳',personal:'🤝',other:'📦'};
 let editAstId=null,editLiabId=null,editLoanId=null;
 
-function totalAssets(){return(S.assets||[]).reduce((t,a)=>t+parseFloat(a.value),0)+(allSaved());}
+function netCashPosition(){
+  // All-time earned minus all-time actual expenses (excl savings transfers)
+  const earned=calcCumulativeIncome();
+  const spent=S.expenses.filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
+  return Math.max(0,earned-spent); // floor at 0 — can't have negative cash from this calc
+}
+function totalAssets(){
+  const manual=(S.assets||[]).reduce((t,a)=>t+parseFloat(a.value),0);
+  const savings=allSaved();
+  const cash=netCashPosition();
+  // Avoid double-counting: net cash already includes savings outflows as expenses,
+  // so we add savings balance separately only if it exceeds what net cash captured
+  return manual+savings+cash;
+}
 function totalLiab(){return(S.liabilities||[]).reduce((t,l)=>t+parseFloat(l.value),0)+totalDebtBal();}
 function netWorth(){return totalAssets()-totalLiab();}
 function totalDebtBal(){return(S.loans||[]).reduce((t,l)=>t+parseFloat(l.balance),0);}
@@ -2223,17 +2372,37 @@ function renderNetWorth(){
     });
   }
 
-  // Asset list
+  // Asset list — split into Liquid and Illiquid
   const astEl=document.getElementById('nw-asset-list');
-  const astList=[...(S.assets||[]).map(a=>({...a,_type:'asset'})),
-    {id:'_savings',name:'Savings Goals Balance',value:allSaved(),cat:'cash',_type:'auto',note:'Auto from savings goals'}
+  const LIQUID_CATS=['cash','investment'];
+  const allAutoAssets=[
+    {id:'_savings',name:'Savings Goals Balance',value:allSaved(),cat:'cash',_type:'auto',note:'Auto-tracked from savings goals'},
+    {id:'_cashpos',name:'Net Cash Position',value:netCashPosition(),cat:'cash',_type:'auto',note:'All-time income minus expenses'}
   ];
-  astEl.innerHTML=astList.length?astList.map(a=>`<div class="li">
+  const allManual=(S.assets||[]).map(a=>({...a,_type:'asset'}));
+  const allAssets=[...allManual,...allAutoAssets];
+  const liquidAssets=allAssets.filter(a=>LIQUID_CATS.includes(a.cat));
+  const illiquidAssets=allAssets.filter(a=>!LIQUID_CATS.includes(a.cat));
+  const liquidTotal=liquidAssets.reduce((t,a)=>t+parseFloat(a.value),0);
+  const illiquidTotal=illiquidAssets.reduce((t,a)=>t+parseFloat(a.value),0);
+  function assetRow(a){return`<div class="li">
     <div class="li-ic" style="background:var(--green-light);color:var(--green)">${ASSET_ICONS[a.cat]||'📦'}</div>
     <div class="li-nm"><div class="p">${a.name}${a._type==='auto'?' <span class="pill pill-g" style="font-size:11px">auto</span>':''}</div><div class="s">${a.cat}${a.note?' · '+a.note:''}</div></div>
     <div style="font-family:'DM Serif Display',serif;font-size:14px;color:var(--green);margin-right:8px;">${fmt(a.value)}</div>
-    ${a._type!=='auto'?`<button class="btn btn-ghost btn-sm" onclick="openAssetModal('${a.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delAsset('${a.id}')">✕</button>`:''}
-  </div>`).join(''):'<div class="empty"><div class="icon">💵</div><p>No assets added yet</p></div>';
+    ${a._type==='asset'?`<button class="btn btn-ghost btn-sm" onclick="openAssetModal('${a.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delAsset('${a.id}')">✕</button>`:''}
+  </div>`;}
+  astEl.innerHTML=`
+    <div style="font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;padding:4px 0;">
+      💧 Liquid Assets <span style="float:right;color:var(--green);font-family:'DM Serif Display',serif;font-size:14px;">${fmt(liquidTotal)}</span>
+    </div>
+    ${liquidAssets.length?liquidAssets.map(assetRow).join(''):'<div style="font-size:12px;color:var(--ink-3);padding:8px 0;">No liquid assets yet</div>'}
+    ${illiquidAssets.length?`
+    <div style="font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;margin:12px 0 6px;padding:4px 0;border-top:1px solid var(--paper-2);">
+      🏛 Fixed Assets <span style="float:right;color:var(--green);font-family:'DM Serif Display',serif;font-size:14px;">${fmt(illiquidTotal)}</span>
+    </div>
+    ${illiquidAssets.map(assetRow).join('')}`:''}
+    ${!allManual.length&&liquidAssets.length<=2?'<div style="font-size:11px;color:var(--ink-3);margin-top:8px;padding:8px;background:var(--paper-2);border-radius:var(--radius-sm);">Add properties, vehicles or investments via + Asset above</div>':''}
+  `;
 
   // Liability list
   const liabEl=document.getElementById('nw-liab-list');
@@ -2471,10 +2640,10 @@ function calcHealthScore(){
   const mwd=mwData();
   const scores={};
 
-  // 1. Save Rate (25%) — target 20%+
+  // 1. Save Rate (20%) — target 20%+
   const savM=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,c)=>s+parseFloat(c.amount),0);
   const saveRate=inc>0?savM/inc*100:0;
-  scores.saveRate={score:Math.min(100,saveRate/20*100),weight:25,label:'Save Rate',value:saveRate.toFixed(1)+'%',target:'20%+',detail:saveRate>=20?'Excellent saving habit':'Aim to save at least 20% of income'};
+  scores.saveRate={score:Math.min(100,saveRate/20*100),weight:20,label:'Save Rate',value:saveRate.toFixed(1)+'%',target:'20%+',detail:saveRate>=20?'Excellent saving habit':'Aim to save at least 20% of income'};
 
   // 2. Budget Adherence (20%) — also penalises spending beyond total income
   const bc=byCat(m,y);
@@ -2490,7 +2659,7 @@ function calcHealthScore(){
     budScore=Math.min(budScore,Math.max(0,100-(ratio-1)*200));
     overspendDetail=' · Spending exceeds income';
   }
-  scores.budget={score:budScore,weight:20,label:'Budget Adherence',value:budOk+'/'+budgetsWithData.length+' on track',target:'All within limit',detail:(budScore>=100?'All budgets within limit':budOk+' of '+budgetsWithData.length+' budgets on track')+overspendDetail};
+  scores.budget={score:budScore,weight:15,label:'Budget Adherence',value:budOk+'/'+budgetsWithData.length+' on track',target:'All within limit',detail:(budScore>=100?'All budgets within limit':budOk+' of '+budgetsWithData.length+' budgets on track')+overspendDetail};
 
   // 3. Net Worth Trend (20%)
   const nw=netWorth();
@@ -2512,7 +2681,23 @@ function calcHealthScore(){
     const progresses=goals.map(g=>{const sv=gSaved(g.id),tgt=new Date(g.date),now2=new Date();const elapsed=(now2-new Date(g.start||now2))/(tgt-new Date(g.start||now2));const expected=Math.min(1,elapsed||0.1);const actual=g.target>0?sv/g.target:0;return Math.min(100,actual/Math.max(0.01,expected)*100);});
     goalScore=progresses.reduce((s,p)=>s+p,0)/progresses.length;
   }
-  scores.goals={score:Math.min(100,goalScore),weight:15,label:'Goal Progress',value:goals.length+' goal'+(goals.length!==1?'s':''),target:'On track',detail:goals.length?'Based on savings goals progress':'Add savings goals to improve this pillar'};
+  scores.goals={score:Math.min(100,goalScore),weight:10,label:'Goal Progress',value:goals.length+' goal'+(goals.length!==1?'s':''),target:'On track',detail:goals.length?'Based on savings goals progress':'Add savings goals to improve this pillar'};
+
+  // 6. Cash Flow Health (15%) — cumulative net cash position
+  // Positive = earned more than spent over time; negative = structural deficit
+  const cumEarned=calcCumulativeIncome();
+  const cumSpent=S.expenses.filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
+  const netCash=cumEarned-cumSpent;
+  let cashScore=50;
+  if(cumEarned>0){
+    const cashRatio=netCash/cumEarned; // 0 to 1 ideally
+    if(netCash>=0)cashScore=Math.min(100,50+cashRatio*100);
+    else cashScore=Math.max(0,50+cashRatio*50);
+  }
+  const cashPct=cumEarned>0?(netCash/cumEarned*100).toFixed(1):0;
+  scores.cashFlow={score:cashScore,weight:15,label:'Cash Flow Health',
+    value:fmt(netCash),target:'Net positive',
+    detail:netCash>=0?`You've retained ${cashPct}% of all income earned`:'Cumulative spending exceeds all income earned'};
 
   // Total weighted score
   const total=Object.values(scores).reduce((t,s)=>t+s.score*s.weight/100,0);
@@ -2559,9 +2744,15 @@ function renderHealth(){
   // Tips
   const tips=[];
   if(scores.saveRate.score<70)tips.push({icon:'💰',tip:'Increase your monthly savings to at least 20% of income',action:"Go to Savings Goals → Contribute"});
-  if(scores.budget.score<80)tips.push({icon:'⊟',tip:'Review overspent budget categories and adjust limits or spending',action:"Go to Budget page"});
+  if(scores.budget.score<80){
+    const _am=mExps(now.getMonth(),now.getFullYear()).filter(e=>!isFuture(e)&&e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
+    const _im=incInMonth(now.getMonth(),now.getFullYear());
+    if(_im>0&&_am>_im)tips.push({icon:'🚨',tip:`Your spending (${fmt(_am)}) exceeded your income (${fmt(_im)}) this month — reduce expenses urgently`,action:'Go to Spending Insights'});
+    else tips.push({icon:'⊟',tip:'Review overspent budget categories and adjust limits or spending',action:'Go to Budget page'});
+  }
   if(scores.debt.score<70)tips.push({icon:'⊗',tip:'Make extra payments on your highest-interest loan first',action:"Go to Debt Tracker"});
   if(scores.netWorth.score<60)tips.push({icon:'◑',tip:'Log all your assets to get a clearer net worth picture',action:"Go to Net Worth"});
+  if(scores.cashFlow&&scores.cashFlow.score<50)tips.push({icon:'💸',tip:'Your cumulative spending has exceeded your income — focus on building a cash surplus',action:'Go to Analytics → Cash Flow'});
   if(!tips.length)tips.push({icon:'✦',tip:'Your finances are in great shape! Keep saving consistently.',action:''});
   document.getElementById('health-tips').innerHTML=tips.map(t=>`<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--paper-2);">
     <div style="font-size:22px;flex-shrink:0;">${t.icon}</div>
@@ -2609,8 +2800,9 @@ function generateInsights(m,y){
   let pm=m-1,py=y;
   if(pm<0){pm=11;py=y-1;}
 
-  const curExps=mExps(m,y).filter(e=>e.cat!=='Savings Transfer');
-  const prevExps=mExps(pm,py).filter(e=>e.cat!=='Savings Transfer');
+  // Exclude future-dated (planned) expenses so insights reflect actual spending
+  const curExps=mExps(m,y).filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e));
+  const prevExps=mExps(pm,py).filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e));
   const curTotal=curExps.reduce((s,e)=>s+parseFloat(e.amount),0);
   const prevTotal=prevExps.reduce((s,e)=>s+parseFloat(e.amount),0);
   const curBC=byCat(m,y);
@@ -2726,7 +2918,7 @@ function renderInsights(){
     return;
   }
   // Group by type
-  const groups={spend:'Overview',category:'Categories',increase:'Increases',decrease:'Good News',trend:'Trends',zero:'Restraint',savings:'Savings',budget:'Budget',goal:'Goals'};
+  const groups={overspend:'Alert',spend:'Overview',category:'Categories',increase:'Increases',decrease:'Good News',trend:'Trends',zero:'Restraint',savings:'Savings',budget:'Budget',goal:'Goals'};
   const seen=new Set();
   wrap.innerHTML=insights.map(ins=>{
     return`<div class="card" style="padding:14px;margin-bottom:10px;border-left:3px solid ${ins.color};">

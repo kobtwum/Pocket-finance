@@ -1197,7 +1197,7 @@ window.closeModal=closeModal;
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,signOut as fbOut,onAuthStateChanged,browserLocalPersistence,browserPopupRedirectResolver,setPersistence}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import{initializeFirestore,persistentLocalCache,persistentMultipleTabManager,doc,collection,setDoc,deleteDoc,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import{getFirestore,enableIndexedDbPersistence,doc,collection,setDoc,deleteDoc,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Show any unhandled errors visibly on screen
 window.addEventListener('error',e=>{
@@ -1215,19 +1215,12 @@ window.addEventListener('unhandledrejection',e=>{
 
 const FC={apiKey:"AIzaSyBuTkiDr-fB_woNrLqobALzYKX3gidq5TE",authDomain:"pocket-finance-cf7a7.firebaseapp.com",databaseURL:"https://pocket-finance-cf7a7-default-rtdb.firebaseio.com",projectId:"pocket-finance-cf7a7",storageBucket:"pocket-finance-cf7a7.firebasestorage.app",messagingSenderId:"94342153271",appId:"1:94342153271:web:0f6b411a01d8a9c160abb2"};
 const app=initializeApp(FC),auth=getAuth(app);
-// v10 persistent cache — replaces deprecated enableIndexedDbPersistence
-// persistentMultipleTabManager allows multiple tabs to share the same cache
-let db;
-try{
-  db=initializeFirestore(app,{
-    localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})
-  });
-}catch(e){
-  // Fallback: plain Firestore if persistence fails (e.g. private browsing)
-  const{getFirestore}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-  db=getFirestore(app);
-  console.warn('Persistence unavailable, using non-persistent Firestore:',e.message);
-}
+const db=getFirestore(app);
+// Enable offline persistence (IndexedDB) — battle-tested for GitHub Pages
+enableIndexedDbPersistence(db).catch(e=>{
+  if(e.code==='failed-precondition')console.warn('Multiple tabs: persistence limited to one tab');
+  else if(e.code==='unimplemented')console.warn('Browser does not support persistence');
+});
 
 // Module-local references to the global modal functions
 const openModal=id=>{const el=document.getElementById(id);if(el)el.classList.add('open');};
@@ -1426,19 +1419,10 @@ async function delDoc(col,id){
 }
 
 // ── SYNC — single source of truth via onSnapshot ──
-// onSnapshot fires from local cache first, then from server.
+// No separate getDocs call. onSnapshot fires immediately from local cache,
+// then again from server. Both devices always see the same Firestore state.
 let READY={profile:false,expenses:false,income:false,contributions:false};
 function checkReady(){return Object.values(READY).every(Boolean);}
-
-// Debounced refresh: batch rapid snapshot arrivals into a single render
-let _refreshTimer=null;
-function scheduleRefresh(){
-  if(_refreshTimer)clearTimeout(_refreshTimer);
-  _refreshTimer=setTimeout(()=>{
-    _refreshTimer=null;
-    if(checkReady())refreshPage();
-  },80); // 80ms window to batch simultaneous snapshot arrivals
-}
 
 function startSync(uid){
   UL.forEach(u=>u());UL=[];
@@ -1458,7 +1442,7 @@ function startSync(uid){
       if(v.selectedColor)S.selectedColor=v.selectedColor;
     }
     READY.profile=true;
-    setSyncDot('online');scheduleRefresh();
+    if(checkReady()){refreshPage();setSyncDot('online');}
   },()=>setSyncDot('offline'));
 
   const u2=onSnapshot(collection(db,'users',uid,'expenses'),sn=>{
@@ -1472,7 +1456,7 @@ function startSync(uid){
         if(c.type==='removed')S.expenses=S.expenses.filter(e=>e.id!==c.doc.id);
       });
     }
-    setSyncDot('online');scheduleRefresh();
+    if(checkReady()){refreshPage();setSyncDot('online');}
   },()=>setSyncDot('offline'));
 
   const u3=onSnapshot(collection(db,'users',uid,'income'),sn=>{
@@ -1486,7 +1470,7 @@ function startSync(uid){
       });
     }
     {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=incInMonth(_m,_y),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
-    setSyncDot('online');scheduleRefresh();
+    if(checkReady()){refreshPage();setSyncDot('online');}
   },()=>setSyncDot('offline'));
 
   const u4=onSnapshot(collection(db,'users',uid,'contributions'),sn=>{
@@ -1499,22 +1483,10 @@ function startSync(uid){
         if(c.type==='removed')S.contributions=S.contributions.filter(x=>x.id!==c.doc.id);
       });
     }
-    setSyncDot('online');scheduleRefresh();
+    if(checkReady()){refreshPage();setSyncDot('online');}
   },()=>setSyncDot('offline'));
 
   UL=[u1,u2,u3,u4];
-
-  // Hard timeout fallback: if any snapshot never fires (offline / rules error),
-  // render whatever we have after 8 seconds rather than staying blank forever
-  setTimeout(()=>{
-    if(!checkReady()){
-      console.warn('Sync timeout — rendering with partial data. READY=',JSON.stringify(READY));
-      // Mark any stuck collections as ready so we can render
-      Object.keys(READY).forEach(k=>{if(!READY[k])READY[k]=true;});
-      refreshPage();
-      setSyncDot('error');
-    }
-  },8000);
 }
 
 // ── HELPERS ──
@@ -1559,6 +1531,10 @@ function monthlyBaseline(){
     .reduce((t,s)=>t+monthlyEq(s),0);
 }
 function incInMonth(m,y){
+  const now=new Date();
+  const isCurrentMonth=(m===now.getMonth()&&y===now.getFullYear());
+  const todayDay=now.getDate();
+
   return S.incomeSources.filter(s=>{
     if(s.noncash)return false;
     const freq=s.freq||s.frequency||'monthly';
@@ -1571,8 +1547,10 @@ function incInMonth(m,y){
     const freq=s.freq||'monthly';
     const spread=s.spread||'spread';
     const a=parseFloat(s.amount)||0;
+
     // One-time: full amount in month received
     if(freq==='onetime')return t+a;
+
     // Quarterly/annual with 'received' — only count in payment month
     if((freq==='quarterly'||freq==='annual')&&spread==='received'){
       if(!s.date||s.date==='')return t+0;
@@ -1586,6 +1564,27 @@ function incInMonth(m,y){
         if(freq==='annual')return monthsFromStart%12===0?t+a:t+0;
       }catch{return t+0;}
     }
+
+    // For current month: gate by payment day so income only counts once received
+    if(isCurrentMonth&&freq==='monthly'){
+      const payDay=parseInt(s.day)||1;
+      // If payment day hasn't arrived yet this month, don't count it
+      if(todayDay<payDay)return t+0;
+      return t+a;
+    }
+
+    // For current month weekly/biweekly: count only payments that have occurred
+    if(isCurrentMonth&&(freq==='weekly'||freq==='biweekly')){
+      const daysInMonth=new Date(y,m+1,0).getDate();
+      const payDay=parseInt(s.day)||1; // first pay day of month
+      const interval=freq==='weekly'?7:14;
+      // Count how many payment instances have passed this month up to today
+      let count=0;
+      for(let d=payDay;d<=Math.min(todayDay,daysInMonth);d+=interval)count++;
+      const perPayment=freq==='weekly'?a:a; // amount per pay period
+      return t+(count*perPayment);
+    }
+
     return t+(monthlyEq(s,m,y)||0);
   },0);
 }
@@ -3115,6 +3114,13 @@ function getRollover(cat){
   const now=new Date();
   let pm=now.getMonth()-1,py=now.getFullYear();
   if(pm<0){pm=11;py=now.getFullYear()-1;}
+
+  // Only roll over if the user was actually tracking expenses in the previous month.
+  // If there are no expenses at all from that month, the user wasn't using the app
+  // then — rolling over a phantom "unspent" balance would be misleading.
+  const prevMonthExps=mExps(pm,py);
+  if(prevMonthExps.length===0)return 0;
+
   const prevSpent=byCat(pm,py)[cat]||0;
   const leftover=b.limit-prevSpent;
   return leftover>0?leftover:0;
@@ -3855,15 +3861,19 @@ window.exportPDF=function(){
 
 
 function initApp(){
-  // NOTE: S is empty at this point — data loads asynchronously via startSync().
-  // Do NOT call renderDash() here. The first render happens when checkReady() fires.
+  // If user already has data, mark onboarding as done so it never shows
+  if(S.incomeSources.length>0||S.expenses.length>0||S.budgets.length>0){
+    localStorage.setItem('pkt_onboarded','1');
+  }
   document.getElementById('greeting').textContent=greet()+' ✦';
+  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=incInMonth(_m,_y),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
   document.getElementById('exp-date').value=tod();
   document.getElementById('co-date').value=tod();
   applyLayout();
   setTimeout(setContentBounds, 100);
   applyDark();updateCurUI();setTimeout(updateCurUI,200);
   const bti=document.getElementById('bud-threshold');if(bti)bti.value=getBudgetThreshold();
+  renderDash();
   setSyncDot(navigator.onLine?'online':'offline');
   setInterval(()=>{const g=document.getElementById('greeting');if(g)g.textContent=greet()+' ✦';},60000);
 }

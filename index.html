@@ -545,7 +545,7 @@ body.dark .fi.error{background:#2a0a0a;}
       <button class="dk-tog" id="dk-btn" onclick="toggleDark()" aria-label="Toggle dark mode" role="switch" aria-checked="false"></button>
     </div>
     <div style="text-align:right;">
-      <div class="tb-lbl">Remaining</div>
+      <div class="tb-lbl">Balance</div>
       <div class="tb-inc" id="tb-inc">₵0.00</div>
     </div>
     <button id="user-av" class="av-ph" aria-label="Account menu">?</button>
@@ -559,7 +559,15 @@ body.dark .fi.error{background:#2a0a0a;}
 <!-- DASHBOARD -->
 <div id="page-dashboard" class="page active">
   <div id="bud-alert-wrap"></div>
-  <div class="card-dark"><div class="ct-g" id="greeting">Good morning ✦</div><div id="inc-strip" class="inc-strip"></div></div>
+  <div class="card-dark" id="dash-wallet">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+      <div class="ct-g" id="greeting">Good morning ✦</div>
+      <div style="font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.05em;text-transform:uppercase;">Running balance</div>
+    </div>
+    <div id="dash-balance" style="font-family:'DM Serif Display',serif;font-size:42px;color:white;line-height:1.1;margin-bottom:4px;">₵0.00</div>
+    <div id="dash-balance-sub" style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:14px;"></div>
+    <div id="inc-strip" class="inc-strip"></div>
+  </div>
   <div id="dash-stats" class="g2"></div>
   <div id="dash-lower">
     <div class="card"><div class="sh"><h2>Recent Expenses</h2><button class="btn btn-gold btn-sm" onclick="showPage('expenses');openExpenseModal()">+ Add</button></div><div id="dash-rec"></div></div>
@@ -1247,8 +1255,8 @@ function fmt(n){
   const rate=getRate(CUR);const cv=v*rate;const sym=CURRENCIES[CUR]?.symbol||CUR;
   return sym+cv.toLocaleString(CURRENCIES[CUR]?.locale||'en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
-window.setCur=function(c){CUR=c;localStorage.setItem('pkt_cur',c);updateCurUI();try{refreshPage();}catch(e){}try{const _m2=new Date().getMonth(),_y2=new Date().getFullYear(),_inc2=incInMonth(_m2,_y2),_sp2=mExps(_m2,_y2).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc2-_sp2);}catch(e){}}
-window.updateRate=function(val){if(!val||isNaN(val))return;localStorage.setItem('pkt_rate_'+CUR,val);try{refreshPage();}catch(e){}try{const _m2=new Date().getMonth(),_y2=new Date().getFullYear(),_inc2=incInMonth(_m2,_y2),_sp2=mExps(_m2,_y2).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc2-_sp2);}catch(e){}}
+window.setCur=function(c){CUR=c;localStorage.setItem('pkt_cur',c);updateCurUI();try{refreshPage();}catch(e){}try{const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(netCashPosition());}catch(e){}}
+window.updateRate=function(val){if(!val||isNaN(val))return;localStorage.setItem('pkt_rate_'+CUR,val);try{refreshPage();}catch(e){}try{const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(netCashPosition());}catch(e){}}
 function updateCurUI(){
   // Only updates UI elements — never reads S, never calls refreshPage
   ['topbar-cur','set-cur'].forEach(id=>{
@@ -1469,7 +1477,7 @@ function startSync(uid){
         if(c.type==='removed')S.incomeSources=S.incomeSources.filter(s=>s.id!==c.doc.id);
       });
     }
-    {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=incInMonth(_m,_y),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
+    {const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(netCashPosition());}
     if(checkReady()){refreshPage();setSyncDot('online');}
   },()=>setSyncDot('offline'));
 
@@ -1531,10 +1539,6 @@ function monthlyBaseline(){
     .reduce((t,s)=>t+monthlyEq(s),0);
 }
 function incInMonth(m,y){
-  const now=new Date();
-  const isCurrentMonth=(m===now.getMonth()&&y===now.getFullYear());
-  const todayDay=now.getDate();
-
   return S.incomeSources.filter(s=>{
     if(s.noncash)return false;
     const freq=s.freq||s.frequency||'monthly';
@@ -1547,10 +1551,8 @@ function incInMonth(m,y){
     const freq=s.freq||'monthly';
     const spread=s.spread||'spread';
     const a=parseFloat(s.amount)||0;
-
     // One-time: full amount in month received
     if(freq==='onetime')return t+a;
-
     // Quarterly/annual with 'received' — only count in payment month
     if((freq==='quarterly'||freq==='annual')&&spread==='received'){
       if(!s.date||s.date==='')return t+0;
@@ -1564,27 +1566,6 @@ function incInMonth(m,y){
         if(freq==='annual')return monthsFromStart%12===0?t+a:t+0;
       }catch{return t+0;}
     }
-
-    // For current month: gate by payment day so income only counts once received
-    if(isCurrentMonth&&freq==='monthly'){
-      const payDay=parseInt(s.day)||1;
-      // If payment day hasn't arrived yet this month, don't count it
-      if(todayDay<payDay)return t+0;
-      return t+a;
-    }
-
-    // For current month weekly/biweekly: count only payments that have occurred
-    if(isCurrentMonth&&(freq==='weekly'||freq==='biweekly')){
-      const daysInMonth=new Date(y,m+1,0).getDate();
-      const payDay=parseInt(s.day)||1; // first pay day of month
-      const interval=freq==='weekly'?7:14;
-      // Count how many payment instances have passed this month up to today
-      let count=0;
-      for(let d=payDay;d<=Math.min(todayDay,daysInMonth);d+=interval)count++;
-      const perPayment=freq==='weekly'?a:a; // amount per pay period
-      return t+(count*perPayment);
-    }
-
     return t+(monthlyEq(s,m,y)||0);
   },0);
 }
@@ -1712,23 +1693,45 @@ window.addEventListener('appinstalled',()=>{document.getElementById('inst-wrap')
 function renderDash(){
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
   document.getElementById('greeting').textContent=greet()+' ✦';
-  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=incInMonth(_m,_y),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
   const sbInc=document.getElementById('sb-inc');if(sbInc)sbInc.textContent=fmt(totInc())+' / month';
-  // Dashboard strip: show pinned sources + total
+
+  // ── Running wallet balance ──
+  const walletBal=netCashPosition();
+  const balEl=document.getElementById('dash-balance');
+  const balSub=document.getElementById('dash-balance-sub');
+  if(balEl){
+    balEl.textContent=fmt(walletBal);
+    balEl.style.color=walletBal<0?'#ff8a80':'white';
+  }
+  if(balSub){
+    const incThisMonth_=incInMonth(m,y);
+    const spentActual_=mExps(m,y).filter(e=>!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
+    const pendingIncome_=Math.max(0,monthlyBaseline()-incThisMonth_);
+    let subParts=[];
+    if(pendingIncome_>0)subParts.push(`+${fmt(pendingIncome_)} incoming this month`);
+    subParts.push(`${fmt(spentActual_)} spent in ${MOS[m]}`);
+    balSub.textContent=subParts.join('  ·  ');
+  }
+  // Update topbar
+  {const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(walletBal);}
+
+  // Dashboard strip: show pinned sources + this month received
   const pinned=S.incomeSources.filter(s=>s.pinned&&!s.noncash);
   const incThisMonth=incInMonth(m,y);
   const pinnedHTML=pinned.map(s=>{const freq=s.freq||'monthly';const amt=freq==='onetime'?((s.date&&new Date(s.date).getMonth()===m&&new Date(s.date).getFullYear()===y)?parseFloat(s.amount):0):monthlyEq(s,m,y);return`<div class="ii"><div class="lb">${s.name}</div><div class="am">${fmt(amt)}</div><div class="nt">${freq==='onetime'?'One-time':freq.charAt(0).toUpperCase()+freq.slice(1)}</div></div>`;}).join('');
-  document.getElementById('inc-strip').innerHTML=pinnedHTML+`<div class="ii"><div class="lb">This Month</div><div class="am">${fmt(incThisMonth)}</div><div class="nt">${MOS[m]}</div></div>`;
-  const spent=mSpent(m,y),inc=incThisMonth,rem=inc-spent,pct=Math.min(100,inc>0?spent/inc*100:0).toFixed(0);
+  document.getElementById('inc-strip').innerHTML=pinnedHTML+`<div class="ii"><div class="lb">Received ${MOS[m].slice(0,3)}</div><div class="am">${fmt(incThisMonth)}</div><div class="nt">${MOS[m]} ${y}</div></div>`;
+
+  // ── Monthly stats cards ──
+  const nonSavSpent=mExps(m,y).filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
+  const allActualSpentM=mExps(m,y).filter(e=>!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
+  const pct=Math.min(100,incThisMonth>0?nonSavSpent/incThisMonth*100:0).toFixed(0);
   const savM=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,c)=>s+parseFloat(c.amount),0);
-  const nonSavSpent=mExps(m,y).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
-  const allSpentM=mExps(m,y).reduce((s,e)=>s+parseFloat(e.amount),0);
-  const remAfterAll=inc-allSpentM;
+  const monthlyLeft=incThisMonth-allActualSpentM;
   document.getElementById('dash-stats').innerHTML=`
-    <div class="card" style="padding:14px;"><div class="ct">Total Income</div><div class="cv">${fmt(inc)}</div><div class="cs">${MOS[m]}</div></div>
-    <div class="card" style="padding:14px;"><div class="ct">Spent</div><div class="cv" style="color:var(--red)">${fmt(nonSavSpent)}</div><div class="cs">${pct}% of income</div></div>
-    <div class="card" style="padding:14px;"><div class="ct">Saved</div><div class="cv" style="color:var(--green)">${fmt(savM)}</div><div class="cs">${fmt(allSaved())} all time</div></div>
-    <div class="card" style="padding:14px;"><div class="ct">Remaining</div><div class="cv" style="color:${remAfterAll<0?'var(--red)':'var(--green)'}">${fmt(remAfterAll)}</div><div class="cs">${remAfterAll>=0?'Available':'Over budget'}</div></div>`;
+    <div class="card" style="padding:14px;"><div class="ct">Received ${MOS[m].slice(0,3)}</div><div class="cv">${fmt(incThisMonth)}</div><div class="cs">of ~${fmt(monthlyBaseline())} expected</div></div>
+    <div class="card" style="padding:14px;"><div class="ct">Spent ${MOS[m].slice(0,3)}</div><div class="cv" style="color:var(--red)">${fmt(nonSavSpent)}</div><div class="cs">${pct}% of received</div></div>
+    <div class="card" style="padding:14px;"><div class="ct">Saved ${MOS[m].slice(0,3)}</div><div class="cv" style="color:var(--green)">${fmt(savM)}</div><div class="cs">${fmt(allSaved())} all time</div></div>
+    <div class="card" style="padding:14px;"><div class="ct">Month Left</div><div class="cv" style="color:${monthlyLeft<0?'var(--red)':'var(--green)'}">${fmt(monthlyLeft)}</div><div class="cs">from ${MOS[m].slice(0,3)} income</div></div>`;
   const rec=mExps(m,y).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('dash-rec').innerHTML=rec.length?rec.map(e=>eRow(e,true)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses yet this month</p></div>';
   const bc=byCat(m,y);
@@ -2171,7 +2174,7 @@ function renderIncStatement(){
 }
 
 function renderIncome(){
-  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=incInMonth(_m,_y),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
+  {const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(netCashPosition());}
   const nowR=new Date(),mNow=nowR.getMonth(),yNow=nowR.getFullYear();
   document.getElementById('inc-list').innerHTML=S.incomeSources.length?S.incomeSources.map(s=>{
     const freq=s.freq||'monthly';
@@ -3114,13 +3117,6 @@ function getRollover(cat){
   const now=new Date();
   let pm=now.getMonth()-1,py=now.getFullYear();
   if(pm<0){pm=11;py=now.getFullYear()-1;}
-
-  // Only roll over if the user was actually tracking expenses in the previous month.
-  // If there are no expenses at all from that month, the user wasn't using the app
-  // then — rolling over a phantom "unspent" balance would be misleading.
-  const prevMonthExps=mExps(pm,py);
-  if(prevMonthExps.length===0)return 0;
-
   const prevSpent=byCat(pm,py)[cat]||0;
   const leftover=b.limit-prevSpent;
   return leftover>0?leftover:0;
@@ -3866,7 +3862,7 @@ function initApp(){
     localStorage.setItem('pkt_onboarded','1');
   }
   document.getElementById('greeting').textContent=greet()+' ✦';
-  {const _n=new Date(),_m=_n.getMonth(),_y=_n.getFullYear(),_inc=incInMonth(_m,_y),_sp=mExps(_m,_y).reduce((s,e)=>s+parseFloat(e.amount),0);const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(_inc-_sp);}
+  {const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(netCashPosition());}
   document.getElementById('exp-date').value=tod();
   document.getElementById('co-date').value=tod();
   applyLayout();

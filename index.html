@@ -125,6 +125,15 @@ body.dark::after{content:'';position:fixed;inset:0;background:linear-gradient(18
 .fab{position:fixed;bottom:calc(var(--sb) + 70px);right:16px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#ffd385);color:var(--ink);font-size:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 24px 60px rgba(255,181,106,0.28);cursor:pointer;border:none;z-index:40;transition:transform .18s,box-shadow .18s;}
 .fab:hover{box-shadow:0 28px 72px rgba(255,181,106,0.32);}
 .fab:active{transform:scale(.96);}
+#fab-menu-modal.open #fab-menu-sheet{transform:translateY(0);}
+body.dark #fab-menu-sheet{background:rgba(15,23,42,0.92);border-color:rgba(255,255,255,0.12);}
+body.dark #fab-menu-sheet button[style*="red-light"]{background:var(--red-light);}
+body.dark #fab-menu-sheet button[style*="green-light"]{background:var(--green-light);}
+body.dark #fab-menu-sheet button[style*="blue-light"]{background:var(--blue-light);}
+.dash-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 4px;border-bottom:1px solid var(--paper-2);}
+.dash-toggle-row:last-child{border-bottom:none;}
+.dash-toggle-row .dt-label{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:var(--ink);}
+.dash-toggle-row .dt-icon{font-size:18px;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--paper-2);font-family:system-ui,sans-serif;}
 
 /* DESKTOP >= 1024px */
 @media(min-width:1024px){
@@ -563,7 +572,10 @@ body.dark .fi.error{background:#2a0a0a;}
   <div class="card-dark" id="dash-wallet">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
       <div class="ct-g" id="greeting">Good morning ✦</div>
-      <div style="font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.05em;text-transform:uppercase;">Running balance</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.05em;text-transform:uppercase;">Running balance</div>
+        <button onclick="openDashCustomise()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);border-radius:8px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:.04em;" aria-label="Customise dashboard">⚙ Cards</button>
+      </div>
     </div>
     <div id="dash-balance" style="font-family:'DM Serif Display',serif;font-size:42px;color:white;line-height:1.1;margin-bottom:4px;">₵0.00</div>
     <div id="dash-balance-sub" style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:14px;"></div>
@@ -571,12 +583,13 @@ body.dark .fi.error{background:#2a0a0a;}
   </div>
   <div id="dash-stats" class="g2"></div>
   <div id="dash-lower">
-    <div class="card"><div class="sh"><h2>Recent Expenses</h2><button class="btn btn-gold btn-sm" onclick="showPage('expenses');openExpenseModal()">+ Add</button></div><div id="dash-rec"></div></div>
-    <div class="card"><div class="sh"><h2>Budget Status</h2><button class="btn btn-ghost btn-sm" onclick="showPage('budget')">All →</button></div><div id="dash-bud"></div></div>
+    <div class="card" id="dcard-recent-expenses"><div class="sh"><h2>Recent Expenses</h2><button class="btn btn-gold btn-sm" onclick="showPage('expenses');openExpenseModal()">+ Add</button></div><div id="dash-rec"></div></div>
+    <div class="card" id="dcard-budget"><div class="sh"><h2>Budget Status</h2><button class="btn btn-ghost btn-sm" onclick="showPage('budget')">All →</button></div><div id="dash-bud"></div></div>
   </div>
-  <div class="card"><div class="sh"><h2>Savings Goals</h2><button class="btn btn-ghost btn-sm" onclick="showPage('savings')">All →</button></div><div id="dash-sav"></div></div>
-  <div class="card" style="cursor:pointer;" onclick="showPage('insights')"><div class="sh"><h2>💡 Insights</h2><span style="font-size:11px;color:var(--ink-3);">Tap to see all →</span></div><div id="dash-insights"></div></div>
-  <div class="card" id="dash-health-card" style="cursor:pointer;" onclick="showPage('health')"><div class="sh"><h2>Financial Health</h2><span style="font-size:11px;color:var(--ink-3);">Tap to see breakdown →</span></div><div id="dash-health"></div></div>
+  <div class="card" id="dcard-income-receipts"><div class="sh"><h2>Income Receipts</h2><button class="btn btn-gold btn-sm" onclick="openIncomeReceiptModal()">+ Record</button></div><div id="dash-receipts"></div></div>
+  <div class="card" id="dcard-savings"><div class="sh"><h2>Savings Goals</h2><button class="btn btn-ghost btn-sm" onclick="showPage('savings')">All →</button></div><div id="dash-sav"></div></div>
+  <div class="card" id="dcard-insights" style="cursor:pointer;" onclick="showPage('insights')"><div class="sh"><h2>💡 Insights</h2><span style="font-size:11px;color:var(--ink-3);">Tap to see all →</span></div><div id="dash-insights"></div></div>
+  <div class="card" id="dcard-health" style="cursor:pointer;" onclick="showPage('health')"><div class="sh"><h2>Financial Health</h2><span style="font-size:11px;color:var(--ink-3);">Tap to see breakdown →</span></div><div id="dash-health"></div></div>
 </div>
 
 <!-- EXPENSES -->
@@ -938,7 +951,7 @@ body.dark .fi.error{background:#2a0a0a;}
 </div><!-- end .d-main -->
 </div><!-- end .app -->
 
-<button class="fab" id="fab" onclick="fabAction()">+</button>
+<button class="fab" id="fab" onclick="openFabMenu()" aria-label="Quick add">+</button>
 
 <!-- MODALS -->
 <div class="mo" id="expense-modal"><div class="modal"><div class="mh"></div>
@@ -1734,7 +1747,86 @@ window.showPage=function(id){
   const pt=document.getElementById('d-ptitle');if(pt)pt.textContent=titles[id]||id;
   ({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{const _at=document.getElementById('inc-tab-alltime');const _st=document.getElementById('inc-tab-statement');if(_at&&_at.style.display!=='none')renderIncAllTime();else if(_st&&_st.style.display!=='none')renderIncStatement();else renderIncome();},recurring:renderRecurring,import:renderImportPage,settings:updateLnInc,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[id]?.();
 };
-window.fabAction=function(){if(CP==='dashboard'||CP==='expenses')openExpenseModal();else if(CP==='savings')openGoalModal();else if(CP==='recurring')openRecurModal();};
+window.fabAction=function(){openFabMenu();};
+
+// ── FAB QUICK ACTION MENU ──
+window.openFabMenu=function(){
+  const modal=document.getElementById('fab-menu-modal');
+  if(!modal)return;
+  modal.classList.add('open');
+};
+window.closeFabMenu=function(){
+  const modal=document.getElementById('fab-menu-modal');
+  if(modal)modal.classList.remove('open');
+};
+
+// ── DASHBOARD CARD DEFINITIONS ──
+const DASH_CARDS=[
+  {id:'dcard-recent-expenses', label:'Recent Expenses',   icon:'💸'},
+  {id:'dcard-income-receipts', label:'Income Receipts',   icon:'💰'},
+  {id:'dcard-budget',          label:'Budget Status',     icon:'⊟'},
+  {id:'dcard-savings',         label:'Savings Goals',     icon:'🎯'},
+  {id:'dcard-insights',        label:'Insights',          icon:'✦'},
+  {id:'dcard-health',          label:'Financial Health',  icon:'❤'},
+];
+const DASH_LAYOUT_KEY='pkt_dash_layout';
+
+function getDashLayout(){
+  try{
+    const saved=localStorage.getItem(DASH_LAYOUT_KEY);
+    if(saved){
+      const parsed=JSON.parse(saved);
+      // Return object keyed by card id
+      return parsed;
+    }
+  }catch(e){}
+  // Default: all visible
+  const def={};DASH_CARDS.forEach(c=>{def[c.id]=true;});
+  return def;
+}
+function applyDashLayout(){
+  const layout=getDashLayout();
+  DASH_CARDS.forEach(c=>{
+    const el=document.getElementById(c.id);
+    if(el)el.style.display=(layout[c.id]===false)?'none':'';
+  });
+  // Also apply to the parent #dash-lower container — hide if both children are hidden
+  const lower=document.getElementById('dash-lower');
+  if(lower){
+    const expVis=layout['dcard-recent-expenses']!==false;
+    const budVis=layout['dcard-budget']!==false;
+    lower.style.display=(expVis||budVis)?'':'none';
+  }
+}
+window.saveDashLayout=function(){
+  const layout={};
+  DASH_CARDS.forEach(c=>{
+    const chk=document.getElementById('dtog-'+c.id);
+    if(chk)layout[c.id]=chk.checked;
+    else layout[c.id]=true;
+  });
+  localStorage.setItem(DASH_LAYOUT_KEY,JSON.stringify(layout));
+  applyDashLayout();
+  showToast('Dashboard updated ✓');
+};
+window.openDashCustomise=function(){
+  const layout=getDashLayout();
+  const container=document.getElementById('dash-card-toggles');
+  if(!container)return;
+  container.innerHTML=DASH_CARDS.map(c=>`
+    <div class="dash-toggle-row">
+      <div class="dt-label">
+        <div class="dt-icon">${c.icon}</div>
+        <span>${c.label}</span>
+      </div>
+      <button class="dk-tog ${layout[c.id]!==false?'on':''}" id="dtog-${c.id}"
+        onclick="this.classList.toggle('on')" role="switch"
+        aria-checked="${layout[c.id]!==false?'true':'false'}"
+        aria-label="Toggle ${c.label}"></button>
+    </div>
+  `).join('');
+  openModal('dash-customise-modal');
+};
 
 // PWA Install
 let DP=null;
@@ -1829,6 +1921,30 @@ function renderDash(){
   document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,rawP=b.limit>0?sp/b.limit*100:0,p2=rawP.toFixed(0),barP=Math.min(100,rawP);const c=gCat(b.cat);return`<div class="bc"><div class="bc-h"><div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name}</div><div class="bc-a"><strong>${fmt(sp)}</strong>/${fmt(b.limit)}${rawP>100?` <span style="color:var(--red);font-size:11px;">${p2}%</span>`:''}</div></div><div class="pw"><div class="pb ${rawP>100?'pb-red':rawP>70?'pb-gold':'pb-green'}" style="width:${barP}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
   renderBudgetAlerts();renderDashHealth();renderDashInsights();
   document.getElementById('dash-sav').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),p3=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green);font-size:18px;font-family:system-ui,sans-serif;">${g.icon}</div><div class="li-nm"><div class="p">${g.name}</div><div class="s">${fmt(sv)} of ${fmt(g.target)}</div></div><span class="pill pill-g">${p3}%</span></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No savings goals yet</p></div>';
+
+  // Income receipts card
+  const dashReceiptsEl=document.getElementById('dash-receipts');
+  if(dashReceiptsEl){
+    const recentRec=[...(S.incomeReceipts||[])].filter(r=>r&&r.date).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,4);
+    dashReceiptsEl.innerHTML=recentRec.length
+      ? recentRec.map(r=>{
+          const src=S.incomeSources.find(s=>s.id===r.sourceId);
+          return`<div class="li">
+            <div class="li-ic" style="background:${r.noncash?'var(--blue-light)':'var(--green-light)'};color:${r.noncash?'var(--blue)':'var(--green)'};font-family:system-ui,sans-serif;">💰</div>
+            <div class="li-nm">
+              <div class="p">${r.note||src?.name||'Income receipt'}${r.noncash?' <span class="pill pill-b" style="font-size:10px">non-cash</span>':''}</div>
+              <div class="s">${new Date(r.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}${r.type?' · '+r.type:''}</div>
+            </div>
+            <div class="li-am crd" style="margin-right:6px;">+${fmt(parseFloat(r.amount)||0)}</div>
+          </div>`;
+        }).join('')+`<div style="border-top:1px solid var(--paper-2);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:var(--ink-3);">All-time received</span>
+          <span style="font-family:'DM Serif Display',serif;font-size:16px;color:var(--gold);">${fmt((S.incomeReceipts||[]).filter(r=>!r.noncash).reduce((t,r)=>t+(parseFloat(r.amount)||0),0))}</span>
+        </div>`
+      : '<div class="empty"><div class="icon" style="font-family:system-ui,sans-serif;">💰</div><p>No receipts recorded yet<br><span style="color:var(--gold);cursor:pointer;" onclick="openIncomeReceiptModal()">Tap to record income →</span></p></div>';
+  }
+
+  applyDashLayout();
 }
 
 // ── EXPENSES ──
@@ -2752,7 +2868,12 @@ for(const c of S.contributions)await delDoc('contributions',c.id);S.expenses=[];
 
 // ── MODALS & TOAST ──
 // openModal and closeModal are defined in the global script above
-document.querySelectorAll('.mo').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
+document.querySelectorAll('.mo').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o){o.classList.remove('open');}});});
+// FAB menu overlay click-to-close
+document.addEventListener('click',function(e){
+  const fm=document.getElementById('fab-menu-modal');
+  if(fm&&fm.classList.contains('open')&&e.target===fm)closeFabMenu();
+});
 document.querySelectorAll('.modal').forEach(m=>{let sy=0;m.addEventListener('touchstart',e=>{sy=e.touches[0].clientY;},{passive:true});m.addEventListener('touchmove',e=>{if(e.touches[0].clientY-sy>80&&m.scrollTop===0)m.closest('.mo').classList.remove('open');},{passive:true});});
 function showToast(msg){const t=document.getElementById('toast');document.getElementById('toast-msg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 window.showToast=showToast;
@@ -4196,6 +4317,7 @@ function initApp(){
   document.getElementById('exp-date').value=tod();
   document.getElementById('co-date').value=tod();
   applyLayout();
+  applyDashLayout();
   setTimeout(setContentBounds, 100);
   applyDark();updateCurUI();setTimeout(updateCurUI,200);
   const bti=document.getElementById('bud-threshold');if(bti)bti.value=getBudgetThreshold();
@@ -4256,6 +4378,41 @@ function initApp(){
     <div class="mfooter">
       <button class="btn btn-ghost" onclick="closeModal('income-receipt-modal')">Cancel</button>
       <button class="btn btn-gold" onclick="saveIncomeReceipt()">Save</button>
+    </div>
+  </div>
+</div>
+<!-- FAB QUICK ACTION MODAL -->
+<div class="mo" id="fab-menu-modal" style="align-items:flex-end;">
+  <div style="background:var(--paper);backdrop-filter:blur(24px);border:1px solid rgba(18,33,68,0.12);border-radius:var(--radius) var(--radius) 0 0;padding:20px 18px calc(var(--sb) + 22px);width:100%;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1);" id="fab-menu-sheet">
+    <div class="mh"></div>
+    <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--ink);margin-bottom:6px;text-align:center;">Quick Add</div>
+    <div style="font-size:12px;color:var(--ink-3);text-align:center;margin-bottom:20px;">What would you like to record?</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+      <button onclick="closeFabMenu();openExpenseModal();" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 10px;border-radius:16px;border:1px solid var(--paper-3);background:var(--red-light);cursor:pointer;transition:transform .15s;">
+        <span style="font-size:28px;font-family:system-ui,sans-serif;">💸</span>
+        <span style="font-size:12px;font-weight:600;color:var(--red);">Expense</span>
+      </button>
+      <button onclick="closeFabMenu();openIncomeReceiptModal();" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 10px;border-radius:16px;border:1px solid var(--paper-3);background:var(--green-light);cursor:pointer;transition:transform .15s;">
+        <span style="font-size:28px;font-family:system-ui,sans-serif;">💰</span>
+        <span style="font-size:12px;font-weight:600;color:var(--green);">Income</span>
+      </button>
+      <button onclick="closeFabMenu();openGoalModal();" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 10px;border-radius:16px;border:1px solid var(--paper-3);background:var(--blue-light);cursor:pointer;transition:transform .15s;">
+        <span style="font-size:28px;font-family:system-ui,sans-serif;">🎯</span>
+        <span style="font-size:12px;font-weight:600;color:var(--blue);">Goal</span>
+      </button>
+    </div>
+    <button onclick="closeFabMenu()" style="display:block;width:100%;margin-top:14px;padding:12px;border-radius:var(--radius-sm);border:none;background:var(--paper-2);color:var(--ink-2);font-size:13px;font-weight:500;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;">Cancel</button>
+  </div>
+</div>
+
+<!-- DASHBOARD CUSTOMISE MODAL -->
+<div class="mo" id="dash-customise-modal">
+  <div class="modal">
+    <div class="mh"></div>
+    <div class="sh"><h2>Customise Dashboard</h2><p>Show or hide cards</p></div>
+    <div id="dash-card-toggles" style="display:flex;flex-direction:column;gap:2px;"></div>
+    <div class="mfooter" style="margin-top:16px;">
+      <button class="btn btn-gold btn-full" onclick="saveDashLayout();closeModal('dash-customise-modal')">Done</button>
     </div>
   </div>
 </div>

@@ -1392,7 +1392,26 @@ const DCATS=[
   {id:'cat_other',name:'Other',icon:'📌',color:'#7a7a9a'}
 ];
 function makeId(prefix){return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2,5)}`;}
-function normalizeCategories(cats){return (cats||[]).map(c=>{if(typeof c==='string')c={name:c,icon:'📌',color:'#888'};const name=(c.name||'Unnamed').toString();const id=c.id||`cat_${name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')}`;return {id,name,icon:c.icon||'📌',color:c.color||'#888'};});}
+function isEmojiOrSymbol(str){
+  // Returns true if the string contains at least one emoji or special symbol
+  // A corrupt icon like "food" or "transport" will fail this check
+  if(!str||str.length===0)return false;
+  return /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{FE00}-\u{FEFF}\u{1F300}-\u{1F9FF}📌💰🔑]/u.test(str);
+}
+function normalizeCategories(cats){
+  return (cats||[]).map(c=>{
+    if(typeof c==='string')c={name:c,icon:'📌',color:'#888'};
+    const name=(c.name||'Unnamed').toString();
+    const id=c.id||`cat_${name.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')}`;
+    // If stored icon is corrupt (plain text, not emoji), look up from DCATS defaults
+    let icon=c.icon||'';
+    if(!isEmojiOrSymbol(icon)){
+      const def=DCATS.find(d=>d.id===id||d.name===name);
+      icon=def?def.icon:'📌';
+    }
+    return {id,name,icon,color:c.color||'#888'};
+  });
+}
 function resolveCategory(value){if(!value)return {id:null,name:'Unknown',icon:'📌',color:'#888'};return S.categories.find(c=>c.id===value||c.name===value)||{id:null,name:value,icon:'📌',color:'#888'};}
 const gCat=value=>resolveCategory(value);
 let S={profile:{name:''},incomeSources:[],incomeReceipts:[],expenses:[],categories:normalizeCategories([...DCATS]),budgets:[],goals:[],contributions:[],recurringExpenses:[],assets:[],liabilities:[],loans:[],accounts:[],currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),selectedColor:'#e67e22',schemaVersion:2};

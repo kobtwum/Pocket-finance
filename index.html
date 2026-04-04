@@ -1766,7 +1766,7 @@ function renderDash(){
   if(sbInc)sbInc.textContent=fmt(totInc())+' / month';
 
   const receipts=incomeReceiptsInMonth(m,y).filter(r=>!r.noncash);
-  const incThisMonth = actualIncomeOrForecast(m,y);
+  const incThisMonth = earnedForPeriod(m,y);
 
   // Only count actual (non-future) non-savings expenses as "spent"
   const nonSavSpent = mExps(m,y).filter(e=>!isFuture(e)&&e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
@@ -1800,16 +1800,16 @@ function renderDash(){
   const monthlyLeft = incThisMonth - nonSavSpent - savM;
 
   document.getElementById('dash-stats').innerHTML=`
-    <div class="card" style="padding:14px;"><div class="ct">Received ${MOS[m].slice(0,3)}</div><div class="cv">${fmt(incThisMonth)}</div><div class="cs">of ~${fmt(monthlyBaseline())} expected</div></div>
+    <div class="card" style="padding:14px;"><div class="ct">Received ${MOS[m].slice(0,3)}</div><div class="cv">${fmt(incThisMonth)}</div><div class="cs">${incThisMonth>0?'actual · ':''}~${fmt(monthlyBaseline())} expected</div></div>
     <div class="card" style="padding:14px;"><div class="ct">Spent ${MOS[m].slice(0,3)}</div><div class="cv" style="color:var(--red)">${fmt(nonSavSpent)}</div><div class="cs">${pct}% of received</div></div>
     <div class="card" style="padding:14px;"><div class="ct">Saved ${MOS[m].slice(0,3)}</div><div class="cv" style="color:var(--green)">${fmt(savM)}</div><div class="cs">${fmt(allSaved())} all time</div></div>
-    <div class="card" style="padding:14px;"><div class="ct">Month Left</div><div class="cv" style="color:${monthlyLeft<0?'var(--red)':'var(--green)'}">${fmt(monthlyLeft)}</div><div class="cs">from ${MOS[m].slice(0,3)} income</div></div>`;
+    <div class="card" style="padding:14px;"><div class="ct">Month Left</div><div class="cv" style="color:${monthlyLeft<0?'var(--red)':'var(--green)'}">${fmt(monthlyLeft)}</div><div class="cs">${incThisMonth>0?'from actual income':'record receipts for actuals'}</div></div>`;
   const rec=mExps(m,y).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('dash-rec').innerHTML=rec.length?rec.map(e=>eRow(e,true)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses yet this month</p></div>';
   const bc=byCat(m,y);
-  document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,rawP=b.limit>0?sp/b.limit*100:0,p2=rawP.toFixed(0),barP=Math.min(100,rawP);const c=gCat(b.cat);return`<div class="bc"><div class="bc-h"><div class="bc-n">${c.icon} ${b.cat}</div><div class="bc-a"><strong>${fmt(sp)}</strong>/${fmt(b.limit)}${rawP>100?` <span style="color:var(--red);font-size:11px;">${p2}%</span>`:''}</div></div><div class="pw"><div class="pb ${rawP>100?'pb-red':rawP>70?'pb-gold':'pb-green'}" style="width:${barP}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
+  document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,rawP=b.limit>0?sp/b.limit*100:0,p2=rawP.toFixed(0),barP=Math.min(100,rawP);const c=gCat(b.cat);return`<div class="bc"><div class="bc-h"><div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name}</div><div class="bc-a"><strong>${fmt(sp)}</strong>/${fmt(b.limit)}${rawP>100?` <span style="color:var(--red);font-size:11px;">${p2}%</span>`:''}</div></div><div class="pw"><div class="pb ${rawP>100?'pb-red':rawP>70?'pb-gold':'pb-green'}" style="width:${barP}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
   renderBudgetAlerts();renderDashHealth();renderDashInsights();
-  document.getElementById('dash-sav').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),p3=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green);font-size:18px">${g.icon}</div><div class="li-nm"><div class="p">${g.name}</div><div class="s">${fmt(sv)} of ${fmt(g.target)}</div></div><span class="pill pill-g">${p3}%</span></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No savings goals yet</p></div>';
+  document.getElementById('dash-sav').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),p3=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green);font-size:18px;font-family:system-ui,sans-serif;">${g.icon}</div><div class="li-nm"><div class="p">${g.name}</div><div class="s">${fmt(sv)} of ${fmt(g.target)}</div></div><span class="pill pill-g">${p3}%</span></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No savings goals yet</p></div>';
 }
 
 // ── EXPENSES ──
@@ -1822,7 +1822,7 @@ function isFuture(e){
 function eRow(e,compact=false){
   const c=gCat(e.cat);
   const future=isFuture(e);
-  return`<div class="li" style="${future?'opacity:0.72;':''}"><div class="li-ic" style="background:${c.color}22;color:${c.color}">${c.icon}</div><div class="li-nm"><div class="p">${e.desc}${future?' <span class="pill pill-b" style="font-size:10px">📅 planned</span>':''}${e.linkedGoal?` <span class="pill pill-g" style="font-size:11px">savings</span>`:''}${e.recurring?` <span class="rb">↻</span>`:''}</div><div class="s">${e.cat} · ${new Date(e.date).toLocaleDateString('en-GH',{day:'numeric',month:'short'})}${e.note?' · '+e.note:''}</div></div><div class="li-am" style="color:${future?'var(--ink-3)':'var(--red)'};margin-right:${compact?0:6}px">${future?'~−':'−'}${fmt(e.amount)}</div>${compact?'':`<button class="btn btn-ghost btn-sm" onclick="openExpenseModal('${e.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delExp('${e.id}')">✕</button>`}</div>`;
+  return`<div class="li" style="${future?'opacity:0.72;':''}"><div class="li-ic" style="background:${c.color}22;color:${c.color};font-family:system-ui,sans-serif;">${c.icon}</div><div class="li-nm"><div class="p">${e.desc}${future?' <span class="pill pill-b" style="font-size:10px">📅 planned</span>':''}${e.linkedGoal?` <span class="pill pill-g" style="font-size:11px">savings</span>`:''}${e.recurring?` <span class="rb">↻</span>`:''}</div><div class="s">${c.name} · ${new Date(e.date).toLocaleDateString('en-GH',{day:'numeric',month:'short'})}${e.note?' · '+e.note:''}</div></div><div class="li-am" style="color:${future?'var(--ink-3)':'var(--red)'};margin-right:${compact?0:6}px">${future?'~−':'−'}${fmt(e.amount)}</div>${compact?'':`<button class="btn btn-ghost btn-sm" onclick="openExpenseModal('${e.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delExp('${e.id}')">✕</button>`}</div>`;
 }
 function renderExp(){
   const m=S.currentMonth,y=S.currentYear;
@@ -1832,7 +1832,7 @@ function renderExp(){
   const plannedExps=exps.filter(e=>isFuture(e));
   const sp=actualExps.filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
   const plannedTotal=plannedExps.filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
-  const incM=actualIncomeOrForecast(m,y);
+  const incM=earnedForPeriod(m,y);
   document.getElementById('exp-stats').innerHTML=`
     <div class="card" style="padding:13px;"><div class="ct">Spent</div><div class="cv" style="font-size:20px">${fmt(sp)}</div><div class="cs">${actualExps.filter(e=>e.cat!=='Savings Transfer').length} items${plannedExps.filter(e=>e.cat!=='Savings Transfer').length?' · <span style="color:var(--blue)">'+plannedExps.filter(e=>e.cat!=='Savings Transfer').length+' planned</span>':''}</div></div>
     <div class="card" style="padding:13px;"><div class="ct">Remaining</div><div class="cv" style="font-size:20px;color:${incM-sp<0?'var(--red)':'var(--green)'}">${fmt(incM-sp)}</div><div class="cs">of ${fmt(incM)}${plannedTotal?' <span style="font-size:10px;color:var(--blue)">~'+fmt(incM-sp-plannedTotal)+' after planned</span>':''}</div></div>
@@ -2026,16 +2026,17 @@ function checkExpenseModalBudget(){
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
   const b=S.budgets.find(x=>x.cat===cat);
   if(!b){hint.style.display='none';return;}
+  const catName=gCat(b.cat).name;
   const currentSpent=byCat(m,y)[cat]||0;
   const newTotal=currentSpent+(EID?amt-(S.expenses.find(e=>e.id===EID)?.amount||0):amt);
   const newPct=b.limit>0?newTotal/b.limit*100:0;
   const threshold=getBudgetThreshold();
   if(newTotal>b.limit){
     hint.style.cssText='display:block;background:var(--red-light);color:var(--red);border-radius:var(--radius-sm);padding:9px 12px;font-size:11px;margin-bottom:4px;';
-    hint.textContent='⚠ This will exceed your '+cat+' budget by '+fmt(newTotal-b.limit)+' ('+newPct.toFixed(0)+'% of '+fmt(b.limit)+')';
+    hint.textContent='⚠ This will exceed your '+catName+' budget by '+fmt(newTotal-b.limit)+' ('+newPct.toFixed(0)+'% of '+fmt(b.limit)+')';
   }else if(newPct>=threshold){
     hint.style.cssText='display:block;background:var(--gold-pale);color:#8a6a1f;border-radius:var(--radius-sm);padding:9px 12px;font-size:11px;margin-bottom:4px;';
-    hint.textContent='ℹ Approaching '+cat+' budget limit — '+newPct.toFixed(0)+'% used ('+fmt(newTotal)+' of '+fmt(b.limit)+')';
+    hint.textContent='ℹ Approaching '+catName+' budget limit — '+newPct.toFixed(0)+'% used ('+fmt(newTotal)+' of '+fmt(b.limit)+')';
   }else{hint.style.display='none';}
 }
 
@@ -2048,18 +2049,19 @@ function renderBudgetAlerts(){
   const alerts=[];
   S.budgets.forEach(b=>{
     const status=catBudgetStatus(b.cat,m,y);if(!status)return;
+    const catName=gCat(b.cat).name;
     if(status.over){
-      alerts.push({cat:b.cat,msg:'Over budget by '+fmt(status.spent-status.limit),type:'error'});
+      alerts.push({cat:b.cat,catName,msg:'Over budget by '+fmt(status.spent-status.limit),type:'error'});
     }else if(status.approaching&&!alerted.includes(b.cat)){
-      alerts.push({cat:b.cat,msg:status.pct.toFixed(0)+'% of budget used',type:'warn'});
+      alerts.push({cat:b.cat,catName,msg:status.pct.toFixed(0)+'% of budget used',type:'warn'});
       markAlerted(b.cat);
-      showToast('⚠ '+b.cat+' at '+status.pct.toFixed(0)+'% of budget');
+      showToast('⚠ '+catName+' at '+status.pct.toFixed(0)+'% of budget');
     }
   });
   const dismissedKey='bud_dismissed_'+new Date().getMonth()+'_'+new Date().getFullYear();
   let dismissed=[];try{dismissed=JSON.parse(localStorage.getItem(dismissedKey)||'[]');}catch{}
   const visible=alerts.filter(a=>!dismissed.includes(a.cat));
-  w.innerHTML=visible.length?visible.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:var(--radius-sm);margin-bottom:8px;background:${a.type==='error'?'var(--red-light)':'var(--gold-pale)'};color:${a.type==='error'?'var(--red)':'#8a6a1f'};font-size:12px;font-weight:500;">${a.type==='error'?'⛔':'⚠'} <span style="flex:1;">${a.cat}: ${a.msg}</span><button onclick="dismissBudgetAlert('${a.cat}')" style="background:none;border:none;cursor:pointer;color:inherit;opacity:.5;font-size:16px;padding:0 2px;flex-shrink:0;">✕</button></div>`).join(''):'';
+  w.innerHTML=visible.length?visible.map(a=>`<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:var(--radius-sm);margin-bottom:8px;background:${a.type==='error'?'var(--red-light)':'var(--gold-pale)'};color:${a.type==='error'?'var(--red)':'#8a6a1f'};font-size:12px;font-weight:500;">${a.type==='error'?'⛔':'⚠'} <span style="flex:1;">${a.catName}: ${a.msg}</span><button onclick="dismissBudgetAlert('${a.cat}')" style="background:none;border:none;cursor:pointer;color:inherit;opacity:.5;font-size:16px;padding:0 2px;flex-shrink:0;">✕</button></div>`).join(''):'';
 }
 window.dismissBudgetAlert=function(cat){
   const key='bud_dismissed_'+new Date().getMonth()+'_'+new Date().getFullYear();
@@ -2193,7 +2195,7 @@ function renderAnOv(){
   document.getElementById('top-cats').innerHTML=sorted.slice(0,5).map(([cat,amt])=>{const p=(amt/Math.max(1,tot)*100).toFixed(1),c=gCat(cat);return`<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--paper-2);"><div style="width:30px;height:30px;border-radius:8px;background:${c.color}22;display:flex;align-items:center;justify-content:center;font-size:16px;font-family:system-ui,sans-serif;">${c.icon}</div><div style="flex:1;"><div style="font-size:12.5px;font-weight:500;">${cat}</div><div class="pw" style="margin-top:4px;"><div class="pb pb-blue" style="width:${p}%"></div></div></div><div style="text-align:right;"><div style="font-size:12px;font-weight:500;">${fmt(amt)}</div><div style="font-size:11px;color:var(--ink-3);">${p}%</div></div></div>`;}).join('')||'<div class="empty"><div class="icon">📊</div><p>No expense data yet</p></div>';
 }
 function renderAnSav(){const mwd=mwData();if(!mwd.length)return;let cum=0;const cd=mwd.map(({month,year})=>{cum+=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0);return{label:MOS[month].slice(0,3)+' '+year,value:cum};});const md=mwd.map(({month,year})=>({label:MOS[month].slice(0,3)+' '+year,value:S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0)}));dChart('sav-cum');CI['sav-cum']=new Chart(document.getElementById('sav-cum').getContext('2d'),{type:'line',data:{labels:cd.map(d=>d.label),datasets:[{data:cd.map(d=>d.value),borderColor:'#2d7a5f',backgroundColor:'#2d7a5f22',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:'#2d7a5f'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}});dChart('sav-mon');CI['sav-mon']=new Chart(document.getElementById('sav-mon').getContext('2d'),{type:'bar',data:{labels:md.map(d=>d.label),datasets:[{data:md.map(d=>d.value),backgroundColor:'#2d7a5f99',borderColor:'#2d7a5f',borderWidth:2,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}});}
-function renderAnMon(){const mwd=mwData();if(!mwd.length)return;const lb=mwd.map(({month,year})=>MOS[month].slice(0,3)+' '+year);const id_=mwd.map(({month,year})=>actualIncomeOrForecast(month,year));const sd=mwd.map(({month,year})=>mExps(month,year).filter(e=>!isFuture(e)&&e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0));const vd=mwd.map(({month,year})=>S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0));dChart('inc-exp');CI['inc-exp']=new Chart(document.getElementById('inc-exp').getContext('2d'),{type:'bar',data:{labels:lb,datasets:[{label:'Income',data:id_,type:'line',borderColor:'#c9a84c',backgroundColor:'rgba(201,168,76,0.1)',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:'#c9a84c',borderWidth:2,order:1},{label:'Spent',data:sd,backgroundColor:'#c0392b88',borderColor:'#c0392b',borderWidth:1,borderRadius:4,order:2},{label:'Saved',data:vd,backgroundColor:'#2d7a5f88',borderColor:'#2d7a5f',borderWidth:1,borderRadius:4,order:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},boxWidth:10,usePointStyle:true}}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}});document.getElementById('mon-sum').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--paper-2);">${['Month','Income','Spent','Saved','Left','Rate'].map(h=>`<th style="padding:7px 8px;text-align:${h==='Month'?'left':'right'};font-weight:500;color:var(--ink-3);">${h}</th>`).join('')}</tr></thead><tbody>${mwd.map(({month,year},i)=>{const mInc=id_[i],sp=sd[i],sv=vd[i],rem=mInc-sp-sv,rate=mInc>0?(sv/mInc*100).toFixed(1):0;return`<tr style="border-bottom:1px solid var(--paper-2);"><td style="padding:7px 8px;font-weight:500;">${lb[i]}</td><td style="padding:7px 8px;text-align:right;color:var(--green);">${fmt(mInc)}</td><td style="padding:7px 8px;text-align:right;color:var(--red);">${fmt(sp)}</td><td style="padding:7px 8px;text-align:right;color:var(--green);">${fmt(sv)}</td><td style="padding:7px 8px;text-align:right;color:${rem<0?'var(--red)':'var(--green)'};">${fmt(rem)}</td><td style="padding:7px 8px;text-align:right;"><span class="pill ${parseFloat(rate)>=15?'pill-g':'pill-r'}">${rate}%</span></td></tr>`;}).join('')}</tbody></table>`;}
+function renderAnMon(){const mwd=mwData();if(!mwd.length)return;const lb=mwd.map(({month,year})=>MOS[month].slice(0,3)+' '+year);const id_=mwd.map(({month,year})=>earnedForPeriod(month,year));const sd=mwd.map(({month,year})=>mExps(month,year).filter(e=>!isFuture(e)&&e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0));const vd=mwd.map(({month,year})=>S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0));dChart('inc-exp');CI['inc-exp']=new Chart(document.getElementById('inc-exp').getContext('2d'),{type:'bar',data:{labels:lb,datasets:[{label:'Income',data:id_,type:'line',borderColor:'#c9a84c',backgroundColor:'rgba(201,168,76,0.1)',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:'#c9a84c',borderWidth:2,order:1},{label:'Spent',data:sd,backgroundColor:'#c0392b88',borderColor:'#c0392b',borderWidth:1,borderRadius:4,order:2},{label:'Saved',data:vd,backgroundColor:'#2d7a5f88',borderColor:'#2d7a5f',borderWidth:1,borderRadius:4,order:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},boxWidth:10,usePointStyle:true}}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}});document.getElementById('mon-sum').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--paper-2);">${['Month','Income','Spent','Saved','Left','Rate'].map(h=>`<th style="padding:7px 8px;text-align:${h==='Month'?'left':'right'};font-weight:500;color:var(--ink-3);">${h}</th>`).join('')}</tr></thead><tbody>${mwd.map(({month,year},i)=>{const mInc=id_[i],sp=sd[i],sv=vd[i],rem=mInc-sp-sv,rate=mInc>0?(sv/mInc*100).toFixed(1):0;return`<tr style="border-bottom:1px solid var(--paper-2);"><td style="padding:7px 8px;font-weight:500;">${lb[i]}</td><td style="padding:7px 8px;text-align:right;color:var(--green);">${fmt(mInc)}</td><td style="padding:7px 8px;text-align:right;color:var(--red);">${fmt(sp)}</td><td style="padding:7px 8px;text-align:right;color:var(--green);">${fmt(sv)}</td><td style="padding:7px 8px;text-align:right;color:${rem<0?'var(--red)':'var(--green)'};">${fmt(rem)}</td><td style="padding:7px 8px;text-align:right;"><span class="pill ${parseFloat(rate)>=15?'pill-g':'pill-r'}">${rate}%</span></td></tr>`;}).join('')}</tbody></table>`;}
 
 // ── INCOME ──
 let IID=null;
@@ -3090,7 +3092,7 @@ window.delLoan=async function(id){
 // ── FINANCIAL HEALTH SCORE ───────────────────────────────
 function calcHealthScore(){
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
-  const inc=actualIncomeOrForecast(m,y)||totInc(); // use actual receipts if available, else forecast
+  const inc=earnedForPeriod(m,y)||totInc(); // actual received this month, fallback to baseline
   const mwd=mwData();
   const scores={};
 
@@ -3342,7 +3344,7 @@ function generateInsights(m,y){
   const bc=byCat(m,y);
   const overBudgets=S.budgets.filter(b=>(bc[b.cat]||0)>b.limit);
   const okBudgets=S.budgets.filter(b=>(bc[b.cat]||0)<=b.limit&&b.limit>0);
-  if(overBudgets.length)insights.push({icon:'⛔',color:'var(--red)',title:`${overBudgets.length} budget${overBudgets.length>1?'s':''} exceeded`,detail:overBudgets.map(b=>`${b.cat}: ${fmt((bc[b.cat]||0)-b.limit)} over`).join(' · '),type:'budget'});
+  if(overBudgets.length)insights.push({icon:'⛔',color:'var(--red)',title:`${overBudgets.length} budget${overBudgets.length>1?'s':''} exceeded`,detail:overBudgets.map(b=>`${gCat(b.cat).name}: ${fmt((bc[b.cat]||0)-b.limit)} over`).join(' · '),type:'budget'});
   if(okBudgets.length&&!overBudgets.length)insights.push({icon:'✅',color:'var(--green)',title:`All ${okBudgets.length} budgets on track!`,detail:'Great discipline — every category within its limit',type:'budget'});
 
   // 8. Savings goal progress
@@ -3438,7 +3440,7 @@ function renderBudget(){
     const pl=isOver?'pill-r':rawPct>70?'pill-gold':'pill-g';
     return`<div class="bc">
       <div class="bc-h">
-        <div class="bc-n">${c.icon} ${b.cat} <span class="pill ${pl}">${pct}%${isOver?' ⚠':''}</span>${b.rollover?'<span class="pill pill-b" style="font-size:11px">↻ rollover</span>':''}</div>
+        <div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name} <span class="pill ${pl}">${pct}%${isOver?' ⚠':''}</span>${b.rollover?'<span class="pill pill-b" style="font-size:11px">↻ rollover</span>':''}</div>
         <div style="display:flex;gap:5px;align-items:center;">
           <div class="bc-a">${fmt(sp)}/${fmt(effLimit)}</div>
           <button class="btn btn-ghost btn-sm" onclick="openBudgetModal('${b.cat}')">Edit</button>
@@ -3455,7 +3457,7 @@ function renderBudget(){
   dChart('bud-chart');if(!S.budgets.length)return;
   const lb=S.budgets.map(b=>b.cat),dt=S.budgets.map(b=>byCat(m,y)[b.cat]||0),cl=S.budgets.map(b=>gCat(b.cat).color);
   CI['bud-chart']=new Chart(document.getElementById('bud-chart').getContext('2d'),{type:'doughnut',data:{labels:lb,datasets:[{data:dt,backgroundColor:cl.map(c=>c+'cc'),borderColor:cl,borderWidth:2,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'62%'}});
-  document.getElementById('bud-leg').innerHTML=S.budgets.map(b=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${gCat(b.cat).color};display:inline-block;"></span>${b.cat}</span>`).join('');
+  document.getElementById('bud-leg').innerHTML=S.budgets.map(b=>{const c=gCat(b.cat);return`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${c.color};display:inline-block;"></span>${c.name}</span>`;}).join('');
 }
 
 // ── PWA WIDGET SHORTCUT ───────────────────────────────────
@@ -3620,6 +3622,19 @@ window.calcLoanPreview=function(){
   if(pmtEl&&!pmtEl.value)pmtEl.value=monthly.toFixed(2);
 };
 
+// For cash flow / analytics: use actual receipts for current+future months,
+// forecast only for completed past months (where receipts might not have been logged)
+function earnedForPeriod(month, year){
+  const now=new Date();
+  const nowM=now.getMonth(), nowY=now.getFullYear();
+  const isPast=year<nowY||(year===nowY&&month<nowM);
+  const actual=incomeReceiptsCashTotal(month,year);
+  // For past months: fall back to forecast if no receipts recorded
+  // For current month and future: only use actual receipts (don't inflate with forecast)
+  if(isPast) return actual>0?actual:incInMonth(month,year);
+  return actual; // current/future: only what's been actually received
+}
+
 // ── CASH FLOW TAB ─────────────────────────────────────────
 function renderAnCashFlow(){
   const mwd=mwData();
@@ -3630,7 +3645,7 @@ function renderAnCashFlow(){
     return;
   }
   const rows=mwd.map(({month,year})=>{
-    const earned=actualIncomeOrForecast(month,year);
+    const earned=earnedForPeriod(month,year);
     const spent=mExps(month,year).filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
     const saved=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0);
     const net=earned-spent-saved;
@@ -3999,7 +4014,7 @@ window.exportXLSX=function(){
   if(typeof XLSX==='undefined'){showToast('Spreadsheet library loading...');return;}
   const wb=XLSX.utils.book_new();
   // Sheet 1: Expenses
-  const expRows=[['Date','Description','Category','Amount','Note'],...S.expenses.map(e=>[e.date,e.desc,e.cat,parseFloat(e.amount),e.note||''])];
+  const expRows=[['Date','Description','Category','Amount','Note'],...S.expenses.map(e=>[e.date,e.desc,gCat(e.cat).name,parseFloat(e.amount),e.note||''])];
   const ws1=XLSX.utils.aoa_to_sheet(expRows);
   ws1['!cols']=[{wch:12},{wch:35},{wch:20},{wch:12},{wch:25}];
   XLSX.utils.book_append_sheet(wb,ws1,'Expenses');
@@ -4099,7 +4114,7 @@ window.exportPDF=function(){
   const budRows=S.budgets.map(b=>{
     const sp=bc[b.cat]||0,pct=(sp/b.limit*100);
     const status=pct>=100?'Over':pct>=getBudgetThreshold()?'Warning':'OK';
-    return[pdfTxt(b.cat),pdfFmt(b.limit),pdfFmt(sp),pct.toFixed(0)+'%',status];
+    return[pdfTxt(gCat(b.cat).name),pdfFmt(b.limit),pdfFmt(sp),pct.toFixed(0)+'%',status];
   });
   if(budRows.length){
     doc.autoTable({startY:y2,head:[['Category','Limit','Spent','%','Status']],body:budRows,theme:'grid',

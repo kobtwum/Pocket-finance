@@ -126,10 +126,8 @@ body.dark::after{content:'';position:fixed;inset:0;background:linear-gradient(18
 .fab:hover{box-shadow:0 28px 72px rgba(255,181,106,0.32);}
 .fab:active{transform:scale(.96);}
 #fab-menu-modal.open #fab-menu-sheet{transform:translateY(0);}
-body.dark #fab-menu-sheet{background:rgba(15,23,42,0.92);border-color:rgba(255,255,255,0.12);}
-body.dark #fab-menu-sheet button[style*="red-light"]{background:var(--red-light);}
-body.dark #fab-menu-sheet button[style*="green-light"]{background:var(--green-light);}
-body.dark #fab-menu-sheet button[style*="blue-light"]{background:var(--blue-light);}
+.fab-sheet{background:var(--paper);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(18,33,68,0.12);border-radius:var(--radius) var(--radius) 0 0;padding:20px 18px calc(var(--sb) + 22px);width:100%;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1);}
+body.dark .fab-sheet{background:rgba(15,23,42,0.92);border-color:rgba(255,255,255,0.12);}
 .dash-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 4px;border-bottom:1px solid var(--paper-2);}
 .dash-toggle-row:last-child{border-bottom:none;}
 .dash-toggle-row .dt-label{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:var(--ink);}
@@ -1801,9 +1799,8 @@ function applyDashLayout(){
 window.saveDashLayout=function(){
   const layout={};
   DASH_CARDS.forEach(c=>{
-    const chk=document.getElementById('dtog-'+c.id);
-    if(chk)layout[c.id]=chk.checked;
-    else layout[c.id]=true;
+    const btn=document.getElementById('dtog-'+c.id);
+    layout[c.id]=btn?btn.classList.contains('on'):true;
   });
   localStorage.setItem(DASH_LAYOUT_KEY,JSON.stringify(layout));
   applyDashLayout();
@@ -4383,7 +4380,7 @@ function initApp(){
 </div>
 <!-- FAB QUICK ACTION MODAL -->
 <div class="mo" id="fab-menu-modal" style="align-items:flex-end;">
-  <div style="background:var(--paper);backdrop-filter:blur(24px);border:1px solid rgba(18,33,68,0.12);border-radius:var(--radius) var(--radius) 0 0;padding:20px 18px calc(var(--sb) + 22px);width:100%;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1.1,.64,1);" id="fab-menu-sheet">
+  <div class="fab-sheet" id="fab-menu-sheet">
     <div class="mh"></div>
     <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--ink);margin-bottom:6px;text-align:center;">Quick Add</div>
     <div style="font-size:12px;color:var(--ink-3);text-align:center;margin-bottom:20px;">What would you like to record?</div>
@@ -4398,7 +4395,7 @@ function initApp(){
       </button>
       <button onclick="closeFabMenu();openGoalModal();" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 10px;border-radius:16px;border:1px solid var(--paper-3);background:var(--blue-light);cursor:pointer;transition:transform .15s;">
         <span style="font-size:28px;font-family:system-ui,sans-serif;">🎯</span>
-        <span style="font-size:12px;font-weight:600;color:var(--blue);">Goal</span>
+        <span style="font-size:12px;font-weight:600;color:var(--blue);">Savings Goal</span>
       </button>
     </div>
     <button onclick="closeFabMenu()" style="display:block;width:100%;margin-top:14px;padding:12px;border-radius:var(--radius-sm);border:none;background:var(--paper-2);color:var(--ink-2);font-size:13px;font-weight:500;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;">Cancel</button>

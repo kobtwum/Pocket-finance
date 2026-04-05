@@ -21,9 +21,49 @@
 })();
 window.addEventListener('load',()=>{
   if(!('serviceWorker' in navigator))return;
-  const sw=`const C='pkt-v5';self.addEventListener('install',e=>{self.skipWaiting();});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>clients.claim()));});self.addEventListener('fetch',e=>{if(e.request.mode==='navigate'){e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));}});`;
+  // v6 — bumping version forces old SW out and clears stale cache
+  const sw=`const C='pkt-v6';
+self.addEventListener('install',e=>{
+  // Take over immediately — don't wait for old SW to finish
+  self.skipWaiting();
+});
+self.addEventListener('activate',e=>{
+  e.waitUntil(
+    caches.keys()
+      .then(keys=>Promise.all(keys.filter(k=>k!==C).map(k=>caches.delete(k))))
+      .then(()=>self.clients.claim())
+  );
+});
+self.addEventListener('fetch',e=>{
+  // Network-first for all navigation requests
+  // Never serve a stale cached HTML page
+  if(e.request.mode==='navigate'){
+    e.respondWith(
+      fetch(e.request)
+        .then(r=>{
+          // Cache a fresh copy for genuine offline fallback
+          const clone=r.clone();
+          caches.open(C).then(cache=>cache.put(e.request,clone));
+          return r;
+        })
+        .catch(()=>caches.match(e.request))
+    );
+  }
+  // For other assets — not cached, just fetch
+});`;
   const b=new Blob([sw],{type:'application/javascript'});
-  navigator.serviceWorker.register(URL.createObjectURL(b),{scope:'./'}).catch(()=>{});
+  navigator.serviceWorker.register(URL.createObjectURL(b),{scope:'./'})
+    .then(reg=>{
+      // When a new SW takes control, reload so the fresh app HTML is executed
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        // Only reload if not already reloading
+        if(!window._swReloading){
+          window._swReloading=true;
+          window.location.reload();
+        }
+      });
+    })
+    .catch(()=>{});
 });
 </script>
 </head>
@@ -1229,7 +1269,7 @@ window.closeModal=closeModal;
 <script type="module">
 import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,signOut as fbOut,onAuthStateChanged,browserLocalPersistence,browserPopupRedirectResolver,setPersistence}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import{getFirestore,enableIndexedDbPersistence,doc,collection,setDoc,deleteDoc,onSnapshot,writeBatch}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import{getFirestore,enableIndexedDbPersistence,doc,collection,setDoc,deleteDoc,onSnapshot,writeBatch,getDoc}from'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Show any unhandled errors visibly on screen
 window.addEventListener('error',e=>{
@@ -1491,7 +1531,33 @@ function startSync(uid){
     }
   },6000);
 
+  // Profile fallback: if the profile snapshot hasn't fired in 3s (common in PWA
+  // background resume), do a direct getDoc pull to unblock budgets/goals/recurring
+  const profileFallbackTimer=setTimeout(async()=>{
+    if(!READY.profile&&CU){
+      try{
+        const sn=await getDoc(doc(db,'users',uid,'meta','profile'));
+        if(sn.exists()&&!READY.profile){
+          const v=sn.data();
+          S.profile.name=v.name||'';
+          if(v.categories?.length)S.categories=normalizeCategories(v.categories);
+          S.budgets=v.budgets||[];
+          S.goals=v.goals||[];
+          S.recurringExpenses=v.recurringExpenses||[];
+          S.assets=v.assets||[];
+          S.liabilities=(v.liabilities||[]).filter(l=>!l.id?.startsWith('ll_'));
+          S.loans=v.loans||[];
+          if(v.selectedColor)S.selectedColor=v.selectedColor;
+          READY.profile=true;
+          refreshPage();
+          console.log('Pocket: profile loaded via fallback getDoc');
+        }
+      }catch(e){console.warn('Pocket: profile fallback failed',e);}
+    }
+  },3000);
+
   const u1=onSnapshot(doc(db,'users',uid,'meta','profile'),sn=>{
+    clearTimeout(profileFallbackTimer);
     if(sn.exists()){
       const v=sn.data();
       S.profile.name=v.name||'';

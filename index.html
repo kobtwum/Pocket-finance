@@ -567,6 +567,7 @@ body.dark .fi.error{background:#2a0a0a;}
 <!-- DASHBOARD -->
 <div id="page-dashboard" class="page active">
   <div id="bud-alert-wrap"></div>
+  <div id="pending-receipts-wrap"></div>
   <div class="card-dark" id="dash-wallet">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
       <div class="ct-g" id="greeting">Good morning ✦</div>
@@ -1218,7 +1219,8 @@ body.dark .fi.error{background:#2a0a0a;}
 <script>
 // These must be global — called from onclick attributes in HTML
 function openModal(id){const el=document.getElementById(id);if(el)el.classList.add('open');}
-function closeModal(id){const el=document.getElementById(id);if(el)el.classList.remove('open');}
+function closeModal(id){const el=document.getElementById(id);if(el)el.classList.remove('open');if(id==='income-receipt-modal')window._rcptDupConfirmed=false;}
+window._rcptDupConfirmed=false;
 window.openModal=openModal;
 window.closeModal=closeModal;
 </script>
@@ -1916,7 +1918,7 @@ function renderDash(){
   document.getElementById('dash-rec').innerHTML=rec.length?rec.map(e=>eRow(e,true)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses yet this month</p></div>';
   const bc=byCat(m,y);
   document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,rawP=b.limit>0?sp/b.limit*100:0,p2=rawP.toFixed(0),barP=Math.min(100,rawP);const c=gCat(b.cat);return`<div class="bc"><div class="bc-h"><div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name}</div><div class="bc-a"><strong>${fmt(sp)}</strong>/${fmt(b.limit)}${rawP>100?` <span style="color:var(--red);font-size:11px;">${p2}%</span>`:''}</div></div><div class="pw"><div class="pb ${rawP>100?'pb-red':rawP>70?'pb-gold':'pb-green'}" style="width:${barP}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
-  renderBudgetAlerts();renderDashHealth();renderDashInsights();
+  renderBudgetAlerts();renderDashHealth();renderDashInsights();renderPendingReceiptsNudge();
   document.getElementById('dash-sav').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),p3=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green);font-size:18px;font-family:system-ui,sans-serif;">${g.icon}</div><div class="li-nm"><div class="p">${g.name}</div><div class="s">${fmt(sv)} of ${fmt(g.target)}</div></div><span class="pill pill-g">${p3}%</span></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No savings goals yet</p></div>';
 
   // Income receipts card
@@ -1943,6 +1945,72 @@ function renderDash(){
 
   applyDashLayout();
 }
+
+// ── PENDING RECEIPTS NUDGE ──────────────────────────────────
+function renderPendingReceiptsNudge(){
+  const wrap=document.getElementById('pending-receipts-wrap');
+  if(!wrap)return;
+  const now=new Date();
+  const m=now.getMonth(),y=now.getFullYear(),today=now.getDate();
+
+  // Find sources whose pay day has passed this month but no receipt logged yet
+  const overdue=S.incomeSources.filter(s=>{
+    if(s.noncash)return false;
+    const freq=s.freq||'monthly';
+    if(freq!=='monthly'&&freq!=='biweekly'&&freq!=='weekly')return false; // only regular recurring
+    const day=parseInt(s.day)||1;
+    if(today<day)return false; // not due yet
+    // Check if receipt exists for this source this month
+    const hasReceipt=(S.incomeReceipts||[]).some(r=>{
+      if(r.sourceId!==s.id)return false;
+      const d=new Date(r.date);
+      return d.getMonth()===m&&d.getFullYear()===y;
+    });
+    return !hasReceipt;
+  });
+
+  const dismissed=JSON.parse(localStorage.getItem('pkt_nudge_dismissed_'+y+'_'+m)||'[]');
+  const visible=overdue.filter(s=>!dismissed.includes(s.id));
+
+  if(!visible.length){wrap.innerHTML='';return;}
+
+  wrap.innerHTML=`<div style="background:linear-gradient(135deg,rgba(45,122,95,0.12),rgba(201,168,76,0.08));border:1px solid rgba(45,122,95,0.25);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div style="font-size:12px;font-weight:600;color:var(--green);">💰 Income due — not yet recorded</div>
+      <button onclick="dismissAllNudges()" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--ink-3);padding:0 2px;">✕</button>
+    </div>
+    ${visible.map(s=>{
+      const expected=sourceExpectedAmount(s);
+      const payDate=sourcePayDate(s);
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(45,122,95,0.15);">
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--ink);">${s.name}</div>
+          <div style="font-size:11px;color:var(--ink-3);">Expected ${fmt(expected)} · due ${new Date(payDate).toLocaleDateString('en-GH',{day:'numeric',month:'short'})}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button onclick="dismissNudge('${s.id}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-3);padding:4px 6px;">Skip</button>
+          <button onclick="openIncomeReceiptModal(null,'${s.id}')" style="background:var(--green);color:white;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">Record →</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+window.dismissNudge=function(sourceId){
+  const now=new Date();
+  const key='pkt_nudge_dismissed_'+now.getFullYear()+'_'+now.getMonth();
+  const dismissed=JSON.parse(localStorage.getItem(key)||'[]');
+  if(!dismissed.includes(sourceId))dismissed.push(sourceId);
+  localStorage.setItem(key,JSON.stringify(dismissed));
+  renderPendingReceiptsNudge();
+};
+window.dismissAllNudges=function(){
+  const now=new Date();
+  const key='pkt_nudge_dismissed_'+now.getFullYear()+'_'+now.getMonth();
+  const ids=S.incomeSources.filter(s=>!s.noncash).map(s=>s.id);
+  localStorage.setItem(key,JSON.stringify(ids));
+  renderPendingReceiptsNudge();
+};
 
 // ── EXPENSES ──
 let EID=null;
@@ -2753,38 +2821,177 @@ window.saveIncome=async function(){
 
 let IRID=null;
 
-window.openIncomeReceiptModal=function(id){
+// ── INCOME RECEIPT HELPERS ─────────────────────────────────
+
+// Compute the most recent pay date for a source based on its day field
+function sourcePayDate(src){
+  const now=new Date();
+  const day=parseInt(src.day)||1;
+  // Clamp to valid days in month
+  const safeDay=Math.min(day,new Date(now.getFullYear(),now.getMonth()+1,0).getDate());
+  const thisMonth=new Date(now.getFullYear(),now.getMonth(),safeDay);
+  if(thisMonth<=now){
+    return thisMonth.toISOString().split('T')[0];
+  }
+  // Pay day hasn't come yet this month — use last month's
+  const prevMonthDays=new Date(now.getFullYear(),now.getMonth(),0).getDate();
+  const prevDay=Math.min(day,prevMonthDays);
+  return new Date(now.getFullYear(),now.getMonth()-1,prevDay).toISOString().split('T')[0];
+}
+
+// Get the expected amount for a source this month
+function sourceExpectedAmount(src){
+  const now=new Date();
+  return monthlyEq(src,now.getMonth(),now.getFullYear())||parseFloat(src.amount)||0;
+}
+
+// Check if a receipt already exists for this source this month
+function findDuplicateReceipt(sourceId,date,excludeId){
+  if(!sourceId||!date)return null;
+  const d=new Date(date);
+  return (S.incomeReceipts||[]).find(r=>{
+    if(r.id===excludeId)return false;
+    if(r.sourceId!==sourceId)return false;
+    const rd=new Date(r.date);
+    return rd.getMonth()===d.getMonth()&&rd.getFullYear()===d.getFullYear();
+  })||null;
+}
+
+// Called when source selector changes — pre-fills fields
+window.onReceiptSourceChange=function(){
+  const srcId=document.getElementById('ircpt-src').value;
+  const src=S.incomeSources.find(s=>s.id===srcId);
+  const hint=document.getElementById('ircpt-hint');
+  const hintText=document.getElementById('ircpt-hint-text');
+  const ncRow=document.getElementById('ircpt-nc-row');
+
+  if(src){
+    // Pre-fill amount only if currently empty
+    const amtEl=document.getElementById('ircpt-amt');
+    const expected=sourceExpectedAmount(src);
+    if(!amtEl.value||amtEl.value==='0'){
+      amtEl.value=expected.toFixed(2);
+    }
+
+    // Pre-fill type from source
+    const typeEl=document.getElementById('ircpt-type');
+    if(src.type&&typeEl){
+      const match=[...typeEl.options].find(o=>o.value===src.type);
+      if(match)typeEl.value=src.type;
+    }
+
+    // Pre-fill note with source name if empty
+    const noteEl=document.getElementById('ircpt-note');
+    if(!noteEl.value)noteEl.value=src.name;
+
+    // Smart date: use source pay day if available
+    const dateEl=document.getElementById('ircpt-date');
+    if(src.day&&(!dateEl.value||dateEl.value===tod())){
+      dateEl.value=sourcePayDate(src);
+    }
+
+    // Show quick-amount hint chip
+    if(hint&&hintText&&expected>0){
+      hintText.textContent=`Expected: ${fmt(expected)} based on "${src.name}"`;
+      hint.style.display='flex';
+      // Store expected amount for the "Use this" button
+      hint.dataset.expected=expected;
+    } else if(hint){
+      hint.style.display='none';
+    }
+
+    // Show non-cash row only if source is non-cash
+    if(ncRow)ncRow.style.display=src.noncash?'block':'none';
+    const ncEl=document.getElementById('ircpt-nc');
+    if(ncEl)ncEl.checked=!!src.noncash;
+
+  } else {
+    // No source selected — hide hint, show non-cash row
+    if(hint)hint.style.display='none';
+    if(ncRow)ncRow.style.display='block';
+  }
+
+  checkReceiptDuplicate();
+};
+
+window.applyExpectedAmount=function(){
+  const hint=document.getElementById('ircpt-hint');
+  const expected=parseFloat(hint?.dataset.expected)||0;
+  if(expected>0){
+    document.getElementById('ircpt-amt').value=expected.toFixed(2);
+    checkReceiptDuplicate();
+    showToast('Amount set ✓');
+  }
+};
+
+window.checkReceiptDuplicate=function(){
+  const srcId=document.getElementById('ircpt-src').value;
+  const date=document.getElementById('ircpt-date').value;
+  const warn=document.getElementById('ircpt-dup-warn');
+  if(!warn)return;
+  const dup=findDuplicateReceipt(srcId,date,IRID);
+  if(dup){
+    const src=S.incomeSources.find(s=>s.id===srcId);
+    const dupDate=new Date(dup.date).toLocaleDateString('en-GH',{day:'numeric',month:'short'});
+    warn.style.display='block';
+    warn.textContent=`⚠ A receipt for "${src?.name||'this source'}" was already recorded on ${dupDate} (${fmt(dup.amount)}). Check before saving.`;
+  } else {
+    warn.style.display='none';
+  }
+};
+
+window.openIncomeReceiptModal=function(id, prefillSourceId){
   IRID=id||null;
   const title=document.getElementById('ircpt-mt');
-  if(title) title.textContent=id?'Edit Income Receipt':'Record Income Receipt';
+  if(title)title.textContent=id?'Edit Income Receipt':'Record Income Receipt';
 
+  // Reset hint and warning
+  const hint=document.getElementById('ircpt-hint');
+  const warn=document.getElementById('ircpt-dup-warn');
+  const ncRow=document.getElementById('ircpt-nc-row');
+  if(hint)hint.style.display='none';
+  if(warn)warn.style.display='none';
+  if(ncRow)ncRow.style.display='block';
+
+  // Populate source dropdown — include all sources (cash + non-cash)
   const srcSel=document.getElementById('ircpt-src');
   if(srcSel){
-    srcSel.innerHTML='<option value="">Unlinked</option>'+
+    srcSel.innerHTML='<option value="">— Select source (optional) —</option>'+
       S.incomeSources
-        .filter(s=>!s.noncash)
-        .map(s=>`<option value="${s.id}">${s.name}</option>`)
+        .map(s=>`<option value="${s.id}">${s.name}${s.noncash?' (non-cash)':''}</option>`)
         .join('');
   }
 
   if(id){
+    // Editing existing receipt — load its values
     const r=S.incomeReceipts.find(x=>x.id===id);
     if(r){
+      if(srcSel)srcSel.value=r.sourceId||'';
       document.getElementById('ircpt-amt').value=r.amount;
       document.getElementById('ircpt-date').value=r.date||'';
       document.getElementById('ircpt-type').value=r.type||'salary';
       document.getElementById('ircpt-note').value=r.note||'';
-      document.getElementById('ircpt-tags').value=r.tags||'';
       document.getElementById('ircpt-nc').checked=!!r.noncash;
-      if(srcSel) srcSel.value=r.sourceId||'';
+      // Show non-cash row based on source
+      const src=S.incomeSources.find(s=>s.id===r.sourceId);
+      if(ncRow)ncRow.style.display=(src?.noncash||r.noncash)?'block':'none';
+      // Show hint for the linked source
+      if(r.sourceId)setTimeout(()=>onReceiptSourceChange(),50);
     }
   } else {
-    ['ircpt-amt','ircpt-note','ircpt-tags']
-      .forEach(fid=>document.getElementById(fid).value='');
+    // New receipt — clear fields
+    document.getElementById('ircpt-amt').value='';
     document.getElementById('ircpt-date').value=tod();
     document.getElementById('ircpt-type').value='salary';
+    document.getElementById('ircpt-note').value='';
     document.getElementById('ircpt-nc').checked=false;
-    if(srcSel) srcSel.value='';
+    if(srcSel)srcSel.value='';
+
+    // If called with a pre-fill source (e.g. from pending nudge), select it and trigger fill
+    if(prefillSourceId){
+      if(srcSel)srcSel.value=prefillSourceId;
+      setTimeout(()=>onReceiptSourceChange(),50);
+    }
   }
 
   openModal('income-receipt-modal');
@@ -2796,11 +3003,10 @@ window.saveIncomeReceipt=async function(){
   const date=document.getElementById('ircpt-date').value;
   const type=document.getElementById('ircpt-type').value;
   const note=document.getElementById('ircpt-note').value.trim();
-  const tags=document.getElementById('ircpt-tags').value.trim();
   const noncash=document.getElementById('ircpt-nc').checked;
 
   if(!amount||amount<=0){
-    showToast('Enter valid amount');
+    setFieldError('ircpt-amt','Enter a valid amount');
     return;
   }
   if(!date){
@@ -2808,12 +3014,22 @@ window.saveIncomeReceipt=async function(){
     return;
   }
 
+  // Soft duplicate warning — if dup exists, require a second tap to confirm
+  const dup=findDuplicateReceipt(sourceId,date,IRID);
+  if(dup&&!window._rcptDupConfirmed){
+    window._rcptDupConfirmed=true;
+    const src=S.incomeSources.find(s=>s.id===sourceId);
+    showToast(`Duplicate detected — tap Save again to confirm`);
+    return;
+  }
+  window._rcptDupConfirmed=false;
+
   const id=IRID||'ir'+Date.now();
-  const data={sourceId,amount,date,type,note,tags,noncash};
+  const data={sourceId,amount,date,type,note,noncash};
 
   if(IRID){
     const i=S.incomeReceipts.findIndex(r=>r.id===IRID);
-    if(i>-1) S.incomeReceipts[i]={...S.incomeReceipts[i],...data};
+    if(i>-1)S.incomeReceipts[i]={...S.incomeReceipts[i],...data};
   } else {
     S.incomeReceipts.push({id,...data});
   }
@@ -2823,7 +3039,7 @@ window.saveIncomeReceipt=async function(){
   renderIncStatement();
   renderIncome();
   renderDash();
-  showToast('Income receipt saved ✓');
+  showToast('Receipt saved ✓');
   IRID=null;
 };
 
@@ -4333,19 +4549,29 @@ function initApp(){
       <h2 id="ircpt-mt">Record Income Receipt</h2>
     </div>
 
+    <!-- Source selector — choosing one pre-fills the rest -->
     <div class="fg">
       <label class="fl">Income Source</label>
-      <select id="ircpt-src" class="fi"></select>
+      <select id="ircpt-src" class="fi" onchange="onReceiptSourceChange()"></select>
+    </div>
+
+    <!-- Source hint bar — shows expected amount as tappable chip -->
+    <div id="ircpt-hint" style="display:none;background:var(--gold-pale);border-radius:var(--radius-sm);padding:8px 12px;margin:-4px 0 10px;font-size:12px;color:var(--ink-2);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <span id="ircpt-hint-text"></span>
+      <button id="ircpt-hint-btn" onclick="applyExpectedAmount()" style="background:var(--gold);color:var(--ink);border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap;">Use this</button>
+    </div>
+
+    <!-- Duplicate warning -->
+    <div id="ircpt-dup-warn" style="display:none;background:var(--red-light);border-radius:var(--radius-sm);padding:8px 12px;margin:-4px 0 10px;font-size:12px;color:var(--red);"></div>
+
+    <div class="fg">
+      <label class="fl req">Amount</label>
+      <input id="ircpt-amt" type="number" class="fi" placeholder="0.00" oninput="checkReceiptDuplicate()">
     </div>
 
     <div class="fg">
-      <label class="fl">Amount</label>
-      <input id="ircpt-amt" type="number" class="fi">
-    </div>
-
-    <div class="fg">
-      <label class="fl">Date</label>
-      <input id="ircpt-date" type="date" class="fi">
+      <label class="fl req">Date Received</label>
+      <input id="ircpt-date" type="date" class="fi" onchange="checkReceiptDuplicate()">
     </div>
 
     <div class="fg">
@@ -4354,27 +4580,28 @@ function initApp(){
         <option value="salary">Salary</option>
         <option value="bonus">Bonus</option>
         <option value="business">Business</option>
+        <option value="freelance">Freelance</option>
+        <option value="investment">Investment</option>
         <option value="gift">Gift</option>
+        <option value="other">Other</option>
       </select>
     </div>
 
     <div class="fg">
       <label class="fl">Note</label>
-      <input id="ircpt-note" class="fi">
+      <input id="ircpt-note" class="fi" placeholder="Optional note">
     </div>
 
-    <div class="fg">
-      <label class="fl">Tags</label>
-      <input id="ircpt-tags" class="fi">
-    </div>
-
-    <div class="fg">
-      <label><input type="checkbox" id="ircpt-nc"> Non-cash</label>
+    <div class="fg" id="ircpt-nc-row">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="ircpt-nc" style="width:16px;height:16px;cursor:pointer;">
+        <span>Non-cash income <span style="font-size:11px;color:var(--ink-3);">(not deposited to bank)</span></span>
+      </label>
     </div>
 
     <div class="mfooter">
       <button class="btn btn-ghost" onclick="closeModal('income-receipt-modal')">Cancel</button>
-      <button class="btn btn-gold" onclick="saveIncomeReceipt()">Save</button>
+      <button class="btn btn-gold" onclick="saveIncomeReceipt()">Save Receipt</button>
     </div>
   </div>
 </div>

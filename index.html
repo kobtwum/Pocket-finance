@@ -610,6 +610,7 @@ body.dark .fi.error{background:#2a0a0a;}
 <!-- BUDGET -->
 <div id="page-budget" class="page">
   <div class="ar"><button class="btn btn-ghost" onclick="openCatModal()">+ Category</button><button class="btn btn-gold" onclick="openBudgetModal()">+ Set Limit</button></div>
+  <div class="mnav"><button onclick="changeBudgetMonth(-1)" aria-label="Previous month">←</button><div class="mdisp" id="bud-mdisp"></div><button onclick="changeBudgetMonth(1)" aria-label="Next month">→</button></div>
   <div id="bud-sum" style="font-size:12px;color:var(--ink-3);margin-bottom:10px;"></div>
   <div id="bud-wrap">
     <div class="card"><div class="sh"><h2>Limits</h2></div><div id="bud-list"></div></div>
@@ -686,7 +687,7 @@ body.dark .fi.error{background:#2a0a0a;}
     </div>
     <!-- Month by month table -->
     <div class="card">
-      <div class="sh"><h2>Month by Month</h2></div>
+      <div class="sh"><h2>Month by Month</h2><button class="btn btn-ghost btn-sm" onclick="copyCashFlowCSV()" id="cf-csv-btn">⎘ Copy CSV</button></div>
       <div id="cf-table" style="overflow-x:auto;"></div>
     </div>
   </div>
@@ -1438,6 +1439,7 @@ function uDoc(c,i){return doc(db,'users',CU.uid,c,i);}
 function pDoc(){return doc(db,'users',CU.uid,'meta','profile');}
 async function saveS(){
   if(!CU){console.warn('saveS: no user');return;}
+  if(typeof invalidateHealthCache==='function')invalidateHealthCache();
   setSyncDot('syncing');
   try{
     const b=writeBatch(db);
@@ -1453,6 +1455,7 @@ async function saveS(){
 }
 async function saveDoc(col,id,data){
   if(!CU){console.warn('saveDoc: no user');return;}
+  if(typeof invalidateHealthCache==='function')invalidateHealthCache();
   setSyncDot('syncing');
   try{await setDoc(uDoc(col,id),{...data,updatedAt:Date.now()});setSyncDot('online');}
   catch(e){
@@ -1478,6 +1481,16 @@ function startSync(uid){
   UL.forEach(u=>u());UL=[];
   setSyncDot('syncing');
 
+  // Safety net: if checkReady() hasn't resolved within 6s, force a render
+  // with whatever data has arrived. This handles slow/stalled Firestore listeners.
+  const safetyTimer=setTimeout(()=>{
+    if(!checkReady()){
+      console.warn('Pocket: sync timeout — rendering with partial data');
+      refreshPage();
+      setSyncDot(navigator.onLine?'online':'offline');
+    }
+  },6000);
+
   const u1=onSnapshot(doc(db,'users',uid,'meta','profile'),sn=>{
     if(sn.exists()){
       const v=sn.data();
@@ -1492,11 +1505,13 @@ function startSync(uid){
       if(v.selectedColor)S.selectedColor=v.selectedColor;
     }
     READY.profile=true;
-    if(checkReady()){refreshPage();setSyncDot('online');}
+    // Render immediately when profile arrives — budgets/goals/recurring are here
+    // Don't wait for all listeners; other data will fill in when their snapshots fire
+    refreshPage();
+    if(checkReady()){clearTimeout(safetyTimer);setSyncDot('online');}
   },()=>setSyncDot('offline'));
 
   const u2=onSnapshot(collection(db,'users',uid,'expenses'),sn=>{
-    // On first snapshot, replace entirely. On subsequent, apply changes.
     if(!READY.expenses){
       S.expenses=[];sn.forEach(d=>S.expenses.push({id:d.id,...d.data()}));
       READY.expenses=true;
@@ -1506,7 +1521,8 @@ function startSync(uid){
         if(c.type==='removed')S.expenses=S.expenses.filter(e=>e.id!==c.doc.id);
       });
     }
-    if(checkReady()){refreshPage();setSyncDot('online');}
+    refreshPage();
+    if(checkReady()){clearTimeout(safetyTimer);setSyncDot('online');}
   },()=>setSyncDot('offline'));
 
   const u3=onSnapshot(collection(db,'users',uid,'income'),sn=>{
@@ -1520,32 +1536,31 @@ function startSync(uid){
       });
     }
     {const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(netCashPosition());}
-    if(checkReady()){refreshPage();setSyncDot('online');}
+    refreshPage();
+    if(checkReady()){clearTimeout(safetyTimer);setSyncDot('online');}
   },()=>setSyncDot('offline'));
 
   const u3b=onSnapshot(collection(db,'users',uid,'incomeReceipts'),sn=>{
-  if(!READY.incomeReceipts){
-    S.incomeReceipts=[];
-    sn.forEach(d=>S.incomeReceipts.push({id:d.id,...d.data()}));
-    READY.incomeReceipts=true;
-  } else {
-    sn.docChanges().forEach(c=>{
-      if(c.type==='added'||c.type==='modified'){
-        const i=S.incomeReceipts.findIndex(r=>r.id===c.doc.id);
-        const it={id:c.doc.id,...c.doc.data()};
-        if(i>-1) S.incomeReceipts[i]=it;
-        else S.incomeReceipts.push(it);
-      }
-      if(c.type==='removed'){
-        S.incomeReceipts=S.incomeReceipts.filter(r=>r.id!==c.doc.id);
-      }
-    });
-  }
-  if(checkReady()){
+    if(!READY.incomeReceipts){
+      S.incomeReceipts=[];
+      sn.forEach(d=>S.incomeReceipts.push({id:d.id,...d.data()}));
+      READY.incomeReceipts=true;
+    } else {
+      sn.docChanges().forEach(c=>{
+        if(c.type==='added'||c.type==='modified'){
+          const i=S.incomeReceipts.findIndex(r=>r.id===c.doc.id);
+          const it={id:c.doc.id,...c.doc.data()};
+          if(i>-1) S.incomeReceipts[i]=it;
+          else S.incomeReceipts.push(it);
+        }
+        if(c.type==='removed'){
+          S.incomeReceipts=S.incomeReceipts.filter(r=>r.id!==c.doc.id);
+        }
+      });
+    }
     refreshPage();
-    setSyncDot('online');
-  }
-},()=>setSyncDot('offline'));
+    if(checkReady()){clearTimeout(safetyTimer);setSyncDot('online');}
+  },()=>setSyncDot('offline'));
 
   const u4=onSnapshot(collection(db,'users',uid,'contributions'),sn=>{
     if(!READY.contributions){
@@ -1557,7 +1572,8 @@ function startSync(uid){
         if(c.type==='removed')S.contributions=S.contributions.filter(x=>x.id!==c.doc.id);
       });
     }
-    if(checkReady()){refreshPage();setSyncDot('online');}
+    refreshPage();
+    if(checkReady()){clearTimeout(safetyTimer);setSyncDot('online');}
   },()=>setSyncDot('offline'));
 
   UL=[u1,u2,u3,u3b,u4];
@@ -1827,7 +1843,21 @@ window.openDashCustomise=function(){
   openModal('dash-customise-modal');
 };
 
-// PWA Install
+// ── PWA FOREGROUND REFRESH ──
+// When the app is resumed from background, data may be stale or partially loaded.
+// Re-render the current page when the tab/app becomes visible again.
+let _lastVisible=Date.now();
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    const elapsed=Date.now()-_lastVisible;
+    // If hidden for more than 30 seconds, force a full page refresh
+    if(elapsed>30000&&CU){
+      refreshPage();
+    }
+  } else {
+    _lastVisible=Date.now();
+  }
+});
 let DP=null;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();DP=e;showInstBanner();});
 function showInstBanner(){const w=document.getElementById('inst-wrap');if(!w||DP===false)return;w.innerHTML=`<div class="inst-ban"><div style="font-size:22px">📲</div><div class="ibt"><strong>Install Pocket as an app</strong>Add to home screen for instant access.</div><button class="btn btn-gold btn-sm" id="inst-btn">Install</button></div>`;document.getElementById('inst-btn').addEventListener('click',async()=>{if(!DP)return;DP.prompt();const{outcome}=await DP.userChoice;DP=false;w.innerHTML='';if(outcome==='accepted')showToast('App installed! 🎉');});}
@@ -2318,7 +2348,56 @@ window.delBudget=async function(cat){if(!confirm('Remove budget for '+cat+'?'))r
 // ── SAVINGS ──
 let GID=null;
 function renderSavings(){
-  document.getElementById('goals-list').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),pct=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1),rem=g.target-sv;const tgt=new Date(g.date),now=new Date();const mL=Math.max(0,(tgt.getFullYear()-now.getFullYear())*12+tgt.getMonth()-now.getMonth());const nd=mL>0?rem/mL:0;return`<div class="card" style="padding:16px;margin-bottom:12px;"><div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;"><span style="font-size:28px">${g.icon}</span><div style="flex:1;"><div style="font-size:14px;font-weight:500;">${g.name}</div><div style="font-size:11px;color:var(--ink-3)">Target: ${new Date(g.date).toLocaleDateString('en-GH',{month:'short',year:'numeric'})}</div></div><div style="text-align:right;"><div style="font-family:'DM Serif Display',serif;font-size:18px;">${fmt(g.target)}</div><div style="font-size:11px;color:var(--green);">${fmt(sv)} saved</div></div></div><div class="pw"><div class="pb pb-green" style="width:${pct}%"></div></div><div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:var(--ink-3);"><span>${pct}% complete</span><span>${fmt(rem)} to go</span></div>${mL>0?`<div style="background:var(--paper-2);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;"><span style="color:var(--ink-3)">Planned: <strong style="color:var(--ink)">${fmt(g.monthly)}/mo</strong></span><span style="color:var(--ink-3)">Needed: <strong style="color:${nd>g.monthly?'var(--red)':'var(--green)'}">${fmt(nd)}/mo</strong></span><span style="color:var(--ink-3)">${mL} months left</span></div>`:`<div style="margin-top:6px;"><span class="pill pill-g">🎉 Goal reached!</span></div>`}${(g.withdrawals&&g.withdrawals.length)?`<div style="margin-top:8px;padding:8px 10px;background:var(--gold-pale);border-radius:8px;"><div style="font-size:10px;font-weight:600;color:#8a6a1f;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;">Withdrawals (${g.withdrawals.length})</div>${g.withdrawals.slice(-3).reverse().map(w=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;"><span style="color:var(--ink-2);">${new Date(w.date).toLocaleDateString('en-GH',{day:'numeric',month:'short'})}${w.note ? ' · ' + w.note : ''}</span><span style="color:#8a6a1f;font-weight:500;">−${fmt(w.amount)}</span></div>`).join('')}${g.withdrawals.length>3?`<div style="font-size:10px;color:var(--ink-3);margin-top:2px;">${g.withdrawals.length-3} more…</div>`:''}</div>`:''}<div style="display:flex;gap:7px;margin-top:10px;"><button class="btn btn-green btn-sm" style="flex:1" onclick="quickContrib('${g.id}')">+ Contribute</button><button class="btn btn-ghost btn-sm" onclick="openWithdrawModal('${g.id}')">Withdraw</button><button class="btn btn-ghost btn-sm" onclick="editGoal('${g.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delGoal('${g.id}')">Del</button></div></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No goals yet. Tap + to create one.</p></div>';
+  const now=new Date(),nm=now.getMonth(),ny=now.getFullYear();
+  document.getElementById('goals-list').innerHTML=S.goals.length?S.goals.map(g=>{
+    const sv=gSaved(g.id),pct=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1),rem=g.target-sv;
+    const tgt=new Date(g.date);
+    const mL=Math.max(0,(tgt.getFullYear()-now.getFullYear())*12+tgt.getMonth()-now.getMonth());
+    const nd=mL>0?rem/mL:0;
+    // Saved this month for this goal
+    const savThisMonth=S.contributions.filter(c=>{
+      if(c.goalId!==g.id)return false;
+      const d=new Date(c.date);
+      return d.getMonth()===nm&&d.getFullYear()===ny;
+    }).reduce((s,c)=>s+parseFloat(c.amount),0);
+    return`<div class="card" style="padding:16px;margin-bottom:12px;">
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">
+        <span style="font-size:28px;font-family:system-ui,sans-serif;">${g.icon}</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:500;">${g.name}</div>
+          <div style="font-size:11px;color:var(--ink-3)">Target: ${new Date(g.date).toLocaleDateString('en-GH',{month:'short',year:'numeric'})}</div>
+          ${savThisMonth>0?`<div style="font-size:11px;color:var(--green);margin-top:2px;font-weight:500;">+${fmt(savThisMonth)} this month</div>`:''}
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:'DM Serif Display',serif;font-size:18px;">${fmt(g.target)}</div>
+          <div style="font-size:11px;color:var(--green);">${fmt(sv)} saved</div>
+        </div>
+      </div>
+      <div class="pw"><div class="pb pb-green" style="width:${pct}%"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:5px;font-size:11px;color:var(--ink-3);">
+        <span>${pct}% complete</span><span>${fmt(rem)} to go</span>
+      </div>
+      ${mL>0?`<div style="background:var(--paper-2);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:11px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;">
+        <span style="color:var(--ink-3)">Planned: <strong style="color:var(--ink)">${fmt(g.monthly)}/mo</strong></span>
+        <span style="color:var(--ink-3)">Needed: <strong style="color:${nd>g.monthly?'var(--red)':'var(--green)'}">${fmt(nd)}/mo</strong></span>
+        <span style="color:var(--ink-3)">${mL} months left</span>
+      </div>`:`<div style="margin-top:6px;"><span class="pill pill-g">🎉 Goal reached!</span></div>`}
+      ${(g.withdrawals&&g.withdrawals.length)?`<div style="margin-top:8px;padding:8px 10px;background:var(--gold-pale);border-radius:8px;">
+        <div style="font-size:10px;font-weight:600;color:#8a6a1f;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;">Withdrawals (${g.withdrawals.length})</div>
+        ${g.withdrawals.slice(-3).reverse().map(w=>`<div style="display:flex;justify-content:space-between;font-size:11px;padding:2px 0;">
+          <span style="color:var(--ink-2);">${new Date(w.date).toLocaleDateString('en-GH',{day:'numeric',month:'short'})}${w.note?' · '+w.note:''}</span>
+          <span style="color:#8a6a1f;font-weight:500;">−${fmt(w.amount)}</span>
+        </div>`).join('')}
+        ${g.withdrawals.length>3?`<div style="font-size:10px;color:var(--ink-3);margin-top:2px;">${g.withdrawals.length-3} more…</div>`:''}
+      </div>`:''}
+      <div style="display:flex;gap:7px;margin-top:10px;">
+        <button class="btn btn-green btn-sm" style="flex:1" onclick="quickContrib('${g.id}')">+ Contribute</button>
+        <button class="btn btn-ghost btn-sm" onclick="openWithdrawModal('${g.id}')">Withdraw</button>
+        <button class="btn btn-ghost btn-sm" onclick="editGoal('${g.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="delGoal('${g.id}')">Del</button>
+      </div>
+    </div>`;
+  }).join(''):'<div class="empty"><div class="icon">🎯</div><p>No goals yet. Tap + to create one.</p></div>';
   renderSavMonth();
   const all=[...S.contributions].sort((a,b)=>new Date(b.date)-new Date(a.date));
   document.getElementById('sav-hist').innerHTML=all.length?all.map(c=>{const g=S.goals.find(x=>x.id===c.goalId);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green)">${g?g.icon:'💰'}</div><div class="li-nm"><div class="p">${g?g.name:'Unknown Goal'}</div><div class="s">${new Date(c.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}</div></div><div class="li-am crd" style="margin-right:6px">+${fmt(c.amount)}</div><button class="btn btn-danger btn-sm" onclick="delContrib('${c.id}')">✕</button></div>`;}).join(''):'<div class="empty"><div class="icon">📜</div><p>No contributions yet</p></div>';
@@ -3443,7 +3522,30 @@ window.delLoan=async function(id){
 };
 
 // ── FINANCIAL HEALTH SCORE ───────────────────────────────
+// ── HEALTH SCORE MEMOISATION ──
+// calcHealthScore runs a lot of calculations. Cache for 60s to avoid
+// re-running on every dashboard render, tab switch, or page refresh.
+let _healthCache=null;
+let _healthCacheKey='';
+function _healthDataKey(){
+  // Key based on counts + last expense/contribution date — cheap fingerprint
+  const lastExp=S.expenses.length?S.expenses[S.expenses.length-1]?.date:'';
+  const lastCon=S.contributions.length?S.contributions[S.contributions.length-1]?.date:'';
+  const lastRec=(S.incomeReceipts||[]).length?(S.incomeReceipts||[])[S.incomeReceipts.length-1]?.date:'';
+  return `${S.expenses.length}|${S.contributions.length}|${(S.incomeReceipts||[]).length}|${S.budgets.length}|${S.loans.length}|${lastExp}|${lastCon}|${lastRec}`;
+}
 function calcHealthScore(){
+  const key=_healthDataKey();
+  if(_healthCache&&_healthCacheKey===key){return _healthCache;}
+  const result=_calcHealthScoreInner();
+  _healthCache=result;
+  _healthCacheKey=key;
+  return result;
+}
+// Invalidate cache whenever data is saved
+function invalidateHealthCache(){_healthCache=null;_healthCacheKey='';}
+
+function _calcHealthScoreInner(){
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
   const inc=earnedForPeriod(m,y)||totInc(); // actual received this month, fallback to baseline
   const mwd=mwData();
@@ -3511,7 +3613,7 @@ function calcHealthScore(){
   // Total weighted score
   const total=Object.values(scores).reduce((t,s)=>t+s.score*s.weight/100,0);
   return{total:Math.round(total),scores};
-}
+}  // end _calcHealthScoreInner
 function totalDebtPmt(){return(S.loans||[]).reduce((t,l)=>t+parseFloat(l.monthly||0),0);}
 
 function renderHealth(){
@@ -3773,31 +3875,43 @@ function effectiveBudgetLimit(cat){
   return b.limit+getRollover(cat);
 }
 
-// ── BUDGET RENDERING with rollover support ──
+// ── BUDGET RENDERING with month navigation and rollover support ──
+let budgetMonth=new Date().getMonth();
+let budgetYear=new Date().getFullYear();
+window.changeBudgetMonth=function(dir){
+  budgetMonth+=dir;
+  if(budgetMonth>11){budgetMonth=0;budgetYear++;}
+  if(budgetMonth<0){budgetMonth=11;budgetYear--;}
+  renderBudget();
+};
 function renderBudget(){
-  const m=new Date().getMonth(),y=new Date().getFullYear();
+  const m=budgetMonth,y=budgetYear;
+  const now=new Date();
+  const isCurrentMonth=m===now.getMonth()&&y===now.getFullYear();
+  const mDispEl=document.getElementById('bud-mdisp');
+  if(mDispEl)mDispEl.textContent=MOS[m]+' '+y+(isCurrentMonth?' (current)':'');
   // Only count actual (non-future) expenses for budget tracking
   const bc={};mExps(m,y).filter(e=>!isFuture(e)).forEach(e=>{bc[e.cat]=(bc[e.cat]||0)+parseFloat(e.amount);});
   document.getElementById('bud-sum').textContent=`${MOS[m]}: ${fmt(S.budgets.reduce((s,b)=>s+(bc[b.cat]||0),0))} spent of ${fmt(S.budgets.reduce((s,b)=>s+effectiveBudgetLimit(b.cat),0))} budgeted`;
   popCatSel('bud-cat');
   document.getElementById('bud-list').innerHTML=S.budgets.length?S.budgets.map(b=>{
     const sp=bc[b.cat]||0;
-    const effLimit=effectiveBudgetLimit(b.cat);
-    const carried=getRollover(b.cat);
+    // Rollover only applies to current month
+    const effLimit=isCurrentMonth?effectiveBudgetLimit(b.cat):(S.budgets.find(x=>x.cat===b.cat)?.limit||0);
+    const carried=isCurrentMonth?getRollover(b.cat):0;
     const rawPct=effLimit>0?sp/effLimit*100:0;
     const pct=rawPct.toFixed(0);
-    const barPct=Math.min(100,rawPct); // bar capped at 100 visually
+    const barPct=Math.min(100,rawPct);
     const isOver=rawPct>100;
     const c=gCat(b.cat);
     const cl=isOver?'pb-red':rawPct>70?'pb-gold':'pb-green';
     const pl=isOver?'pill-r':rawPct>70?'pill-gold':'pill-g';
     return`<div class="bc">
       <div class="bc-h">
-        <div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name} <span class="pill ${pl}">${pct}%${isOver?' ⚠':''}</span>${b.rollover?'<span class="pill pill-b" style="font-size:11px">↻ rollover</span>':''}</div>
+        <div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name} <span class="pill ${pl}">${pct}%${isOver?' ⚠':''}</span>${b.rollover&&isCurrentMonth?'<span class="pill pill-b" style="font-size:11px">↻ rollover</span>':''}</div>
         <div style="display:flex;gap:5px;align-items:center;">
           <div class="bc-a">${fmt(sp)}/${fmt(effLimit)}</div>
-          <button class="btn btn-ghost btn-sm" onclick="openBudgetModal('${b.cat}')">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="delBudget('${b.cat}')">✕</button>
+          ${isCurrentMonth?`<button class="btn btn-ghost btn-sm" onclick="openBudgetModal('${b.cat}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delBudget('${b.cat}')">✕</button>`:''}
         </div>
       </div>
       <div class="pw"><div class="pb ${cl}" style="width:${barPct}%"></div></div>
@@ -3808,7 +3922,9 @@ function renderBudget(){
     </div>`;
   }).join(''):'<div class="empty"><div class="icon">📂</div><p>No budgets yet</p></div>';
   dChart('bud-chart');if(!S.budgets.length)return;
-  const lb=S.budgets.map(b=>b.cat),dt=S.budgets.map(b=>byCat(m,y)[b.cat]||0),cl=S.budgets.map(b=>gCat(b.cat).color);
+  const lb=S.budgets.map(b=>gCat(b.cat).name);
+  const dt=S.budgets.map(b=>bc[b.cat]||0);
+  const cl=S.budgets.map(b=>gCat(b.cat).color);
   CI['bud-chart']=new Chart(document.getElementById('bud-chart').getContext('2d'),{type:'doughnut',data:{labels:lb,datasets:[{data:dt,backgroundColor:cl.map(c=>c+'cc'),borderColor:cl,borderWidth:2,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'62%'}});
   document.getElementById('bud-leg').innerHTML=S.budgets.map(b=>{const c=gCat(b.cat);return`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${c.color};display:inline-block;"></span>${c.name}</span>`;}).join('');
 }
@@ -4066,7 +4182,33 @@ function renderAnCashFlow(){
     </tbody></table>`;
 }
 
-// ── FIX 8: Analytics income section ─────────────
+// Copy cash flow table as CSV to clipboard
+window.copyCashFlowCSV=function(){
+  const mwd=mwData();
+  if(!mwd.length){showToast('No data to export');return;}
+  const rows=[['Month','Earned','Spent','Saved','Net','Running Balance']];
+  let running=0;
+  mwd.forEach(({month,year})=>{
+    const earned=earnedForPeriod(month,year);
+    const spent=mExps(month,year).filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
+    const saved=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0);
+    const net=earned-spent-saved;
+    running+=net;
+    rows.push([MOS[month]+' '+year,earned.toFixed(2),spent.toFixed(2),saved.toFixed(2),net.toFixed(2),running.toFixed(2)]);
+  });
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  navigator.clipboard.writeText(csv).then(()=>{
+    showToast('Cash flow data copied to clipboard ✓');
+    const btn=document.getElementById('cf-csv-btn');
+    if(btn){btn.textContent='✓ Copied';setTimeout(()=>{btn.textContent='⎘ Copy CSV';},2000);}
+  }).catch(()=>{
+    // Fallback: create a download
+    const blob=new Blob([csv],{type:'text/csv'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='pocket-cashflow-'+new Date().toISOString().split('T')[0]+'.csv';
+    a.click();showToast('CSV downloaded ✓');
+  });
+};
 function renderAnExpOverview(){
   const mwd=mwData().slice(-6);
   const now=new Date(),m=now.getMonth(),y=now.getFullYear();
@@ -4338,10 +4480,16 @@ window.confirmCSVImport=async function(){
   const toImport=csvMapped.filter(r=>r.include);
   if(!toImport.length){showToast('No transactions selected');return;}
   let imported=0;
+  let skipped=0;
+  const skippedDescs=[];
   for(const r of toImport){
     // Check for duplicate (same date, amount, desc)
     const dup=S.expenses.find(e=>e.date===r.date&&parseFloat(e.amount)===r.amount&&e.desc===r.desc);
-    if(dup)continue;
+    if(dup){
+      skipped++;
+      if(skippedDescs.length<3)skippedDescs.push(r.desc||'(no description)');
+      continue;
+    }
     const id='e'+Date.now()+Math.random().toString(36).slice(2,5);
     const exp={desc:r.desc,amount:r.amount,cat:r.cat,date:r.date,note:'Imported from CSV'};
     // Auto-create contribution for Savings Transfer
@@ -4358,7 +4506,23 @@ window.confirmCSVImport=async function(){
   }
   resetCSVImport();
   renderDash();
-  showToast(imported+' transactions imported ✓');
+  // Show detailed summary with skipped count
+  if(skipped>0){
+    const skipMsg=skipped===1?`1 duplicate skipped`:`${skipped} duplicates skipped`;
+    showToast(`${imported} imported · ${skipMsg}`);
+    // Show a more detailed notice in the import page
+    const wrap=document.getElementById('csv-preview-wrap');
+    if(!wrap||wrap.style.display==='none'){
+      const info=document.createElement('div');
+      info.style.cssText='background:var(--gold-pale);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--ink-2);';
+      info.innerHTML=`<strong>${imported} transactions imported.</strong> ${skipMsg} (already existed): ${skippedDescs.map(d=>`"${d}"`).join(', ')}${skipped>3?` and ${skipped-3} more…`:''}`;
+      const page=document.getElementById('page-import');
+      if(page)page.insertBefore(info,page.firstChild);
+      setTimeout(()=>info.remove(),8000);
+    }
+  } else {
+    showToast(imported+' transactions imported ✓');
+  }
   showPage('expenses');
 }
 

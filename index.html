@@ -335,11 +335,14 @@ body.dark .more-item{background:var(--paper-3);}
 .sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .sh h2{font-family:'DM Serif Display',serif;font-size:17px;font-weight:400;}
 .sh p{font-size:11px;color:var(--ink-3);}
-.bc{margin-bottom:13px;padding:11px;background:var(--paper-2);border-radius:var(--radius-sm);}
+.bc{margin-bottom:13px;padding:12px;background:var(--paper-2);border-radius:var(--radius-sm);}
 body.dark .bc{background:var(--paper-3);}
-.bc-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
-.bc-n{font-size:12.5px;font-weight:500;display:flex;align-items:center;gap:5px;}
-.bc-a{font-size:11px;color:var(--ink-3);}
+.bc-h{display:flex;flex-direction:column;gap:6px;margin-bottom:6px;}
+.bc-top{display:flex;justify-content:space-between;align-items:center;gap:6px;}
+.bc-bot{display:flex;justify-content:space-between;align-items:center;gap:6px;}
+.bc-n{font-size:13px;font-weight:500;display:flex;align-items:center;gap:5px;flex-wrap:wrap;flex:1;min-width:0;}
+.bc-a{font-size:12px;color:var(--ink-3);white-space:nowrap;flex-shrink:0;}
+.bc-acts{display:flex;gap:4px;flex-shrink:0;}
 .mnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;background:var(--paper);border-radius:var(--radius-sm);padding:9px 14px;box-shadow:var(--shadow);border:1px solid var(--paper-3);}
 body.dark .mnav{background:var(--paper-2);}
 .mnav button{background:none;border:none;font-size:18px;cursor:pointer;padding:4px 10px;color:var(--ink-2);border-radius:8px;}
@@ -678,11 +681,22 @@ select.fi:focus{border-color:var(--gold);outline:none;}
   <div class="ar" style="margin-bottom:10px;"><button class="btn btn-gold" style="flex:none;" onclick="openExpenseModal()">+ Add Expense</button></div>
   <div class="g2" id="exp-stats"></div>
   <div class="card">
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <select class="fi" style="flex:1;min-width:130px;" id="cat-filter" onchange="renderExp()"><option value="">All Categories</option></select>
       <select class="fi" style="flex:1;min-width:120px;" id="type-filter" onchange="renderExp()">
         <option value="">All Types</option><option value="savings">Savings only</option><option value="expense">Expenses only</option>
       </select>
+      <select class="fi" style="flex:1;min-width:130px;" id="sort-filter" onchange="renderExp()">
+        <option value="date-desc">Newest first</option>
+        <option value="date-asc">Oldest first</option>
+        <option value="amount-desc">Amount: high → low</option>
+        <option value="amount-asc">Amount: low → high</option>
+        <option value="name-asc">Name: A → Z</option>
+      </select>
+    </div>
+    <div id="exp-filter-total" style="display:none;padding:8px 0 10px;border-bottom:1px solid var(--paper-2);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+      <span id="exp-filter-label" style="font-size:12px;color:var(--ink-3);"></span>
+      <span id="exp-filter-amt" style="font-family:'DM Serif Display',serif;font-size:16px;color:var(--red);"></span>
     </div>
     <div id="exp-list"></div>
   </div>
@@ -1797,7 +1811,13 @@ const gContributed=id=>S.contributions.filter(c=>c.goalId===id).reduce((s,c)=>s+
 const gWithdrawn=id=>{const g=S.goals.find(x=>x.id===id);return(g?.withdrawals||[]).reduce((s,w)=>s+parseFloat(w.amount),0);};
 const gSaved=id=>Math.max(0,gContributed(id)-gWithdrawn(id));
 const allSaved=()=>S.contributions.reduce((s,c)=>s+parseFloat(c.amount),0);
-function greet(){const h=new Date().getHours();if(h<5)return'Good night';if(h<12)return'Good morning';if(h<17)return'Good afternoon';if(h<21)return'Good evening';return'Good night';}
+function greet(){
+  const h=new Date().getHours();
+  const time=h<5?'Good night':h<12?'Good morning':h<17?'Good afternoon':h<21?'Good evening':'Good night';
+  // Use first name from Firebase auth if available
+  const firstName=CU?.displayName?.split(' ')[0]||S.profile?.name?.split(' ')[0]||'';
+  return firstName?`${time}, ${firstName}`:`${time}`;
+}
 function mwData(){const s=new Set();S.expenses.forEach(e=>{const d=new Date(e.date);s.add(d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'));});S.contributions.forEach(c=>{const d=new Date(c.date);s.add(d.getFullYear()+'-'+String(d.getMonth()).padStart(2,'0'));});return[...s].sort().map(k=>{const[y,m]=k.split('-');return{year:parseInt(y),month:parseInt(m)};});}
 function popCatSel(id,sel){const el=document.getElementById(id);if(!el)return;const cur=sel||el.value;el.innerHTML=S.categories.map(c=>`<option value="${c.name}">${c.icon} ${c.name}</option>`).join('');if(cur){const match=S.categories.find(c=>c.name===cur||c.id===cur);if(match)el.value=match.name;}}
 const CI={};function dChart(id){if(CI[id]){CI[id].destroy();delete CI[id];}}
@@ -2102,10 +2122,10 @@ function renderDash(){
     <div class="card" style="padding:14px;"><div class="ct">Spent ${MOS[m].slice(0,3)}</div><div class="cv" style="color:var(--red)">${fmt(nonSavSpent)}</div><div class="cs">${pct}% of received</div></div>
     <div class="card" style="padding:14px;"><div class="ct">Saved ${MOS[m].slice(0,3)}</div><div class="cv" style="color:var(--green)">${fmt(savM)}</div><div class="cs">${fmt(allSaved())} all time</div></div>
     <div class="card" style="padding:14px;"><div class="ct">Month Left</div><div class="cv" style="color:${monthlyLeft<0?'var(--red)':'var(--green)'}">${fmt(monthlyLeft)}</div><div class="cs">${incThisMonth>0?'from actual income':'record receipts for actuals'}</div></div>`;
-  const rec=mExps(m,y).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
+  const rec=mExps(m,y).filter(e=>e.cat!=='Savings Transfer'&&gCat(e.cat).name!=='Savings Transfer').sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,5);
   document.getElementById('dash-rec').innerHTML=rec.length?rec.map(e=>eRow(e,true)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses yet this month</p></div>';
   const bc=byCat(m,y);
-  document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,rawP=b.limit>0?sp/b.limit*100:0,p2=rawP.toFixed(0),barP=Math.min(100,rawP);const c=gCat(b.cat);return`<div class="bc"><div class="bc-h"><div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name}</div><div class="bc-a"><strong>${fmt(sp)}</strong>/${fmt(b.limit)}${rawP>100?` <span style="color:var(--red);font-size:11px;">${p2}%</span>`:''}</div></div><div class="pw"><div class="pb ${rawP>100?'pb-red':rawP>70?'pb-gold':'pb-green'}" style="width:${barP}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
+  document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,rawP=b.limit>0?sp/b.limit*100:0,p2=rawP.toFixed(0),barP=Math.min(100,rawP);const c=gCat(b.cat);const pl=rawP>100?'pill-r':rawP>70?'pill-gold':'pill-g';return`<div class="bc"><div class="bc-h"><div class="bc-top"><div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name} <span class="pill ${pl}">${p2}%</span></div><div class="bc-a">${fmt(sp)} / ${fmt(b.limit)}</div></div></div><div class="pw"><div class="pb ${rawP>100?'pb-red':rawP>70?'pb-gold':'pb-green'}" style="width:${barP}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
   renderBudgetAlerts();renderDashHealth();renderDashInsights();renderPendingReceiptsNudge();
   document.getElementById('dash-sav').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),p3=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green);font-size:18px;font-family:system-ui,sans-serif;">${g.icon}</div><div class="li-nm"><div class="p">${g.name}</div><div class="s">${fmt(sv)} of ${fmt(g.target)}</div></div><span class="pill pill-g">${p3}%</span></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No savings goals yet</p></div>';
 
@@ -2225,14 +2245,51 @@ function renderExp(){
     <div class="card" style="padding:13px;"><div class="ct">Spent</div><div class="cv" style="font-size:20px">${fmt(sp)}</div><div class="cs">${actualExps.filter(e=>e.cat!=='Savings Transfer').length} items${plannedExps.filter(e=>e.cat!=='Savings Transfer').length?' · <span style="color:var(--blue)">'+plannedExps.filter(e=>e.cat!=='Savings Transfer').length+' planned</span>':''}</div></div>
     <div class="card" style="padding:13px;"><div class="ct">Remaining</div><div class="cv" style="font-size:20px;color:${incM-sp<0?'var(--red)':'var(--green)'}">${fmt(incM-sp)}</div><div class="cs">of ${fmt(incM)}${plannedTotal?' <span style="font-size:10px;color:var(--blue)">~'+fmt(incM-sp-plannedTotal)+' after planned</span>':''}</div></div>
     <div class="card" style="padding:13px;"><div class="ct">Daily Avg</div><div class="cv" style="font-size:20px">${fmt(sp/Math.max(1,new Date(y,m+1,0).getDate()))}</div><div class="cs">Actual per day</div></div>`;
-  const cats=[...new Set(S.expenses.map(e=>e.cat))];
+
+  // Category filter — rebuild preserving current selection
+  const cats=[...new Set(exps.map(e=>gCat(e.cat).name))].sort();
   const sel=document.getElementById('cat-filter');const cur=sel.value;
   sel.innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option value="${c}" ${c===cur?'selected':''}>${c}</option>`).join('');
-  let fl=[...exps];const cf=sel.value,tf=document.getElementById('type-filter').value;
-  if(cf)fl=fl.filter(e=>e.cat===cf);
-  if(tf==='savings')fl=fl.filter(e=>e.cat==='Savings Transfer');
-  if(tf==='expense')fl=fl.filter(e=>e.cat!=='Savings Transfer');
-  fl.sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  // Apply filters
+  const cf=sel.value;
+  const tf=document.getElementById('type-filter').value;
+  const sf=document.getElementById('sort-filter')?.value||'date-desc';
+  let fl=[...exps];
+  // Category filter matches against resolved c.name
+  if(cf)fl=fl.filter(e=>gCat(e.cat).name===cf);
+  if(tf==='savings')fl=fl.filter(e=>e.cat==='Savings Transfer'||gCat(e.cat).name==='Savings Transfer');
+  if(tf==='expense')fl=fl.filter(e=>e.cat!=='Savings Transfer'&&gCat(e.cat).name!=='Savings Transfer');
+
+  // Sort
+  switch(sf){
+    case'date-asc':  fl.sort((a,b)=>new Date(a.date)-new Date(b.date));break;
+    case'amount-desc':fl.sort((a,b)=>parseFloat(b.amount)-parseFloat(a.amount));break;
+    case'amount-asc': fl.sort((a,b)=>parseFloat(a.amount)-parseFloat(b.amount));break;
+    case'name-asc':   fl.sort((a,b)=>a.desc.localeCompare(b.desc));break;
+    default:          fl.sort((a,b)=>new Date(b.date)-new Date(a.date));// newest first
+  }
+
+  // Filtered total — show when any filter is active
+  const isFiltered=!!cf||!!tf;
+  const ftWrap=document.getElementById('exp-filter-total');
+  const ftLabel=document.getElementById('exp-filter-label');
+  const ftAmt=document.getElementById('exp-filter-amt');
+  if(ftWrap&&ftLabel&&ftAmt){
+    if(isFiltered&&fl.length){
+      const filtTotal=fl.filter(e=>!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
+      const label=cf?`${cf} · ${fl.length} item${fl.length!==1?'s':''}`:
+                  tf==='savings'?`Savings transfers · ${fl.length} item${fl.length!==1?'s':''}`:
+                  `Expenses only · ${fl.length} item${fl.length!==1?'s':''}`;
+      ftLabel.textContent=label;
+      ftAmt.textContent='−'+fmt(filtTotal);
+      ftAmt.style.color=tf==='savings'?'var(--green)':'var(--red)';
+      ftWrap.style.display='flex';
+    } else {
+      ftWrap.style.display='none';
+    }
+  }
+
   document.getElementById('exp-list').innerHTML=fl.length?fl.map(e=>eRow(e)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses for this period</p></div>';
 }
 window.renderExp=renderExp;
@@ -3753,20 +3810,22 @@ function _calcHealthScoreInner(){
   scores.goals={score:Math.min(100,goalScore),weight:10,label:'Goal Progress',value:goals.length+' goal'+(goals.length!==1?'s':''),target:'On track',detail:goals.length?'Based on savings goals progress':'Add savings goals to improve this pillar'};
 
   // 6. Cash Flow Health (15%) — cumulative net cash position
-  // Positive = earned more than spent over time; negative = structural deficit
-  const cumEarned=calcCumulativeIncome();
+  // Use actual receipts if any have been recorded, else fall back to forecast
+  const receiptsCumTotal=(S.incomeReceipts||[]).filter(r=>!r.noncash).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+  const cumEarned=receiptsCumTotal>0?receiptsCumTotal:calcCumulativeIncome();
   const cumSpent=S.expenses.filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
   const netCash=cumEarned-cumSpent;
   let cashScore=50;
   if(cumEarned>0){
-    const cashRatio=netCash/cumEarned; // 0 to 1 ideally
+    const cashRatio=netCash/cumEarned;
     if(netCash>=0)cashScore=Math.min(100,50+cashRatio*100);
     else cashScore=Math.max(0,50+cashRatio*50);
   }
   const cashPct=cumEarned>0?(netCash/cumEarned*100).toFixed(1):0;
+  const cumLabel=receiptsCumTotal>0?'based on actual receipts':'estimate based on income sources';
   scores.cashFlow={score:cashScore,weight:15,label:'Cash Flow Health',
     value:fmt(netCash),target:'Net positive',
-    detail:netCash>=0?`You've retained ${cashPct}% of all income earned`:'Cumulative spending exceeds all income earned'};
+    detail:netCash>=0?`Retained ${cashPct}% of all income earned (${cumLabel})`:`Cumulative spending exceeds income earned (${cumLabel})`};
 
   // Total weighted score
   const total=Object.values(scores).reduce((t,s)=>t+s.score*s.weight/100,0);
@@ -3855,9 +3914,14 @@ let insightMonth=new Date().getMonth();
 let insightYear=new Date().getFullYear();
 
 window.changeInsightMonth=function(dir){
+  const now=new Date();
   insightMonth+=dir;
   if(insightMonth>11){insightMonth=0;insightYear++;}
   if(insightMonth<0){insightMonth=11;insightYear--;}
+  // Don't allow navigating into the future
+  if(insightYear>now.getFullYear()||(insightYear===now.getFullYear()&&insightMonth>now.getMonth())){
+    insightMonth=now.getMonth();insightYear=now.getFullYear();
+  }
   renderInsights();
 };
 
@@ -3865,6 +3929,10 @@ function generateInsights(m,y){
   const insights=[];
   const now=new Date();
   const isCurrentMonth=m===now.getMonth()&&y===now.getFullYear();
+  const isFutureMonth=y>now.getFullYear()||(y===now.getFullYear()&&m>now.getMonth());
+
+  // Don't generate insights for future months — there's no data yet
+  if(isFutureMonth)return [];
 
   // Previous month
   let pm=m-1,py=y;
@@ -4021,7 +4089,12 @@ function getRollover(cat){
   const now=new Date();
   let pm=now.getMonth()-1,py=now.getFullYear();
   if(pm<0){pm=11;py=now.getFullYear()-1;}
-  const prevSpent=byCat(pm,py)[cat]||0;
+  // Only roll over if the user actually had ANY expenses recorded last month.
+  // If there are no expenses at all for last month, the app wasn't being used —
+  // don't fabricate rollover from an "unspent" budget the user never tracked.
+  const prevMonthExps=mExps(pm,py);
+  if(!prevMonthExps.length)return 0;
+  const prevSpent=prevMonthExps.filter(e=>gCat(e.cat).name===cat||e.cat===cat).reduce((s,e)=>s+parseFloat(e.amount),0);
   const leftover=b.limit-prevSpent;
   return leftover>0?leftover:0;
 }
@@ -4066,17 +4139,19 @@ function renderBudget(){
     const pl=isOver?'pill-r':rawPct>70?'pill-gold':'pill-g';
     return`<div class="bc">
       <div class="bc-h">
-        <div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name} <span class="pill ${pl}">${pct}%${isOver?' ⚠':''}</span>${b.rollover&&isCurrentMonth?'<span class="pill pill-b" style="font-size:11px">↻ rollover</span>':''}</div>
-        <div style="display:flex;gap:5px;align-items:center;">
-          <div class="bc-a">${fmt(sp)}/${fmt(effLimit)}</div>
-          ${isCurrentMonth?`<button class="btn btn-ghost btn-sm" onclick="openBudgetModal('${b.cat}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delBudget('${b.cat}')">✕</button>`:''}
+        <div class="bc-top">
+          <div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name} <span class="pill ${pl}">${pct}%${isOver?' ⚠':''}</span>${b.rollover&&isCurrentMonth?'<span class="pill pill-b" style="font-size:11px">↻</span>':''}</div>
+          <div class="bc-a">${fmt(sp)} / ${fmt(effLimit)}</div>
         </div>
+        ${isCurrentMonth?`<div class="bc-bot">
+          <div style="font-size:11px;color:var(--ink-3);">${effLimit-sp>=0?fmt(effLimit-sp)+' remaining':fmt(sp-effLimit)+' over'}${carried>0?` <span style="color:var(--blue);">· +${fmt(carried)} rollover</span>`:''}</div>
+          <div class="bc-acts">
+            <button class="btn btn-ghost btn-sm" onclick="openBudgetModal('${b.cat}')">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="delBudget('${b.cat}')">✕</button>
+          </div>
+        </div>`:`<div style="font-size:11px;color:var(--ink-3);">${effLimit-sp>=0?fmt(effLimit-sp)+' remaining':fmt(sp-effLimit)+' over'}</div>`}
       </div>
       <div class="pw"><div class="pb ${cl}" style="width:${barPct}%"></div></div>
-      <div style="font-size:10px;color:var(--ink-3);margin-top:3px;">
-        ${effLimit-sp>=0?fmt(effLimit-sp)+' remaining':fmt(sp-effLimit)+' over'}
-        ${carried>0?`<span style="color:var(--blue);"> · ${fmt(carried)} rolled over from last month</span>`:''}
-      </div>
     </div>`;
   }).join(''):'<div class="empty"><div class="icon">📂</div><p>No budgets yet</p></div>';
   dChart('bud-chart');if(!S.budgets.length)return;

@@ -343,6 +343,18 @@ body.dark .bc{background:var(--paper-3);}
 .bc-n{font-size:13px;font-weight:500;display:flex;align-items:center;gap:5px;flex-wrap:wrap;flex:1;min-width:0;}
 .bc-a{font-size:12px;color:var(--ink-3);white-space:nowrap;flex-shrink:0;}
 .bc-acts{display:flex;gap:4px;flex-shrink:0;}
+
+/* ── DATE RANGE FILTER ── */
+.dr-bar{background:var(--paper-2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px;}
+.dr-presets{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:0;}
+.dr-presets.has-custom{margin-bottom:8px;}
+.dr-chip{padding:5px 11px;border-radius:100px;font-size:12px;font-weight:500;border:1.5px solid var(--paper-3);background:var(--paper);color:var(--ink-2);cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;transition:all .15s;white-space:nowrap;}
+.dr-chip:hover{border-color:var(--gold);color:var(--gold);}
+.dr-chip.active{background:var(--gold);color:var(--ink);border-color:var(--gold);}
+.dr-custom{display:none;gap:8px;align-items:center;flex-wrap:wrap;}
+.dr-custom.open{display:flex;}
+.dr-custom .fi{flex:1;min-width:120px;padding:7px 10px;font-size:13px;}
+.dr-label{font-size:11px;color:var(--ink-3);margin-top:5px;}
 .mnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;background:var(--paper);border-radius:var(--radius-sm);padding:9px 14px;box-shadow:var(--shadow);border:1px solid var(--paper-3);}
 body.dark .mnav{background:var(--paper-2);}
 .mnav button{background:none;border:none;font-size:18px;cursor:pointer;padding:4px 10px;color:var(--ink-2);border-radius:8px;}
@@ -677,9 +689,26 @@ select.fi:focus{border-color:var(--gold);outline:none;}
 
 <!-- EXPENSES -->
 <div id="page-expenses" class="page">
-  <div class="mnav"><button onclick="changeMonth(-1)" aria-label="Previous month">←</button><div class="mdisp" id="mdisp"></div><button onclick="changeMonth(1)" aria-label="Next month">→</button></div>
+  <!-- Date range bar -->
+  <div class="dr-bar" id="exp-dr-bar">
+    <div class="dr-presets" id="exp-dr-presets">
+      <button class="dr-chip" data-range="today" onclick="setExpRange('today',this)">Today</button>
+      <button class="dr-chip" data-range="week" onclick="setExpRange('week',this)">This Week</button>
+      <button class="dr-chip active" data-range="month" onclick="setExpRange('month',this)">This Month</button>
+      <button class="dr-chip" data-range="last-month" onclick="setExpRange('last-month',this)">Last Month</button>
+      <button class="dr-chip" data-range="year" onclick="setExpRange('year',this)">This Year</button>
+      <button class="dr-chip" data-range="all" onclick="setExpRange('all',this)">All Time</button>
+      <button class="dr-chip" data-range="custom" onclick="setExpRange('custom',this)">Custom ▾</button>
+    </div>
+    <div class="dr-custom" id="exp-dr-custom">
+      <input type="date" class="fi" id="exp-dr-from" onchange="applyExpCustomRange()">
+      <span style="font-size:13px;color:var(--ink-3);">to</span>
+      <input type="date" class="fi" id="exp-dr-to" onchange="applyExpCustomRange()">
+    </div>
+    <div class="dr-label" id="exp-dr-label"></div>
+  </div>
   <div class="ar" style="margin-bottom:10px;"><button class="btn btn-gold" style="flex:none;" onclick="openExpenseModal()">+ Add Expense</button></div>
-  <div class="g2" id="exp-stats"></div>
+  <div class="g3" id="exp-stats"></div>
   <div class="card">
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <select class="fi" style="flex:1;min-width:130px;" id="cat-filter" onchange="renderExp()"><option value="">All Categories</option></select>
@@ -694,7 +723,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
         <option value="name-asc">Name: A → Z</option>
       </select>
     </div>
-    <div id="exp-filter-total" style="display:none;padding:8px 0 10px;border-bottom:1px solid var(--paper-2);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+    <div id="exp-filter-total" style="display:none;padding:8px 0 10px;border-bottom:1px solid var(--paper-2);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
       <span id="exp-filter-label" style="font-size:12px;color:var(--ink-3);"></span>
       <span id="exp-filter-amt" style="font-family:'DM Serif Display',serif;font-size:16px;color:var(--red);"></span>
     </div>
@@ -725,7 +754,23 @@ select.fi:focus{border-color:var(--gold);outline:none;}
     </div>
     <div id="sav-tab-month"></div>
     <div id="sav-tab-cumulative" style="display:none;"></div>
-    <div id="sav-tab-all" style="display:none;"><div id="sav-hist"></div></div>
+    <div id="sav-tab-all" style="display:none;">
+      <div class="dr-bar" id="sav-dr-bar">
+        <div class="dr-presets" id="sav-dr-presets">
+          <button class="dr-chip active" data-range="all" onclick="setSavRange('all',this)">All Time</button>
+          <button class="dr-chip" data-range="year" onclick="setSavRange('year',this)">This Year</button>
+          <button class="dr-chip" data-range="month" onclick="setSavRange('month',this)">This Month</button>
+          <button class="dr-chip" data-range="custom" onclick="setSavRange('custom',this)">Custom ▾</button>
+        </div>
+        <div class="dr-custom" id="sav-dr-custom">
+          <input type="date" class="fi" id="sav-dr-from" onchange="applySavCustomRange()">
+          <span style="font-size:13px;color:var(--ink-3);">to</span>
+          <input type="date" class="fi" id="sav-dr-to" onchange="applySavCustomRange()">
+        </div>
+        <div class="dr-label" id="sav-dr-label"></div>
+      </div>
+      <div id="sav-hist"></div>
+    </div>
   </div>
 </div>
 
@@ -809,10 +854,27 @@ select.fi:focus{border-color:var(--gold);outline:none;}
   </div>
   <!-- INCOME STATEMENT TAB -->
   <div id="inc-tab-statement">
-    <div class="mnav"><button onclick="changeIncMonth(-1)" aria-label="Previous month">←</button><div class="mdisp" id="inc-mdisp"></div><button onclick="changeIncMonth(1)" aria-label="Next month">→</button></div>
+    <!-- Date range filter for income receipts -->
+    <div class="dr-bar" id="inc-dr-bar">
+      <div class="dr-presets" id="inc-dr-presets">
+        <button class="dr-chip" data-range="today" onclick="setIncRange('today',this)">Today</button>
+        <button class="dr-chip" data-range="week" onclick="setIncRange('week',this)">This Week</button>
+        <button class="dr-chip active" data-range="month" onclick="setIncRange('month',this)">This Month</button>
+        <button class="dr-chip" data-range="last-month" onclick="setIncRange('last-month',this)">Last Month</button>
+        <button class="dr-chip" data-range="year" onclick="setIncRange('year',this)">This Year</button>
+        <button class="dr-chip" data-range="all" onclick="setIncRange('all',this)">All Time</button>
+        <button class="dr-chip" data-range="custom" onclick="setIncRange('custom',this)">Custom ▾</button>
+      </div>
+      <div class="dr-custom" id="inc-dr-custom">
+        <input type="date" class="fi" id="inc-dr-from" onchange="applyIncCustomRange()">
+        <span style="font-size:13px;color:var(--ink-3);">to</span>
+        <input type="date" class="fi" id="inc-dr-to" onchange="applyIncCustomRange()">
+      </div>
+      <div class="dr-label" id="inc-dr-label"></div>
+    </div>
     <div class="ar" style="margin-bottom:10px;"><button class="btn btn-gold" onclick="openIncomeReceiptModal()">+ Record Receipt</button></div>
     <div id="inc-month-stats" class="g2" style="margin-bottom:12px;"></div>
-    <div class="card"><div class="sh"><h2>Income This Month</h2></div><div id="inc-statement-list"></div></div>
+    <div class="card"><div class="sh"><h2>Income Receipts</h2></div><div id="inc-statement-list"></div></div>
     <div class="card"><div class="sh"><h2>Actual vs Forecast</h2><p>Last 6 months</p></div><div style="position:relative;height:200px;"><canvas role="img" aria-label="Actual vs forecast income chart" id="inc-avf-chart"></canvas></div></div>
     <div class="card"><div class="sh"><h2>Income Breakdown</h2></div><div style="position:relative;height:220px;"><canvas role="img" aria-label="Income sources breakdown chart" id="inc-chart"></canvas></div><div id="inc-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
   </div>
@@ -2233,44 +2295,67 @@ function eRow(e,compact=false){
   return`<div class="li" style="${future?'opacity:0.72;':''}"><div class="li-ic" style="background:${c.color}22;color:${c.color};font-family:system-ui,sans-serif;">${c.icon}</div><div class="li-nm"><div class="p">${e.desc}${future?' <span class="pill pill-b" style="font-size:10px">📅 planned</span>':''}${e.linkedGoal?` <span class="pill pill-g" style="font-size:11px">savings</span>`:''}${e.recurring?` <span class="rb">↻</span>`:''}</div><div class="s">${c.name} · ${new Date(e.date).toLocaleDateString('en-GH',{day:'numeric',month:'short'})}${e.note?' · '+e.note:''}</div></div><div class="li-am" style="color:${future?'var(--ink-3)':'var(--red)'};margin-right:${compact?0:6}px">${future?'~−':'−'}${fmt(e.amount)}</div>${compact?'':`<button class="btn btn-ghost btn-sm" onclick="openExpenseModal('${e.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delExp('${e.id}')">✕</button>`}</div>`;
 }
 function renderExp(){
-  const m=S.currentMonth,y=S.currentYear;
-  document.getElementById('mdisp').textContent=MOS[m]+' '+y;
-  const exps=mExps(m,y);
+  // Get all expenses in the selected date range
+  const from=expDateRange.from||new Date('2000-01-01');
+  const to=expDateRange.to||new Date('2099-12-31');
+  const exps=S.expenses.filter(e=>{
+    if(!e.date)return false;
+    const d=new Date(e.date);
+    return d>=from&&d<=to;
+  });
+
   const actualExps=exps.filter(e=>!isFuture(e));
   const plannedExps=exps.filter(e=>isFuture(e));
-  const sp=actualExps.filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
-  const plannedTotal=plannedExps.filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
-  const incM=earnedForPeriod(m,y);
-  document.getElementById('exp-stats').innerHTML=`
-    <div class="card" style="padding:13px;"><div class="ct">Spent</div><div class="cv" style="font-size:20px">${fmt(sp)}</div><div class="cs">${actualExps.filter(e=>e.cat!=='Savings Transfer').length} items${plannedExps.filter(e=>e.cat!=='Savings Transfer').length?' · <span style="color:var(--blue)">'+plannedExps.filter(e=>e.cat!=='Savings Transfer').length+' planned</span>':''}</div></div>
-    <div class="card" style="padding:13px;"><div class="ct">Remaining</div><div class="cv" style="font-size:20px;color:${incM-sp<0?'var(--red)':'var(--green)'}">${fmt(incM-sp)}</div><div class="cs">of ${fmt(incM)}${plannedTotal?' <span style="font-size:10px;color:var(--blue)">~'+fmt(incM-sp-plannedTotal)+' after planned</span>':''}</div></div>
-    <div class="card" style="padding:13px;"><div class="ct">Daily Avg</div><div class="cv" style="font-size:20px">${fmt(sp/Math.max(1,new Date(y,m+1,0).getDate()))}</div><div class="cs">Actual per day</div></div>`;
+  const sp=actualExps.filter(e=>gCat(e.cat).name!=='Savings Transfer'&&e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
+  const plannedTotal=plannedExps.filter(e=>gCat(e.cat).name!=='Savings Transfer'&&e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
 
-  // Category filter — rebuild preserving current selection
+  // For single-month ranges, show Remaining vs income; for custom ranges, just show totals
+  const isSingleMonth=expDateRange.preset==='month'||expDateRange.preset==='last-month';
+  let statsHtml;
+  if(isSingleMonth){
+    const d=expDateRange.from||new Date();
+    const m=d.getMonth(),y=d.getFullYear();
+    const incM=earnedForPeriod(m,y);
+    const days=new Date(y,m+1,0).getDate();
+    statsHtml=`
+      <div class="card" style="padding:13px;"><div class="ct">Spent</div><div class="cv" style="font-size:20px">${fmt(sp)}</div><div class="cs">${actualExps.filter(e=>gCat(e.cat).name!=='Savings Transfer').length} items${plannedExps.filter(e=>gCat(e.cat).name!=='Savings Transfer').length?' · <span style="color:var(--blue)">'+plannedExps.filter(e=>gCat(e.cat).name!=='Savings Transfer').length+' planned</span>':''}</div></div>
+      <div class="card" style="padding:13px;"><div class="ct">Remaining</div><div class="cv" style="font-size:20px;color:${incM-sp<0?'var(--red)':'var(--green)'}">${fmt(incM-sp)}</div><div class="cs">of ${fmt(incM)}${plannedTotal?' <span style="font-size:10px;color:var(--blue)">~'+fmt(incM-sp-plannedTotal)+' after planned</span>':''}</div></div>
+      <div class="card" style="padding:13px;"><div class="ct">Daily Avg</div><div class="cv" style="font-size:20px">${fmt(sp/Math.max(1,days))}</div><div class="cs">Actual per day</div></div>`;
+  } else {
+    // Range view — show spent, count, daily average
+    const days=Math.max(1,Math.round((to-from)/(1000*60*60*24))+1);
+    const savingsTotal=actualExps.filter(e=>gCat(e.cat).name==='Savings Transfer'||e.cat==='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
+    statsHtml=`
+      <div class="card" style="padding:13px;"><div class="ct">Spent</div><div class="cv" style="font-size:20px">${fmt(sp)}</div><div class="cs">${actualExps.filter(e=>gCat(e.cat).name!=='Savings Transfer').length} transactions</div></div>
+      <div class="card" style="padding:13px;"><div class="ct">Daily Avg</div><div class="cv" style="font-size:20px">${fmt(sp/days)}</div><div class="cs">Over ${days} day${days!==1?'s':''}</div></div>
+      <div class="card" style="padding:13px;"><div class="ct">Saved</div><div class="cv" style="font-size:20px;color:var(--green)">${fmt(savingsTotal)}</div><div class="cs">Savings transfers</div></div>`;
+  }
+  document.getElementById('exp-stats').innerHTML=statsHtml;
+
+  // Category filter — build from range data only (shows relevant cats)
   const cats=[...new Set(exps.map(e=>gCat(e.cat).name))].sort();
   const sel=document.getElementById('cat-filter');const cur=sel.value;
   sel.innerHTML='<option value="">All Categories</option>'+cats.map(c=>`<option value="${c}" ${c===cur?'selected':''}>${c}</option>`).join('');
 
-  // Apply filters
+  // Apply content filters
   const cf=sel.value;
   const tf=document.getElementById('type-filter').value;
   const sf=document.getElementById('sort-filter')?.value||'date-desc';
   let fl=[...exps];
-  // Category filter matches against resolved c.name
   if(cf)fl=fl.filter(e=>gCat(e.cat).name===cf);
   if(tf==='savings')fl=fl.filter(e=>e.cat==='Savings Transfer'||gCat(e.cat).name==='Savings Transfer');
   if(tf==='expense')fl=fl.filter(e=>e.cat!=='Savings Transfer'&&gCat(e.cat).name!=='Savings Transfer');
 
   // Sort
   switch(sf){
-    case'date-asc':  fl.sort((a,b)=>new Date(a.date)-new Date(b.date));break;
+    case'date-asc':   fl.sort((a,b)=>new Date(a.date)-new Date(b.date));break;
     case'amount-desc':fl.sort((a,b)=>parseFloat(b.amount)-parseFloat(a.amount));break;
     case'amount-asc': fl.sort((a,b)=>parseFloat(a.amount)-parseFloat(b.amount));break;
     case'name-asc':   fl.sort((a,b)=>a.desc.localeCompare(b.desc));break;
-    default:          fl.sort((a,b)=>new Date(b.date)-new Date(a.date));// newest first
+    default:          fl.sort((a,b)=>new Date(b.date)-new Date(a.date));
   }
 
-  // Filtered total — show when any filter is active
+  // Filtered summary bar
   const isFiltered=!!cf||!!tf;
   const ftWrap=document.getElementById('exp-filter-total');
   const ftLabel=document.getElementById('exp-filter-label');
@@ -2282,7 +2367,7 @@ function renderExp(){
                   tf==='savings'?`Savings transfers · ${fl.length} item${fl.length!==1?'s':''}`:
                   `Expenses only · ${fl.length} item${fl.length!==1?'s':''}`;
       ftLabel.textContent=label;
-      ftAmt.textContent='−'+fmt(filtTotal);
+      ftAmt.textContent=(tf==='savings'?'+':'-')+fmt(filtTotal);
       ftAmt.style.color=tf==='savings'?'var(--green)':'var(--red)';
       ftWrap.style.display='flex';
     } else {
@@ -2290,8 +2375,205 @@ function renderExp(){
     }
   }
 
-  document.getElementById('exp-list').innerHTML=fl.length?fl.map(e=>eRow(e)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses for this period</p></div>';
+  document.getElementById('exp-list').innerHTML=fl.length
+    ?fl.map(e=>eRow(e)).join('')
+    :'<div class="empty"><div class="icon">📋</div><p>No expenses in this period</p></div>';
 }
+// ── DATE RANGE FILTER SYSTEM ────────────────────────────────
+
+// Shared helper: compute {from, to} Date objects for a named preset
+function dateRangeForPreset(preset){
+  const now=new Date();
+  const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const todayEnd=new Date(today);todayEnd.setHours(23,59,59,999);
+  switch(preset){
+    case'today':
+      return{from:today,to:todayEnd,label:'Today — '+today.toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})};
+    case'week':{
+      const dow=today.getDay(); // 0=Sun
+      const mon=new Date(today);mon.setDate(today.getDate()-(dow===0?6:dow-1));
+      const sun=new Date(mon);sun.setDate(mon.getDate()+6);sun.setHours(23,59,59,999);
+      return{from:mon,to:sun,label:'This Week: '+mon.toLocaleDateString('en-GH',{day:'numeric',month:'short'})+' – '+sun.toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})};
+    }
+    case'month':{
+      const mStart=new Date(now.getFullYear(),now.getMonth(),1);
+      const mEnd=new Date(now.getFullYear(),now.getMonth()+1,0,23,59,59,999);
+      return{from:mStart,to:mEnd,label:MOS[now.getMonth()]+' '+now.getFullYear()};
+    }
+    case'last-month':{
+      let lm=now.getMonth()-1,ly=now.getFullYear();
+      if(lm<0){lm=11;ly--;}
+      const lStart=new Date(ly,lm,1);
+      const lEnd=new Date(ly,lm+1,0,23,59,59,999);
+      return{from:lStart,to:lEnd,label:MOS[lm]+' '+ly};
+    }
+    case'year':{
+      const yStart=new Date(now.getFullYear(),0,1);
+      const yEnd=new Date(now.getFullYear(),11,31,23,59,59,999);
+      return{from:yStart,to:yEnd,label:'Year '+now.getFullYear()};
+    }
+    case'all':
+      return{from:new Date('2000-01-01'),to:new Date('2099-12-31'),label:'All time'};
+    default:
+      return null;
+  }
+}
+
+function activateDrChip(presetsId,preset){
+  document.querySelectorAll(`#${presetsId} .dr-chip`).forEach(c=>c.classList.toggle('active',c.dataset.range===preset));
+}
+
+// ── EXPENSE DATE RANGE ──
+let expDateRange={from:null,to:null,preset:'month'};
+{const r=dateRangeForPreset('month');expDateRange.from=r.from;expDateRange.to=r.to;}
+
+window.setExpRange=function(preset,btn){
+  const customDiv=document.getElementById('exp-dr-custom');
+  const presetsEl=document.getElementById('exp-dr-presets');
+  activateDrChip('exp-dr-presets',preset);
+  if(preset==='custom'){
+    customDiv?.classList.add('open');
+    presetsEl?.classList.add('has-custom');
+    // Init dates to current range
+    const fd=document.getElementById('exp-dr-from');
+    const td=document.getElementById('exp-dr-to');
+    if(fd&&!fd.value)fd.value=expDateRange.from?expDateRange.from.toISOString().split('T')[0]:tod();
+    if(td&&!td.value)td.value=expDateRange.to?expDateRange.to.toISOString().split('T')[0]:tod();
+    expDateRange.preset='custom';
+    applyExpCustomRange();
+    return;
+  }
+  customDiv?.classList.remove('open');
+  presetsEl?.classList.remove('has-custom');
+  expDateRange.preset=preset;
+  const r=dateRangeForPreset(preset);
+  if(r){expDateRange.from=r.from;expDateRange.to=r.to;}
+  const lbl=document.getElementById('exp-dr-label');
+  if(lbl)lbl.textContent=r?.label||'';
+  renderExp();
+};
+
+window.applyExpCustomRange=function(){
+  const fv=document.getElementById('exp-dr-from')?.value;
+  const tv=document.getElementById('exp-dr-to')?.value;
+  if(!fv||!tv)return;
+  expDateRange.from=new Date(fv+'T00:00:00');
+  expDateRange.to=new Date(tv+'T23:59:59');
+  const lbl=document.getElementById('exp-dr-label');
+  if(lbl){
+    const df=expDateRange.from.toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'});
+    const dt=expDateRange.to.toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'});
+    lbl.textContent=df===dt?df:`${df} – ${dt}`;
+  }
+  renderExp();
+};
+
+// ── INCOME DATE RANGE ──
+let incDateRange={from:null,to:null,preset:'month'};
+{const r=dateRangeForPreset('month');incDateRange.from=r.from;incDateRange.to=r.to;}
+
+window.setIncRange=function(preset,btn){
+  const customDiv=document.getElementById('inc-dr-custom');
+  const presetsEl=document.getElementById('inc-dr-presets');
+  activateDrChip('inc-dr-presets',preset);
+  if(preset==='custom'){
+    customDiv?.classList.add('open');
+    presetsEl?.classList.add('has-custom');
+    const fd=document.getElementById('inc-dr-from');
+    const td=document.getElementById('inc-dr-to');
+    if(fd&&!fd.value)fd.value=incDateRange.from?incDateRange.from.toISOString().split('T')[0]:tod();
+    if(td&&!td.value)td.value=incDateRange.to?incDateRange.to.toISOString().split('T')[0]:tod();
+    incDateRange.preset='custom';
+    applyIncCustomRange();
+    return;
+  }
+  customDiv?.classList.remove('open');
+  presetsEl?.classList.remove('has-custom');
+  incDateRange.preset=preset;
+  const r=dateRangeForPreset(preset);
+  if(r){incDateRange.from=r.from;incDateRange.to=r.to;}
+  const lbl=document.getElementById('inc-dr-label');
+  if(lbl)lbl.textContent=r?.label||'';
+  renderIncStatement();
+};
+
+window.applyIncCustomRange=function(){
+  const fv=document.getElementById('inc-dr-from')?.value;
+  const tv=document.getElementById('inc-dr-to')?.value;
+  if(!fv||!tv)return;
+  incDateRange.from=new Date(fv+'T00:00:00');
+  incDateRange.to=new Date(tv+'T23:59:59');
+  const lbl=document.getElementById('inc-dr-label');
+  if(lbl){
+    const df=incDateRange.from.toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'});
+    const dt=incDateRange.to.toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'});
+    lbl.textContent=df===dt?df:`${df} – ${dt}`;
+  }
+  renderIncStatement();
+};
+
+// ── SAVINGS HISTORY DATE RANGE ──
+let savDateRange={from:new Date('2000-01-01'),to:new Date('2099-12-31'),preset:'all'};
+
+window.setSavRange=function(preset,btn){
+  const customDiv=document.getElementById('sav-dr-custom');
+  const presetsEl=document.getElementById('sav-dr-presets');
+  activateDrChip('sav-dr-presets',preset);
+  if(preset==='custom'){
+    customDiv?.classList.add('open');
+    presetsEl?.classList.add('has-custom');
+    const fd=document.getElementById('sav-dr-from');
+    const td=document.getElementById('sav-dr-to');
+    if(fd&&!fd.value)fd.value=tod();
+    if(td&&!td.value)td.value=tod();
+    savDateRange.preset='custom';
+    applySavCustomRange();
+    return;
+  }
+  customDiv?.classList.remove('open');
+  presetsEl?.classList.remove('has-custom');
+  savDateRange.preset=preset;
+  const r=dateRangeForPreset(preset);
+  if(r){savDateRange.from=r.from;savDateRange.to=r.to;}
+  const lbl=document.getElementById('sav-dr-label');
+  if(lbl)lbl.textContent=r?.label||'';
+  renderSavHistFiltered();
+};
+
+window.applySavCustomRange=function(){
+  const fv=document.getElementById('sav-dr-from')?.value;
+  const tv=document.getElementById('sav-dr-to')?.value;
+  if(!fv||!tv)return;
+  savDateRange.from=new Date(fv+'T00:00:00');
+  savDateRange.to=new Date(tv+'T23:59:59');
+  const lbl=document.getElementById('sav-dr-label');
+  if(lbl){
+    const df=savDateRange.from.toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'});
+    const dt=savDateRange.to.toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'});
+    lbl.textContent=df===dt?df:`${df} – ${dt}`;
+  }
+  renderSavHistFiltered();
+};
+
+function renderSavHistFiltered(){
+  const el=document.getElementById('sav-hist');if(!el)return;
+  const from=savDateRange.from||new Date('2000-01-01');
+  const to=savDateRange.to||new Date('2099-12-31');
+  const filtered=[...S.contributions].filter(c=>{
+    if(!c.date)return false;
+    const d=new Date(c.date);
+    return d>=from&&d<=to;
+  }).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const total=filtered.reduce((s,c)=>s+(parseFloat(c.amount)||0),0);
+  el.innerHTML=(filtered.length
+    ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:0 0 10px;border-bottom:1px solid var(--paper-2);margin-bottom:6px;">
+         <span style="font-size:12px;color:var(--ink-3);">${filtered.length} contribution${filtered.length!==1?'s':''}</span>
+         <span style="font-family:'DM Serif Display',serif;font-size:16px;color:var(--green);">+${fmt(total)}</span>
+       </div>`
+    +filtered.map(c=>{const g=S.goals.find(x=>x.id===c.goalId);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green);font-family:system-ui,sans-serif;">${g?g.icon:'💰'}</div><div class="li-nm"><div class="p">${g?g.name:'Manual Savings'}</div><div class="s">${new Date(c.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}</div></div><div class="li-am crd" style="margin-right:6px">+${fmt(c.amount)}</div><button class="btn btn-danger btn-sm" onclick="delContrib('${c.id}')">✕</button></div>`;}).join('')
+    :'<div class="empty"><div class="icon">📜</div><p>No contributions in this period</p></div>');
+}
+
 window.renderExp=renderExp;
 window.openExpenseModal=function(id){
   EID=id||null;
@@ -2615,7 +2897,7 @@ function renderSavings(){
   }).join(''):'<div class="empty"><div class="icon">🎯</div><p>No goals yet. Tap + to create one.</p></div>';
   renderSavMonth();
   const all=[...S.contributions].sort((a,b)=>new Date(b.date)-new Date(a.date));
-  document.getElementById('sav-hist').innerHTML=all.length?all.map(c=>{const g=S.goals.find(x=>x.id===c.goalId);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green)">${g?g.icon:'💰'}</div><div class="li-nm"><div class="p">${g?g.name:'Unknown Goal'}</div><div class="s">${new Date(c.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}</div></div><div class="li-am crd" style="margin-right:6px">+${fmt(c.amount)}</div><button class="btn btn-danger btn-sm" onclick="delContrib('${c.id}')">✕</button></div>`;}).join(''):'<div class="empty"><div class="icon">📜</div><p>No contributions yet</p></div>';
+  renderSavHistFiltered();
 }
 let withdrawingGoalId=null;
 window.openWithdrawModal=function(goalId){
@@ -2708,62 +2990,64 @@ window.switchIncTab=function(tab){
 window.changeIncMonth=function(dir){incStmtMonth+=dir;if(incStmtMonth>11){incStmtMonth=0;incStmtYear++;}if(incStmtMonth<0){incStmtMonth=11;incStmtYear--;}renderIncStatement();};
 
 function renderIncStatement(){
-  const m=incStmtMonth,y=incStmtYear;
-  const el=document.getElementById('inc-mdisp');
-  if(el)el.textContent=MOS[m]+' '+y;
+  const from=incDateRange.from||new Date('2000-01-01');
+  const to=incDateRange.to||new Date('2099-12-31');
 
-  const receipts=incomeReceiptsInMonth(m,y);
-  const actualCash=incomeReceiptsCashTotal(m,y);
-  const forecast=incInMonth(m,y);
+  // Filter receipts by date range
+  const receipts=(S.incomeReceipts||[]).filter(r=>{
+    if(!r||!r.date)return false;
+    const d=new Date(r.date);
+    return d>=from&&d<=to;
+  }).sort((a,b)=>new Date(b.date)-new Date(a.date));
 
-  const activeSources=S.incomeSources.filter(s=>{
-    if(s.noncash)return false;
-    const freq=s.freq||'monthly';
-    if(freq==='onetime'){
-      if(!s.date)return false;
-      const d=new Date(s.date);
-      return d.getMonth()===m&&d.getFullYear()===y;
-    }
-    return true;
-  });
+  const actualCash=receipts.filter(r=>!r.noncash).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+  const nonCashTotal=receipts.filter(r=>r.noncash).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+
+  // For single month — also show forecast
+  const isSingle=incDateRange.preset==='month'||incDateRange.preset==='last-month';
+  const m=from.getMonth(),y=from.getFullYear();
+  const forecast=isSingle?incInMonth(m,y):0;
 
   const stats=document.getElementById('inc-month-stats');
   if(stats)stats.innerHTML=`
     <div class="card" style="padding:13px;">
-      <div class="ct">Actual Cash Income</div>
+      <div class="ct">Cash Received</div>
       <div class="cv" style="font-size:20px;color:var(--green)">${fmt(actualCash)}</div>
       <div class="cs">${receipts.filter(r=>!r.noncash).length} receipt(s)</div>
     </div>
-    <div class="card" style="padding:13px;">
-      <div class="ct">Forecasted Income</div>
+    ${isSingle?`<div class="card" style="padding:13px;">
+      <div class="ct">Forecasted</div>
       <div class="cv" style="font-size:20px;color:var(--gold)">${fmt(forecast)}</div>
-      <div class="cs">Based on income sources</div>
-    </div>`;
+      <div class="cs">${actualCash>0?fmt(actualCash-forecast)+' vs forecast':'Based on income sources'}</div>
+    </div>`:`<div class="card" style="padding:13px;">
+      <div class="ct">Non-Cash</div>
+      <div class="cv" style="font-size:20px;color:var(--blue)">${fmt(nonCashTotal)}</div>
+      <div class="cs">${receipts.filter(r=>r.noncash).length} non-cash entries</div>
+    </div>`}`;
 
   const list=document.getElementById('inc-statement-list');
   if(!list)return;
 
   if(receipts.length){
-    list.innerHTML=receipts.map(r=>`
-      <div class="li">
+    list.innerHTML=receipts.map(r=>{
+      const src=S.incomeSources.find(s=>s.id===r.sourceId);
+      return`<div class="li">
         <div class="li-ic" style="background:${r.noncash?'var(--blue-light)':'var(--green-light)'};color:${r.noncash?'var(--blue)':'var(--green)'}">💰</div>
         <div class="li-nm">
-          <div class="p">${r.note||'Income receipt'}</div>
-          <div class="s">${new Date(r.date).toLocaleDateString()}</div>
+          <div class="p">${r.note||src?.name||'Income receipt'}${r.noncash?' <span class="pill pill-b" style="font-size:10px">non-cash</span>':''}</div>
+          <div class="s">${new Date(r.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}${r.type?' · '+r.type:''}</div>
         </div>
         <div class="li-am crd">+${fmt(parseFloat(r.amount)||0)}</div>
         <button class="btn btn-ghost btn-sm" onclick="openIncomeReceiptModal('${r.id}')">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="delIncomeReceipt('${r.id}')">✕</button>
-      </div>
-    `).join('')+`
-      <div style="border-top:1px solid var(--paper-2);margin-top:8px;padding-top:10px;display:flex;justify-content:space-between;">
-        <span style="font-size:13px;font-weight:600;">Total Actual Income</span>
+      </div>`;
+    }).join('')+`
+      <div style="border-top:1px solid var(--paper-2);margin-top:8px;padding-top:10px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;font-weight:600;">Total Cash Income</span>
         <span style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--green);">${fmt(actualCash)}</span>
       </div>`;
   } else {
-    list.innerHTML=activeSources.length
-      ? '<div class="empty"><div class="icon">💰</div><p>No receipts yet — showing forecast in chart</p></div>'
-      : '<div class="empty"><div class="icon">💰</div><p>No income recorded for this month</p></div>';
+    list.innerHTML='<div class="empty"><div class="icon">💰</div><p>No receipts in this period</p></div>';
   }
 
   renderIncChart();

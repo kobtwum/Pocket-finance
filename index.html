@@ -723,7 +723,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
         <option value="name-asc">Name: A → Z</option>
       </select>
     </div>
-    <div id="exp-filter-total" style="display:none;padding:8px 0 10px;border-bottom:1px solid var(--paper-2);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
+    <div id="exp-filter-total" style="padding:8px 0 10px;border-bottom:1px solid var(--paper-2);margin-bottom:6px;display:none;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
       <span id="exp-filter-label" style="font-size:12px;color:var(--ink-3);"></span>
       <span id="exp-filter-amt" style="font-family:'DM Serif Display',serif;font-size:16px;color:var(--red);"></span>
     </div>
@@ -2355,20 +2355,29 @@ function renderExp(){
     default:          fl.sort((a,b)=>new Date(b.date)-new Date(a.date));
   }
 
-  // Filtered summary bar
-  const isFiltered=!!cf||!!tf;
+  // Summary bar — always visible, always reflects exactly what's in the list
   const ftWrap=document.getElementById('exp-filter-total');
   const ftLabel=document.getElementById('exp-filter-label');
   const ftAmt=document.getElementById('exp-filter-amt');
   if(ftWrap&&ftLabel&&ftAmt){
-    if(isFiltered&&fl.length){
-      const filtTotal=fl.filter(e=>!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0);
-      const label=cf?`${cf} · ${fl.length} item${fl.length!==1?'s':''}`:
-                  tf==='savings'?`Savings transfers · ${fl.length} item${fl.length!==1?'s':''}`:
-                  `Expenses only · ${fl.length} item${fl.length!==1?'s':''}`;
-      ftLabel.textContent=label;
-      ftAmt.textContent=(tf==='savings'?'+':'-')+fmt(filtTotal);
-      ftAmt.style.color=tf==='savings'?'var(--green)':'var(--red)';
+    if(fl.length){
+      const actualItems=fl.filter(e=>!isFuture(e));
+      const plannedItems=fl.filter(e=>isFuture(e));
+      const filtTotal=actualItems.reduce((s,e)=>s+parseFloat(e.amount),0);
+      const plannedSum=plannedItems.reduce((s,e)=>s+parseFloat(e.amount),0);
+      const isSavingsOnly=tf==='savings'||(cf&&fl.every(e=>e.cat==='Savings Transfer'||gCat(e.cat).name==='Savings Transfer'));
+      // Build label: period + category/type qualifier + count
+      const periodLabel=expDateRange.preset==='month'?MOS[(expDateRange.from||new Date()).getMonth()]:
+                        expDateRange.preset==='last-month'?'Last month':
+                        expDateRange.preset==='today'?'Today':
+                        expDateRange.preset==='week'?'This week':
+                        expDateRange.preset==='year'?'This year':
+                        expDateRange.preset==='all'?'All time':
+                        document.getElementById('exp-dr-label')?.textContent||'Custom range';
+      const qualifier=cf?` · ${cf}`:tf==='savings'?' · Savings':tf==='expense'?' · Expenses only':'';
+      ftLabel.textContent=`${periodLabel}${qualifier} · ${fl.length} item${fl.length!==1?'s':''}${plannedItems.length?` (${plannedItems.length} planned)`:''}`;
+      ftAmt.textContent=(isSavingsOnly?'+':'-')+fmt(filtTotal)+(plannedSum>0?` (~-${fmt(filtTotal+plannedSum)} incl. planned)`:'');
+      ftAmt.style.color=isSavingsOnly?'var(--green)':'var(--red)';
       ftWrap.style.display='flex';
     } else {
       ftWrap.style.display='none';
@@ -3054,41 +3063,114 @@ function renderIncStatement(){
   renderIncAvfChart();
 }
 
-// ── Actual vs Forecast chart — last 6 months ──
+// ── Actual vs Forecast chart — driven by incDateRange ──
 function renderIncAvfChart(){
   dChart('inc-avf-chart');
   const canvas=document.getElementById('inc-avf-chart');if(!canvas)return;
-  // Build last 6 months ending at incStmtMonth/incStmtYear
-  const months=[];
-  let cm=incStmtMonth,cy=incStmtYear;
-  for(let i=0;i<6;i++){
-    months.unshift({month:cm,year:cy});
-    cm--;if(cm<0){cm=11;cy--;}
+  const card=canvas.closest('.card');
+
+  const from=incDateRange.from||new Date('2000-01-01');
+  const to=incDateRange.to||new Date();
+  const preset=incDateRange.preset||'month';
+
+  // Determine how many whole months the range spans
+  const fromM=from.getMonth(),fromY=from.getFullYear();
+  const toM=to.getMonth(),toY=to.getFullYear();
+  const spanMonths=(toY-fromY)*12+(toM-fromM)+1;
+
+  let labels=[],actualData=[],forecastData=[],chartType='bar',chartTitle='Actual vs Forecast';
+
+  if(spanMonths<=1){
+    // ── SINGLE MONTH: weekly breakdown ──
+    // Divide the month into ~4 weekly buckets
+    const year=fromY,month=fromM;
+    const daysInMonth=new Date(year,month+1,0).getDate();
+    const weeks=[{label:'Week 1',days:[1,7]},{label:'Week 2',days:[8,14]},{label:'Week 3',days:[15,21]},{label:'Week 4',days:[22,daysInMonth]}];
+    labels=weeks.map(w=>w.label);
+    actualData=weeks.map(({days})=>{
+      const wFrom=new Date(year,month,days[0]);
+      const wTo=new Date(year,month,days[1],23,59,59);
+      return (S.incomeReceipts||[]).filter(r=>{
+        if(r.noncash||!r.date)return false;
+        const d=new Date(r.date);
+        return d>=wFrom&&d<=wTo;
+      }).reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+    });
+    // Distribute monthly forecast evenly across weeks by proportion of days
+    const monthForecast=incInMonth(month,year);
+    forecastData=weeks.map(({days})=>(days[1]-days[0]+1)/daysInMonth*monthForecast);
+    chartTitle=MOS[month]+' '+year+' — Weekly Breakdown';
+    chartType='bar';
+
+  } else if(spanMonths<=24){
+    // ── MULTI-MONTH: one bar per month ──
+    const months=[];
+    let cm=fromM,cy=fromY;
+    while(cy<toY||(cy===toY&&cm<=toM)){
+      months.push({month:cm,year:cy});
+      cm++;if(cm>11){cm=0;cy++;}
+    }
+    labels=months.map(({month,year})=>MOS[month].slice(0,3)+(months.length>12?' \''+String(year).slice(2):' '+year));
+    actualData=months.map(({month,year})=>incomeReceiptsCashTotal(month,year));
+    forecastData=months.map(({month,year})=>incInMonth(month,year));
+    chartTitle=`${months.length} month${months.length!==1?'s':''}: Actual vs Forecast`;
+
+  } else {
+    // ── LONG RANGE (>24 months): quarterly aggregation ──
+    const quarters=[];
+    let qm=fromM,qy=fromY;
+    while(qy<toY||(qy===toY&&qm<=toM)){
+      const qEnd=Math.min(qm+2,11);
+      quarters.push({label:`Q${Math.floor(qm/3)+1} ${qy}`,startM:qm,endM:qEnd,year:qy});
+      qm+=3;if(qm>11){qm=qm-12;qy++;}
+    }
+    labels=quarters.map(q=>q.label);
+    actualData=quarters.map(({startM,endM,year})=>{
+      let total=0;
+      for(let m=startM;m<=endM;m++)total+=incomeReceiptsCashTotal(m,year);
+      return total;
+    });
+    forecastData=quarters.map(({startM,endM,year})=>{
+      let total=0;
+      for(let m=startM;m<=endM;m++)total+=incInMonth(m,year);
+      return total;
+    });
+    chartTitle=`Quarterly: ${fromY}–${toY}`;
   }
-  const labels=months.map(({month,year})=>MOS[month].slice(0,3)+' '+year);
-  const actualData=months.map(({month,year})=>incomeReceiptsCashTotal(month,year));
-  const forecastData=months.map(({month,year})=>incInMonth(month,year));
-  // Only render if there's any data
-  if(forecastData.every(v=>v===0)&&actualData.every(v=>v===0)){canvas.closest('.card').style.display='none';return;}
-  canvas.closest('.card').style.display='';
+
+  // Hide if no data at all
+  if(forecastData.every(v=>v===0)&&actualData.every(v=>v===0)){
+    if(card)card.style.display='none';return;
+  }
+  if(card){
+    card.style.display='';
+    // Update card subtitle dynamically
+    const sub=card.querySelector('.sh p');
+    if(sub)sub.textContent=chartTitle;
+  }
+
+  // Detect dark mode for grid lines
+  const isDark=document.body.classList.contains('dark');
+  const gridColor=isDark?'rgba(255,255,255,.06)':'rgba(0,0,0,.05)';
+
   CI['inc-avf-chart']=new Chart(canvas.getContext('2d'),{
-    type:'bar',
+    type:chartType,
     data:{
       labels,
       datasets:[
-        {label:'Forecast',data:forecastData,backgroundColor:'rgba(201,168,76,0.25)',borderColor:'#c9a84c',borderWidth:2,borderRadius:4,order:2},
-        {label:'Actual Received',data:actualData,backgroundColor:'rgba(45,122,95,0.7)',borderColor:'#2d7a5f',borderWidth:1,borderRadius:4,order:1}
+        {label:'Forecast',data:forecastData,backgroundColor:'rgba(201,168,76,0.22)',borderColor:'#c9a84c',borderWidth:2,borderRadius:4,order:2},
+        {label:'Actual Received',data:actualData,backgroundColor:'rgba(45,122,95,0.72)',borderColor:'#2d7a5f',borderWidth:1,borderRadius:4,order:1}
       ]
     },
     options:{
       responsive:true,maintainAspectRatio:false,
       plugins:{
-        legend:{display:true,position:'bottom',labels:{font:{size:10},boxWidth:10,usePointStyle:true}},
+        legend:{display:true,position:'bottom',labels:{font:{size:10},boxWidth:10,usePointStyle:true,color:isDark?'#9aa7cc':'#4e5f80'}},
         tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.raw)}`}}
       },
       scales:{
-        y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},
-        x:{grid:{display:false}}
+        y:{ticks:{callback:v=>fmt(v),font:{size:10},color:isDark?'#9aa7cc':'#7d8bac'},grid:{color:gridColor}},
+        x:{ticks:{font:{size:10},color:isDark?'#9aa7cc':'#7d8bac'},grid:{display:false}}
       }
     }
   });
@@ -3143,41 +3225,76 @@ function renderIncome(){
 
 }
 
-// ── Income breakdown chart — called by both Statement and Sources tabs ──
+// ── Income breakdown chart — driven by incDateRange ──
 function renderIncChart(){
-  const _icm=incStmtMonth,_icy=incStmtYear;
-  dChart('inc-chart');if(!S.incomeSources.length)return;
+  dChart('inc-chart');
+  const canvas=document.getElementById('inc-chart');if(!canvas)return;
+  if(!S.incomeSources.length)return;
   const clrs=['#c9a84c','#2d7a5f','#2471a3','#8e44ad','#c0392b','#e67e22','#e84393','#00b894','#6c5ce7','#fd79a8'];
-  const cashSrc=S.incomeSources.filter(s=>!s.noncash);
-  const chartAmts=cashSrc.map(s=>{
-    const freq=s.freq||'monthly';
-    const a=parseFloat(s.amount)||0;
-    if(freq==='onetime'){if(!s.date)return 0;const d=new Date(s.date);return d.getMonth()===_icm&&d.getFullYear()===_icy?a:0;}
-    if((freq==='quarterly'||freq==='annual')&&(s.spread||'spread')==='received'){
-      if(!s.date)return 0;
-      const sd=new Date(s.date),sm=sd.getMonth(),sy=sd.getFullYear();
-      const mfs=(_icy-sy)*12+(_icm-sm);
-      if(mfs<0)return 0;
-      return(freq==='quarterly'?mfs%3:mfs%12)===0?a:0;
-    }
-    return monthlyEq(s,_icm,_icy);
+  const from=incDateRange.from||new Date('2000-01-01');
+  const to=incDateRange.to||new Date();
+
+  // Aggregate actual receipts by source for the selected range
+  const receiptsBySource={};
+  (S.incomeReceipts||[]).filter(r=>{
+    if(r.noncash||!r.date)return false;
+    const d=new Date(r.date);
+    return d>=from&&d<=to;
+  }).forEach(r=>{
+    if(r.sourceId)receiptsBySource[r.sourceId]=(receiptsBySource[r.sourceId]||0)+(parseFloat(r.amount)||0);
   });
+
+  const cashSrc=S.incomeSources.filter(s=>!s.noncash);
+  const hasActualData=Object.keys(receiptsBySource).length>0;
+
+  let chartAmts;
+  if(hasActualData){
+    // Use actual receipts by source
+    chartAmts=cashSrc.map(s=>receiptsBySource[s.id]||0);
+  } else {
+    // Fallback: show forecast for the range
+    const fromM=from.getMonth(),fromY=from.getFullYear();
+    const toM=to.getMonth(),toY=to.getFullYear();
+    const spanMonths=Math.max(1,(toY-fromY)*12+(toM-fromM)+1);
+    chartAmts=cashSrc.map(s=>monthlyEq(s,fromM,fromY)*spanMonths);
+  }
+
   const visEntries=cashSrc.map((s,i)=>({s,i,amt:chartAmts[i]})).filter(e=>e.amt>0);
-  if(visEntries.length){
-    CI['inc-chart']=new Chart(document.getElementById('inc-chart').getContext('2d'),{
-      type:'doughnut',
-      data:{labels:visEntries.map(e=>e.s.name),
-        datasets:[{data:visEntries.map(e=>e.amt),
-          backgroundColor:visEntries.map(e=>clrs[e.i%clrs.length]+'cc'),
-          borderColor:visEntries.map(e=>clrs[e.i%clrs.length]),
-          borderWidth:2}]},
-      options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},
-        cutout:'60%'}});
+  if(!visEntries.length)return;
+
+  CI['inc-chart']=new Chart(canvas.getContext('2d'),{
+    type:'doughnut',
+    data:{
+      labels:visEntries.map(e=>e.s.name),
+      datasets:[{
+        data:visEntries.map(e=>e.amt),
+        backgroundColor:visEntries.map(e=>clrs[e.i%clrs.length]+'cc'),
+        borderColor:visEntries.map(e=>clrs[e.i%clrs.length]),
+        borderWidth:2
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}
+      },
+      cutout:'60%'
+    }
+  });
+  // Update legend — dim sources with zero amount in this range
+  const breakdownCard=canvas.closest('.card');
+  if(breakdownCard){
+    const sh=breakdownCard.querySelector('.sh');
+    if(sh){
+      const p=sh.querySelector('p')||document.createElement('p');
+      p.textContent=hasActualData?`Actual receipts · ${Object.keys(receiptsBySource).length} source(s)`:'Forecast estimate for period';
+      if(!sh.querySelector('p'))sh.appendChild(p);
+    }
   }
   document.getElementById('inc-leg').innerHTML=cashSrc.map((s,i)=>{
     const amt=chartAmts[i];
-    return`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);opacity:${amt>0?1:0.4};"><span style="width:10px;height:10px;border-radius:2px;background:${clrs[i%clrs.length]};display:inline-block;"></span>${s.name}${amt===0?'<span style="font-size:9px;margin-left:2px;">(not this month)</span>':''}</span>`;
+    return`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);opacity:${amt>0?1:0.35};"><span style="width:10px;height:10px;border-radius:2px;background:${clrs[i%clrs.length]};display:inline-block;"></span>${s.name}</span>`;
   }).join('');
 }
 window.renderIncAllTime=function(){

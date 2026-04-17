@@ -664,6 +664,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
 <div id="page-dashboard" class="page active">
   <div id="bud-alert-wrap"></div>
   <div id="pending-receipts-wrap"></div>
+  <div id="overdue-recv-wrap"></div>
   <div class="card-dark" id="dash-wallet">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
       <div class="ct-g" id="greeting">Good morning ✦</div>
@@ -950,17 +951,39 @@ select.fi:focus{border-color:var(--gold);outline:none;}
 
 <!-- DEBT TRACKER -->
 <div id="page-debt" class="page">
-  <div class="ar"><button class="btn btn-gold" onclick="openLoanModal()">+ Add Loan</button></div>
-  <!-- Debt summary -->
-  <div class="card-dark" style="margin-bottom:12px;">
-    <div class="ct-g">Total Debt</div>
-    <div id="debt-total" style="font-family:'DM Serif Display',serif;font-size:36px;color:white;margin:4px 0;"></div>
-    <div class="g2" style="margin-top:12px;margin-bottom:0;">
-      <div class="ii"><div class="lb">Monthly Payments</div><div class="am" id="debt-monthly"></div></div>
-      <div class="ii"><div class="lb">Debt-free Date</div><div class="am" id="debt-free" style="font-size:13px;"></div></div>
-    </div>
+  <!-- Tabs -->
+  <div class="tabs" style="margin-bottom:12px;">
+    <button class="tab active" id="debt-tab-loans" onclick="switchDebtTab('loans')">💳 Debt</button>
+    <button class="tab" id="debt-tab-receivables" onclick="switchDebtTab('receivables')">🤝 Lent Out</button>
   </div>
-  <div id="debt-list"></div>
+
+  <!-- LOANS TAB -->
+  <div id="debt-panel-loans">
+    <div class="ar"><button class="btn btn-gold" onclick="openLoanModal()">+ Add Loan</button></div>
+    <div class="card-dark" style="margin-bottom:12px;">
+      <div class="ct-g">Total Debt</div>
+      <div id="debt-total" style="font-family:'DM Serif Display',serif;font-size:36px;color:white;margin:4px 0;"></div>
+      <div class="g2" style="margin-top:12px;margin-bottom:0;">
+        <div class="ii"><div class="lb">Monthly Payments</div><div class="am" id="debt-monthly"></div></div>
+        <div class="ii"><div class="lb">Debt-free Date</div><div class="am" id="debt-free" style="font-size:13px;"></div></div>
+      </div>
+    </div>
+    <div id="debt-list"></div>
+  </div>
+
+  <!-- RECEIVABLES TAB -->
+  <div id="debt-panel-receivables" style="display:none;">
+    <div class="ar"><button class="btn btn-gold" onclick="openReceivableModal()">+ Record Loan Given</button></div>
+    <div class="card-dark" style="margin-bottom:12px;">
+      <div class="ct-g">Total Lent Out</div>
+      <div id="recv-total" style="font-family:'DM Serif Display',serif;font-size:36px;color:white;margin:4px 0;"></div>
+      <div class="g2" style="margin-top:12px;margin-bottom:0;">
+        <div class="ii"><div class="lb">Outstanding</div><div class="am" id="recv-outstanding"></div></div>
+        <div class="ii"><div class="lb">Repaid so far</div><div class="am" id="recv-repaid" style="color:#6dba99;"></div></div>
+      </div>
+    </div>
+    <div id="recv-list"></div>
+  </div>
 </div>
 
 <!-- HEALTH SCORE -->
@@ -1372,6 +1395,37 @@ select.fi:focus{border-color:var(--gold);outline:none;}
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('loan-payment-modal')">Cancel</button><button class="btn btn-green btn-full" onclick="saveLoanPayment()">Confirm Payment</button></div>
 </div></div>
 
+<!-- RECEIVABLE MODAL -->
+<div class="mo" id="receivable-modal"><div class="modal"><div class="mh"></div>
+  <div class="mt" id="recv-mt">Record Loan Given</div>
+  <div class="fg"><label class="fl req" for="rv-name">Borrower's Name</label><input class="fi" id="rv-name" placeholder="e.g. Kwame, Ama Boateng..."/></div>
+  <div class="g2">
+    <div class="fg"><label class="fl req" for="rv-amt">Amount Lent</label><input class="fi" type="number" inputmode="decimal" id="rv-amt" placeholder="0.00"/></div>
+    <div class="fg"><label class="fl req" for="rv-date">Date Lent</label><input class="fi" type="date" id="rv-date"/></div>
+  </div>
+  <div class="fg"><label class="fl" for="rv-due">Expected Repayment Date</label><input class="fi" type="date" id="rv-due"/></div>
+  <div class="fg"><label class="fl" for="rv-note">Note</label><input class="fi" id="rv-note" placeholder="What was it for?"/></div>
+  <div class="fg"><label class="fl" for="rv-type">Type</label>
+    <select class="fi" id="rv-type">
+      <option value="personal">Personal</option>
+      <option value="family">Family</option>
+      <option value="business">Business</option>
+      <option value="other">Other</option>
+    </select>
+  </div>
+  <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('receivable-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveReceivable()">Save</button></div>
+</div></div>
+
+<!-- RECEIVABLE REPAYMENT MODAL -->
+<div class="mo" id="recv-repay-modal"><div class="modal"><div class="mh"></div>
+  <div class="mt" id="rrp-title">Record Repayment</div>
+  <div class="fg"><label class="fl req">Amount Received</label><input class="fi" type="number" inputmode="decimal" id="rrp-amt" placeholder="0.00"/></div>
+  <div class="fg"><label class="fl req">Date Received</label><input class="fi" type="date" id="rrp-date"/></div>
+  <div class="fg"><label class="fl">Note</label><input class="fi" id="rrp-note" placeholder="Optional note"/></div>
+  <div id="rrp-preview" style="background:var(--paper-2);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;margin-bottom:4px;display:none;"></div>
+  <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('recv-repay-modal')">Cancel</button><button class="btn btn-green btn-full" onclick="saveReceivableRepayment()">Confirm Receipt</button></div>
+</div></div>
+
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
 <script>
@@ -1616,7 +1670,7 @@ function normalizeCategories(cats){
 }
 function resolveCategory(value){if(!value)return {id:null,name:'Unknown',icon:'📌',color:'#888'};return S.categories.find(c=>c.id===value||c.name===value)||{id:null,name:value,icon:'📌',color:'#888'};}
 const gCat=value=>resolveCategory(value);
-let S={profile:{name:''},incomeSources:[],incomeReceipts:[],expenses:[],categories:normalizeCategories([...DCATS]),budgets:[],goals:[],contributions:[],recurringExpenses:[],assets:[],liabilities:[],loans:[],accounts:[],currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),selectedColor:'#e67e22',schemaVersion:2};
+let S={profile:{name:''},incomeSources:[],incomeReceipts:[],expenses:[],categories:normalizeCategories([...DCATS]),budgets:[],goals:[],contributions:[],recurringExpenses:[],assets:[],liabilities:[],loans:[],receivables:[],accounts:[],currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),selectedColor:'#e67e22',schemaVersion:2};
 let CU=null,UL=[];
 
 // ── FIRESTORE ──
@@ -1631,7 +1685,7 @@ async function saveS(){
   setSyncDot('syncing');
   try{
     const b=writeBatch(db);
-    b.set(pDoc(),{name:S.profile.name,categories:S.categories,budgets:S.budgets,goals:S.goals,recurringExpenses:S.recurringExpenses||[],assets:S.assets||[],liabilities:S.liabilities||[],loans:S.loans||[],accounts:S.accounts||[],schemaVersion:S.schemaVersion||2,selectedColor:S.selectedColor,updatedAt:Date.now()});
+    b.set(pDoc(),{name:S.profile.name,categories:S.categories,budgets:S.budgets,goals:S.goals,recurringExpenses:S.recurringExpenses||[],assets:S.assets||[],liabilities:S.liabilities||[],loans:S.loans||[],receivables:S.receivables||[],accounts:S.accounts||[],schemaVersion:S.schemaVersion||2,selectedColor:S.selectedColor,updatedAt:Date.now()});
     await b.commit();
     setSyncDot('online');
   }catch(e){
@@ -1695,6 +1749,7 @@ function startSync(uid){
           S.assets=v.assets||[];
           S.liabilities=(v.liabilities||[]).filter(l=>!l.id?.startsWith('ll_'));
           S.loans=v.loans||[];
+          S.receivables=v.receivables||[];
           if(v.selectedColor)S.selectedColor=v.selectedColor;
           READY.profile=true;
           refreshPage();
@@ -1716,6 +1771,7 @@ function startSync(uid){
       S.assets=v.assets||[];
       S.liabilities=(v.liabilities||[]).filter(l=>!l.id?.startsWith('ll_'));
       S.loans=v.loans||[];
+      S.receivables=v.receivables||[];
       if(v.selectedColor)S.selectedColor=v.selectedColor;
     }
     READY.profile=true;
@@ -2068,7 +2124,7 @@ window.openDashCustomise=function(){
 function wrapSaveFunctions(){
   const fns=['saveExpense','saveBudget','saveGoal','saveContrib','saveWithdrawal',
              'saveRecur','saveIncome','saveIncomeReceipt','saveLoan','saveLoanPayment',
-             'saveAsset','saveLiability','saveCategory'];
+             'saveAsset','saveLiability','saveCategory','saveReceivable','saveReceivableRepayment'];
   fns.forEach(name=>{
     const orig=window[name];
     if(typeof orig!=='function')return;
@@ -2188,7 +2244,7 @@ function renderDash(){
   document.getElementById('dash-rec').innerHTML=rec.length?rec.map(e=>eRow(e,true)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses yet this month</p></div>';
   const bc=byCat(m,y);
   document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,rawP=b.limit>0?sp/b.limit*100:0,p2=rawP.toFixed(0),barP=Math.min(100,rawP);const c=gCat(b.cat);const pl=rawP>100?'pill-r':rawP>70?'pill-gold':'pill-g';return`<div class="bc"><div class="bc-h"><div class="bc-top"><div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name} <span class="pill ${pl}">${p2}%</span></div><div class="bc-a">${fmt(sp)} / ${fmt(b.limit)}</div></div></div><div class="pw"><div class="pb ${rawP>100?'pb-red':rawP>70?'pb-gold':'pb-green'}" style="width:${barP}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
-  renderBudgetAlerts();renderDashHealth();renderDashInsights();renderPendingReceiptsNudge();
+  renderBudgetAlerts();renderDashHealth();renderDashInsights();renderPendingReceiptsNudge();renderOverdueReceivablesNudge();
   document.getElementById('dash-sav').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),p3=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green);font-size:18px;font-family:system-ui,sans-serif;">${g.icon}</div><div class="li-nm"><div class="p">${g.name}</div><div class="s">${fmt(sv)} of ${fmt(g.target)}</div></div><span class="pill pill-g">${p3}%</span></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No savings goals yet</p></div>';
 
   // Income receipts card
@@ -2281,6 +2337,43 @@ window.dismissAllNudges=function(){
   localStorage.setItem(key,JSON.stringify(ids));
   renderPendingReceiptsNudge();
 };
+
+// ── OVERDUE RECEIVABLES NUDGE ──
+function renderOverdueReceivablesNudge(){
+  const wrap=document.getElementById('overdue-recv-wrap');
+  if(!wrap)return;
+  const now=new Date();
+  const overdue=(S.receivables||[]).filter(r=>{
+    if(recvOutstanding(r)<=0)return false; // fully repaid
+    if(!r.due)return false; // no due date set
+    return new Date(r.due)<now;
+  });
+  // Check per-item dismissals (dismissed until next day)
+  const dismissKey='pkt_recv_nudge_'+new Date().toISOString().split('T')[0];
+  const dismissed=JSON.parse(localStorage.getItem(dismissKey)||'[]');
+  const visible=overdue.filter(r=>!dismissed.includes(r.id));
+  if(!visible.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`<div style="background:linear-gradient(135deg,rgba(220,107,121,0.12),rgba(201,168,76,0.08));border:1px solid rgba(220,107,121,0.28);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div style="font-size:12px;font-weight:600;color:var(--red);">⚠ Overdue repayments</div>
+      <button onclick="document.getElementById('overdue-recv-wrap').innerHTML=''" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--ink-3);padding:0 2px;">✕</button>
+    </div>
+    ${visible.map(r=>{
+      const out=recvOutstanding(r);
+      const daysOverdue=Math.floor((now-new Date(r.due))/(1000*60*60*24));
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(220,107,121,0.15);">
+        <div>
+          <div style="font-size:13px;font-weight:500;color:var(--ink);">${r.name}</div>
+          <div style="font-size:11px;color:var(--red);">${fmt(out)} outstanding · ${daysOverdue} day${daysOverdue!==1?'s':''} overdue</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button onclick="(()=>{const d=JSON.parse(localStorage.getItem('${dismissKey}')||'[]');d.push('${r.id}');localStorage.setItem('${dismissKey}',JSON.stringify(d));renderOverdueReceivablesNudge();})()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--ink-3);padding:4px 6px;">Dismiss</button>
+          <button onclick="showPage('debt');setTimeout(()=>switchDebtTab('receivables'),100)" style="background:var(--red);color:white;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">View →</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
 
 // ── EXPENSES ──
 let EID=null;
@@ -2984,8 +3077,6 @@ function renderAnMon(){const mwd=mwData();if(!mwd.length)return;const lb=mwd.map
 
 // ── INCOME ──
 let IID=null;
-let incStmtMonth=new Date().getMonth();
-let incStmtYear=new Date().getFullYear();
 
 window.switchIncTab=function(tab){
   document.querySelectorAll('#page-income .tab').forEach(t=>t.classList.remove('active'));
@@ -2995,8 +3086,6 @@ window.switchIncTab=function(tab){
   else if(tab==='alltime')renderIncAllTime();
   else renderIncome();
 };
-
-window.changeIncMonth=function(dir){incStmtMonth+=dir;if(incStmtMonth>11){incStmtMonth=0;incStmtYear++;}if(incStmtMonth<0){incStmtMonth=11;incStmtYear--;}renderIncStatement();};
 
 function renderIncStatement(){
   const from=incDateRange.from||new Date('2000-01-01');
@@ -3769,10 +3858,10 @@ if(d.incomeReceipts)for(const ir of d.incomeReceipts)await saveDoc('incomeReceip
 S={...S,...d};S.categories=normalizeCategories(S.categories);
 if(d.accounts?.length)S.accounts=d.accounts;
 if(d.schemaVersion)S.schemaVersion=d.schemaVersion;
-S.budgets=d.budgets||S.budgets;S.goals=d.goals||S.goals;S.recurringExpenses=d.recurringExpenses||[];S.incomeReceipts=d.incomeReceipts||S.incomeReceipts||[];
+S.budgets=d.budgets||S.budgets;S.goals=d.goals||S.goals;S.recurringExpenses=d.recurringExpenses||[];S.incomeReceipts=d.incomeReceipts||S.incomeReceipts||[];S.receivables=d.receivables||S.receivables||[];S.loans=d.loans||S.loans||[];
 await saveS();showToast('Import successful ✓');refreshPage();}catch(err){showToast('Invalid or corrupted file');}};r.readAsText(f);e.target.value='';};
 window.clearAllData=async function(){if(!confirm('Delete ALL your data permanently?'))return;if(!confirm('Are you absolutely sure?'))return;for(const e of S.expenses)await delDoc('expenses',e.id);for(const s of S.incomeSources)await delDoc('income',s.id);for(const r of (S.incomeReceipts||[]))await delDoc('incomeReceipts',r.id);
-for(const c of S.contributions)await delDoc('contributions',c.id);S.expenses=[];S.incomeSources=[];S.incomeReceipts=[];S.contributions=[];S.budgets=[];S.goals=[];S.categories=normalizeCategories(DCATS);S.recurringExpenses=[];S.assets=[];S.liabilities=[];S.loans=[];S.accounts=[];await saveS();showToast('All data deleted');renderDash();};
+for(const c of S.contributions)await delDoc('contributions',c.id);S.expenses=[];S.incomeSources=[];S.incomeReceipts=[];S.contributions=[];S.budgets=[];S.goals=[];S.categories=normalizeCategories(DCATS);S.recurringExpenses=[];S.assets=[];S.liabilities=[];S.loans=[];S.receivables=[];S.accounts=[];await saveS();showToast('All data deleted');renderDash();};
 
 // ── MODALS & TOAST ──
 // openModal and closeModal are defined in the global script above
@@ -3808,12 +3897,12 @@ function netCashPosition(){
   return totalActualIncome - totalExpenses - totalSavings;
 }
 function totalAssets(){
-  // manual assets + savings goal balance (what you've set aside) + net cash (unallocated remainder)
-  // No double-counting: savings transfers reduce net cash AND appear in allSaved()
+  // manual assets + savings goal balance + net cash + outstanding receivables (money owed to you)
   const manual=(S.assets||[]).reduce((t,a)=>t+parseFloat(a.value),0);
   const savings=allSaved();
   const cash=netCashPosition();
-  return manual+savings+cash;
+  const receivables=(S.receivables||[]).reduce((t,r)=>t+recvOutstanding(r),0);
+  return manual+savings+cash+receivables;
 }
 function totalLiab(){return(S.liabilities||[]).filter(l=>!l.clearedAt).reduce((t,l)=>t+parseFloat(l.value),0)+totalDebtBal();}
 function netWorth(){return totalAssets()-totalLiab();}
@@ -3850,7 +3939,8 @@ function renderNetWorth(){
   const LIQUID_CATS=['cash','investment'];
   const allAutoAssets=[
     {id:'_savings',name:'Savings Goals Balance',value:allSaved(),cat:'cash',_type:'auto',note:'Auto-tracked from savings goals'},
-    {id:'_cashpos',name:'Net Cash Position',value:netCashPosition(),cat:'cash',_type:'auto',note:'All-time income minus expenses'}
+    {id:'_cashpos',name:'Net Cash Position',value:netCashPosition(),cat:'cash',_type:'auto',note:'All-time income minus expenses'},
+    ...(totalReceivablesBal()>0?[{id:'_recv',name:'Money Lent Out',value:totalReceivablesBal(),cat:'cash',_type:'auto',note:`${(S.receivables||[]).filter(r=>recvOutstanding(r)>0).length} outstanding loan(s) — go to Debt → Lent Out`,_link:'debt'}]:[])
   ];
   const allManual=(S.assets||[]).map(a=>({...a,_type:'asset'}));
   const allAssets=[...allManual,...allAutoAssets];
@@ -3863,6 +3953,7 @@ function renderNetWorth(){
     <div class="li-nm"><div class="p">${a.name}${a._type==='auto'?' <span class="pill pill-g" style="font-size:11px">auto</span>':''}</div><div class="s">${a.cat}${a.note?' · '+a.note:''}</div></div>
     <div style="font-family:'DM Serif Display',serif;font-size:14px;color:var(--green);margin-right:8px;">${fmt(a.value)}</div>
     ${a._type==='asset'?`<button class="btn btn-ghost btn-sm" onclick="openAssetModal('${a.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delAsset('${a.id}')">✕</button>`:''}
+    ${a._link?`<button class="btn btn-ghost btn-sm" onclick="showPage('${a._link}');switchDebtTab('receivables')">View →</button>`:''}
   </div>`;}
   astEl.innerHTML=`
     <div style="font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;padding:4px 0;">
@@ -4044,6 +4135,9 @@ function renderDebt(){
       </div>
     </div>`;
   }).join(''):'<div class="empty"><div class="icon">🎉</div><p>No active loans tracked.<br>Add a loan to track your payoff progress.</p></div>';
+  // Also refresh receivables summary if that panel is visible
+  const rvPanel=document.getElementById('debt-panel-receivables');
+  if(rvPanel&&rvPanel.style.display!=='none')renderReceivables();
 }
 
 window.openLoanModal=function(id){
@@ -4135,6 +4229,205 @@ window.delLoan=async function(id){
   if(!confirm('Delete this loan?'))return;
   S.loans=(S.loans||[]).filter(l=>l.id!==id);
   await saveS();renderDebt();renderNetWorth();showToast('Removed');
+};
+
+// ── RECEIVABLES (Money Lent Out) ──────────────────────────
+
+window.switchDebtTab=function(tab){
+  document.getElementById('debt-panel-loans').style.display=tab==='loans'?'':'none';
+  document.getElementById('debt-panel-receivables').style.display=tab==='receivables'?'':'none';
+  document.getElementById('debt-tab-loans').classList.toggle('active',tab==='loans');
+  document.getElementById('debt-tab-receivables').classList.toggle('active',tab==='receivables');
+  if(tab==='receivables')renderReceivables();
+  else renderDebt();
+};
+
+function totalReceivablesBal(){
+  return(S.receivables||[]).filter(r=>recvOutstanding(r)>0).reduce((t,r)=>t+recvOutstanding(r),0);
+}
+function recvOutstanding(r){
+  const lent=parseFloat(r.amount)||0;
+  const repaid=(r.repayments||[]).reduce((s,p)=>s+(parseFloat(p.amount)||0),0);
+  return Math.max(0,lent-repaid);
+}
+function recvTotalRepaid(r){
+  return(r.repayments||[]).reduce((s,p)=>s+(parseFloat(p.amount)||0),0);
+}
+
+function renderReceivables(){
+  const rv=S.receivables||[];
+  const totalLent=rv.reduce((t,r)=>t+(parseFloat(r.amount)||0),0);
+  const totalOut=rv.reduce((t,r)=>t+recvOutstanding(r),0);
+  const totalRepaid=rv.reduce((t,r)=>t+recvTotalRepaid(r),0);
+
+  const rtEl=document.getElementById('recv-total');
+  if(rtEl)rtEl.textContent=fmt(totalLent);
+  const roEl=document.getElementById('recv-outstanding');
+  if(roEl)roEl.textContent=fmt(totalOut);
+  const rrEl=document.getElementById('recv-repaid');
+  if(rrEl)rrEl.textContent=fmt(totalRepaid);
+
+  const el=document.getElementById('recv-list');
+  if(!el)return;
+
+  if(!rv.length){
+    el.innerHTML='<div class="empty"><div class="icon">🤝</div><p>No loans recorded yet.<br>Tap "+ Record Loan Given" to track money you\'ve lent.</p></div>';
+    return;
+  }
+
+  const now=new Date();
+  el.innerHTML=rv.map(r=>{
+    const outstanding=recvOutstanding(r);
+    const repaid=recvTotalRepaid(r);
+    const lent=parseFloat(r.amount)||0;
+    const pct=lent>0?Math.min(100,(repaid/lent*100)).toFixed(0):0;
+    const fullyRepaid=outstanding<=0;
+    const isOverdue=r.due&&!fullyRepaid&&new Date(r.due)<now;
+    const dueLabel=r.due?new Date(r.due).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'}):'No due date';
+
+    return`<div class="card" style="padding:16px;margin-bottom:12px;${fullyRepaid?'opacity:.75':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div>
+          <div style="font-size:14px;font-weight:500;">${r.name}
+            ${fullyRepaid?'<span class="pill pill-g" style="margin-left:4px;">Repaid ✓</span>':''}
+            ${isOverdue?'<span class="pill pill-r" style="margin-left:4px;">Overdue</span>':''}
+          </div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:2px;">${r.type||'Personal'} · Lent ${new Date(r.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}${r.note?' · '+r.note:''}</div>
+          <div style="font-size:11px;color:${isOverdue?'var(--red)':'var(--ink-3)'};margin-top:2px;">Due: ${dueLabel}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:12px;">
+          <div style="font-family:'DM Serif Display',serif;font-size:18px;color:${fullyRepaid?'var(--green)':'var(--gold)'};">${fmt(outstanding)}</div>
+          <div style="font-size:11px;color:var(--ink-3);">outstanding</div>
+        </div>
+      </div>
+      <div class="pw"><div class="pb pb-green" style="width:${pct}%"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:var(--ink-3);">
+        <span>${pct}% repaid (${fmt(repaid)})</span><span>${fmt(lent)} lent</span>
+      </div>
+      ${r.repayments&&r.repayments.length?`
+      <div style="margin-top:10px;">
+        <div style="font-size:11px;font-weight:500;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Repayment History (${r.repayments.length})</div>
+        <div style="max-height:140px;overflow-y:auto;">
+          ${[...r.repayments].reverse().map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--paper-2);font-size:11px;">
+            <div><div style="font-weight:500;">${new Date(p.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}</div>
+            ${p.note?`<div style="color:var(--ink-3);">${p.note}</div>`:''}</div>
+            <div style="text-align:right;"><div style="color:var(--green);font-weight:500;">+${fmt(p.amount)}</div><div style="color:var(--ink-3);">Bal: ${fmt(p.balanceAfter)}</div></div>
+          </div>`).join('')}
+        </div>
+      </div>`:''}
+      <div style="display:flex;gap:7px;margin-top:10px;">
+        ${!fullyRepaid?`<button class="btn btn-green btn-sm" style="flex:1;" onclick="openRecvRepayModal('${r.id}')">💰 Record Repayment</button>`:''}
+        <button class="btn btn-ghost btn-sm" onclick="openReceivableModal('${r.id}')" style="${fullyRepaid?'flex:1;':''}">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="delReceivable('${r.id}')">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let editRecvId=null;
+window.openReceivableModal=function(id){
+  editRecvId=id||null;
+  document.getElementById('recv-mt').textContent=id?'Edit Loan Given':'Record Loan Given';
+  const today=new Date().toISOString().split('T')[0];
+  if(id){
+    const r=(S.receivables||[]).find(x=>x.id===id);
+    if(r){
+      document.getElementById('rv-name').value=r.name||'';
+      document.getElementById('rv-amt').value=r.amount||'';
+      document.getElementById('rv-date').value=r.date||today;
+      document.getElementById('rv-due').value=r.due||'';
+      document.getElementById('rv-note').value=r.note||'';
+      document.getElementById('rv-type').value=r.type||'personal';
+    }
+  } else {
+    document.getElementById('rv-name').value='';
+    document.getElementById('rv-amt').value='';
+    document.getElementById('rv-date').value=today;
+    document.getElementById('rv-due').value='';
+    document.getElementById('rv-note').value='';
+    document.getElementById('rv-type').value='personal';
+  }
+  openModal('receivable-modal');
+};
+
+window.saveReceivable=async function(){
+  const name=document.getElementById('rv-name').value.trim();
+  const amount=parseFloat(document.getElementById('rv-amt').value);
+  const date=document.getElementById('rv-date').value;
+  const due=document.getElementById('rv-due').value;
+  const note=document.getElementById('rv-note').value.trim();
+  const type=document.getElementById('rv-type').value;
+  clearAllErrors(['rv-name','rv-amt','rv-date']);
+  let hasErr=false;
+  if(!name){setFieldError('rv-name','Borrower name is required');hasErr=true;}
+  if(!amount||amount<=0){setFieldError('rv-amt','Enter the amount lent');hasErr=true;}
+  if(!date){setFieldError('rv-date','Date is required');hasErr=true;}
+  if(hasErr)return;
+  if(!S.receivables)S.receivables=[];
+  const id=editRecvId||'rv'+Date.now();
+  const data={id,name,amount,date,due,note,type};
+  if(editRecvId){
+    const i=S.receivables.findIndex(r=>r.id===editRecvId);
+    if(i>-1)S.receivables[i]={...data,repayments:S.receivables[i].repayments||[]};
+  } else {
+    S.receivables.push({...data,repayments:[]});
+  }
+  await saveS();
+  closeModal('receivable-modal');
+  renderReceivables();
+  renderNetWorth();
+  showToast('Saved ✓');
+  editRecvId=null;
+};
+
+let repayingRecvId=null;
+window.openRecvRepayModal=function(id){
+  repayingRecvId=id;
+  const r=(S.receivables||[]).find(x=>x.id===id);if(!r)return;
+  const outstanding=recvOutstanding(r);
+  document.getElementById('rrp-title').textContent='Repayment from '+r.name;
+  document.getElementById('rrp-amt').value=outstanding.toFixed(2);
+  document.getElementById('rrp-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('rrp-note').value='';
+  const prev=document.getElementById('rrp-preview');
+  if(prev){
+    prev.style.display='block';
+    prev.innerHTML=`<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--ink-3);">Outstanding balance</span><span style="font-weight:600;">${fmt(outstanding)}</span></div>
+      <div style="font-size:11px;color:var(--ink-3);margin-top:2px;">You lent ${fmt(r.amount)} on ${new Date(r.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}</div>`;
+  }
+  openModal('recv-repay-modal');
+};
+
+window.saveReceivableRepayment=async function(){
+  const amt=parseFloat(document.getElementById('rrp-amt').value);
+  const date=document.getElementById('rrp-date').value;
+  const note=document.getElementById('rrp-note').value.trim();
+  if(!amt||amt<=0||!date){showToast('Enter amount and date');return;}
+  const r=(S.receivables||[]).find(x=>x.id===repayingRecvId);if(!r)return;
+  const newOutstanding=Math.max(0,recvOutstanding(r)-amt);
+  const payment={id:'rp'+Date.now(),amount:amt,date,note,balanceAfter:newOutstanding};
+  const i=S.receivables.findIndex(x=>x.id===repayingRecvId);
+  if(i>-1){
+    S.receivables[i]={...S.receivables[i],repayments:[...(S.receivables[i].repayments||[]),payment]};
+  }
+  // Log as income receipt so it appears in cash flow
+  const rcId='ir'+Date.now();
+  const rcData={sourceId:null,amount:amt,date,type:'other',note:'Repayment from '+r.name+(note?' · '+note:''),noncash:false};
+  S.incomeReceipts.push({id:rcId,...rcData});
+  await saveDoc('incomeReceipts',rcId,rcData);
+  await saveS();
+  closeModal('recv-repay-modal');
+  renderReceivables();
+  renderNetWorth();
+  renderDash();
+  showToast(newOutstanding<=0?'Fully repaid! 🎉':'Repayment recorded ✓');
+  repayingRecvId=null;
+};
+
+window.delReceivable=async function(id){
+  if(!confirm('Delete this receivable?'))return;
+  S.receivables=(S.receivables||[]).filter(r=>r.id!==id);
+  await saveS();renderReceivables();renderNetWorth();showToast('Removed');
 };
 
 // ── FINANCIAL HEALTH SCORE ───────────────────────────────
@@ -5186,6 +5479,22 @@ window.exportXLSX=function(){
   const ws4=XLSX.utils.aoa_to_sheet(sumRows);
   ws4['!cols']=[{wch:16},{wch:16},{wch:14},{wch:14},{wch:14},{wch:12}];
   XLSX.utils.book_append_sheet(wb,ws4,'Monthly Summary');
+  // Sheet 5: Loans (Debt)
+  if((S.loans||[]).length){
+    const loanRows=[['Name','Type','Original','Balance','Monthly Payment','Interest Rate','Start Date','Payoff Date'],
+      ...(S.loans||[]).map(l=>[l.name,l.type||'personal',parseFloat(l.original),parseFloat(l.balance),parseFloat(l.monthly||0),parseFloat(l.rate||0),l.start||'',loanPayoffDate(l)])];
+    const ws5=XLSX.utils.aoa_to_sheet(loanRows);
+    ws5['!cols']=[{wch:25},{wch:14},{wch:14},{wch:14},{wch:16},{wch:14},{wch:14},{wch:16}];
+    XLSX.utils.book_append_sheet(wb,ws5,'Loans');
+  }
+  // Sheet 6: Receivables (Money Lent Out)
+  if((S.receivables||[]).length){
+    const recvRows=[['Borrower','Type','Amount Lent','Outstanding','Repaid','Date Lent','Due Date','Note'],
+      ...(S.receivables||[]).map(r=>[r.name,r.type||'personal',parseFloat(r.amount),recvOutstanding(r),recvTotalRepaid(r),r.date||'',r.due||'',r.note||''])];
+    const ws6=XLSX.utils.aoa_to_sheet(recvRows);
+    ws6['!cols']=[{wch:22},{wch:12},{wch:14},{wch:14},{wch:12},{wch:14},{wch:14},{wch:25}];
+    XLSX.utils.book_append_sheet(wb,ws6,'Money Lent Out');
+  }
   const fname='Pocket-Export-'+new Date().toISOString().split('T')[0]+'.xlsx';
   XLSX.writeFile(wb,fname);
   showToast('Spreadsheet exported ✓');

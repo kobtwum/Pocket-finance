@@ -669,12 +669,13 @@ select.fi:focus{border-color:var(--gold);outline:none;}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
       <div class="ct-g" id="greeting">Good morning ✦</div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <div style="font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.05em;text-transform:uppercase;">Running balance</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.05em;text-transform:uppercase;" title="All-time income received minus all-time spending and savings">Net Position ⓘ</div>
         <button onclick="openDashCustomise()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);border-radius:8px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:.04em;" aria-label="Customise dashboard">⚙ Cards</button>
       </div>
     </div>
     <div id="dash-balance" style="font-family:'DM Serif Display',serif;font-size:42px;color:white;line-height:1.1;margin-bottom:4px;">₵0.00</div>
-    <div id="dash-balance-sub" style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:14px;"></div>
+    <div id="dash-balance-sub" style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:6px;"></div>
+    <div id="dash-streak" style="display:none;align-items:center;gap:6px;margin-bottom:10px;background:rgba(255,255,255,0.07);border-radius:8px;padding:5px 10px;width:fit-content;"></div>
     <div id="inc-strip" class="inc-strip"></div>
   </div>
   <div id="dash-stats" class="g2"></div>
@@ -712,6 +713,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
   <div class="g3" id="exp-stats"></div>
   <div class="card">
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <input class="fi" type="search" id="exp-search" placeholder="🔍 Search expenses…" oninput="renderExp()" style="flex:1;min-width:180px;">
       <select class="fi" style="flex:1;min-width:130px;" id="cat-filter" onchange="renderExp()"><option value="">All Categories</option></select>
       <select class="fi" style="flex:1;min-width:120px;" id="type-filter" onchange="renderExp()">
         <option value="">All Types</option><option value="savings">Savings only</option><option value="expense">Expenses only</option>
@@ -1149,6 +1151,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
           style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--gold);color:var(--ink);border:none;border-radius:6px;width:24px;height:24px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">=</button>
       </div>
       <div id="exp-amt-preview" style="font-size:11px;color:var(--green);margin-top:3px;min-height:16px;"></div>
+      <div style="font-size:10px;color:var(--ink-3);margin-top:2px;">Tip: type an expression like <span style="font-family:monospace;">450+230</span> and tap <strong>=</strong> to calculate</div>
     </div>
     <div class="fg"><label class="fl req" for="exp-date">Date</label><input class="fi" type="date" id="exp-date" aria-required="true"/></div>
   </div>
@@ -1568,7 +1571,7 @@ async function doSignIn(){
     }
   }
 }
-async function doSignOut(){if(!confirm('Sign out of Pocket?'))return;await fbOut(auth);location.reload();}
+async function doSignOut(){if(!await pktConfirm({title:'Sign out?',msg:'You will need to sign in again to access your data.',icon:'👋',okLabel:'Sign Out',danger:false}))return;await fbOut(auth);location.reload();}
 function gBtnHTML(){return`<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"/></svg> Continue with Google`;}
 
 document.getElementById('google-signin-btn').addEventListener('click',doSignIn);
@@ -1885,10 +1888,17 @@ function totInc(m,y){
   const ty=y!==undefined?y:now.getFullYear();
   return incInMonth(tm,ty);
 }
-// Monthly baseline (for budget planning — excludes one-time, spreads all recurring)
+// Monthly baseline (for budget planning — excludes one-time AND lump-sum periodic income)
+// Sources with spread='received' mean the user said "don't spread across months",
+// so we exclude them from the baseline to avoid inflating every month's expectation.
 function monthlyBaseline(){
-  return S.incomeSources.filter(s=>!s.noncash&&(s.freq||'monthly')!=='onetime')
-    .reduce((t,s)=>t+monthlyEq(s),0);
+  return S.incomeSources.filter(s=>{
+    if(s.noncash)return false;
+    const freq=s.freq||'monthly';
+    if(freq==='onetime')return false;
+    if((freq==='quarterly'||freq==='annual')&&(s.spread||'spread')==='received')return false;
+    return true;
+  }).reduce((t,s)=>t+monthlyEq(s),0);
 }
 function incInMonth(m,y){
   return S.incomeSources.filter(s=>{
@@ -2217,9 +2227,13 @@ function renderDash(){
   }
 
   if(balSub){
-    let subParts=[];
+    const subParts=[];
     subParts.push(`${fmt(nonSavSpent)} spent in ${MOS[m]}`);
     balSub.textContent=subParts.join('  ·  ');
+    // Add a small explanatory tag below the number
+    let posTag=document.getElementById('dash-pos-tag');
+    if(!posTag){posTag=document.createElement('div');posTag.id='dash-pos-tag';posTag.style.cssText='font-size:10px;color:rgba(255,255,255,.25);margin-top:2px;letter-spacing:.02em;';balSub.insertAdjacentElement('afterend',posTag);}
+    posTag.textContent='income received − spending − savings (all time)';
   }
 
   const ri=document.getElementById('tb-inc');
@@ -2244,7 +2258,7 @@ function renderDash(){
   document.getElementById('dash-rec').innerHTML=rec.length?rec.map(e=>eRow(e,true)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses yet this month</p></div>';
   const bc=byCat(m,y);
   document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,rawP=b.limit>0?sp/b.limit*100:0,p2=rawP.toFixed(0),barP=Math.min(100,rawP);const c=gCat(b.cat);const pl=rawP>100?'pill-r':rawP>70?'pill-gold':'pill-g';return`<div class="bc"><div class="bc-h"><div class="bc-top"><div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name} <span class="pill ${pl}">${p2}%</span></div><div class="bc-a">${fmt(sp)} / ${fmt(b.limit)}</div></div></div><div class="pw"><div class="pb ${rawP>100?'pb-red':rawP>70?'pb-gold':'pb-green'}" style="width:${barP}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
-  renderBudgetAlerts();renderDashHealth();renderDashInsights();renderPendingReceiptsNudge();renderOverdueReceivablesNudge();
+  renderBudgetAlerts();renderDashHealth();renderDashInsights();renderPendingReceiptsNudge();renderOverdueReceivablesNudge();renderStreakBadge();
   document.getElementById('dash-sav').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),p3=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green);font-size:18px;font-family:system-ui,sans-serif;">${g.icon}</div><div class="li-nm"><div class="p">${g.name}</div><div class="s">${fmt(sv)} of ${fmt(g.target)}</div></div><span class="pill pill-g">${p3}%</span></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No savings goals yet</p></div>';
 
   // Income receipts card
@@ -2434,10 +2448,12 @@ function renderExp(){
   const cf=sel.value;
   const tf=document.getElementById('type-filter').value;
   const sf=document.getElementById('sort-filter')?.value||'date-desc';
+  const sq=(document.getElementById('exp-search')?.value||'').toLowerCase().trim();
   let fl=[...exps];
   if(cf)fl=fl.filter(e=>gCat(e.cat).name===cf);
   if(tf==='savings')fl=fl.filter(e=>e.cat==='Savings Transfer'||gCat(e.cat).name==='Savings Transfer');
   if(tf==='expense')fl=fl.filter(e=>e.cat!=='Savings Transfer'&&gCat(e.cat).name!=='Savings Transfer');
+  if(sq)fl=fl.filter(e=>(e.desc||'').toLowerCase().includes(sq)||(e.note||'').toLowerCase().includes(sq)||gCat(e.cat).name.toLowerCase().includes(sq));
 
   // Sort
   switch(sf){
@@ -2730,31 +2746,26 @@ window.onRecCatChange=function(){
   if(cat==='Savings Transfer')populateGoalSel('rc-goal');
 };
 
-// ── Inline calculator for expense amount field ──
-window.evalExpAmt=function(){
-  const el=document.getElementById('exp-amt');
-  const prev=document.getElementById('exp-amt-preview');
+// ── Generic inline arithmetic evaluator for any amount field ──
+window.evalAmt=function(inputId,previewId){
+  const el=document.getElementById(inputId);
+  const prev=previewId?document.getElementById(previewId):null;
   if(!el)return;
   const raw=el.value.trim();
   if(!raw){if(prev)prev.textContent='';return;}
-  // Only evaluate if it looks like an expression (contains operators)
   if(!/[+\-*/]/.test(raw)){if(prev)prev.textContent='';return;}
   try{
-    // Safe eval: only allow numbers, operators, spaces, dots, parentheses
     const sanitised=raw.replace(/[^0-9+\-*/().\s]/g,'');
     if(!sanitised){if(prev)prev.textContent='';return;}
-    // eslint-disable-next-line no-new-func
     const result=Function('"use strict";return ('+sanitised+')')();
     if(typeof result==='number'&&isFinite(result)&&result>=0){
       el.value=result.toFixed(2);
       if(prev){prev.textContent='= '+result.toFixed(2);setTimeout(()=>{prev.textContent='';},2000);}
-    }else{
-      if(prev)prev.textContent='';
-    }
-  }catch(e){
-    if(prev)prev.textContent='';
-  }
+    }else{if(prev)prev.textContent='';}
+  }catch(e){if(prev)prev.textContent='';}
 };
+// ── Inline calculator for expense amount field ──
+window.evalExpAmt=function(){evalAmt('exp-amt','exp-amt-preview');};
 window.saveExpense=async function(){
   const desc=document.getElementById('exp-desc').value.trim(),amount=parseFloat(document.getElementById('exp-amt').value),cat=document.getElementById('exp-cat').value,date=document.getElementById('exp-date').value,note=document.getElementById('exp-note').value.trim();
   clearAllErrors(['exp-desc','exp-amt','exp-date']);
@@ -2807,12 +2818,12 @@ window.delExp=async function(id){
     : e.linkedContrib;
   if(linkedContribId){
     const confirmMsg=e.cat==='Savings Transfer'
-      ?'Delete this savings transfer and its linked savings record?'
-      :'Delete this expense and its linked savings record?';
-    if(!confirm(confirmMsg))return;
+      ?'This will also remove the linked savings record.'
+      :'This will also remove the linked savings record.';
+    if(!await pktConfirm({title:'Delete expense?',msg:confirmMsg,icon:'🗑️',okLabel:'Delete',danger:true}))return;
     S.contributions=S.contributions.filter(c=>c.id!==linkedContribId);
     await delDoc('contributions',linkedContribId);
-  } else if(!confirm('Delete this expense?'))return;
+  } else if(!await pktConfirm({title:'Delete expense?',msg:'This cannot be undone.',icon:'🗑️',okLabel:'Delete',danger:true}))return;
   S.expenses=S.expenses.filter(x=>x.id!==id);
   await delDoc('expenses',id);renderExp();renderDash();showToast('Deleted');
 };
@@ -2942,7 +2953,7 @@ window.saveBudget=async function(){
   else S.budgets.push({cat,limit,rollover});
   closeModal('budget-modal');renderBudget();showToast('Budget saved ✓');saveS();
 };
-window.delBudget=async function(cat){if(!confirm('Remove budget for '+cat+'?'))return;S.budgets=S.budgets.filter(b=>b.cat!==cat);await saveS();renderBudget();showToast('Removed');};
+window.delBudget=async function(cat){if(!await pktConfirm({title:'Remove budget?',msg:`Remove spending limit for "${cat}"?`,icon:'📊',okLabel:'Remove',danger:true}))return;S.budgets=S.budgets.filter(b=>b.cat!==cat);await saveS();renderBudget();showToast('Removed');};
 
 // ── SAVINGS ──
 let GID=null;
@@ -3036,11 +3047,11 @@ window.saveWithdrawal=async function(){
 window.openGoalModal=function(){GID=null;document.getElementById('goal-mt').textContent='New Savings Goal';['g-name','g-target','g-date','g-mon'].forEach(id=>document.getElementById(id).value='');document.getElementById('g-icon').value='🎯';openModal('goal-modal');};
 window.editGoal=function(id){GID=id;const g=S.goals.find(x=>x.id===id);if(!g)return;document.getElementById('goal-mt').textContent='Edit Savings Goal';document.getElementById('g-name').value=g.name;document.getElementById('g-target').value=g.target;document.getElementById('g-date').value=g.date;document.getElementById('g-mon').value=g.monthly;document.getElementById('g-icon').value=g.icon;openModal('goal-modal');};
 window.saveGoal=async function(){const name=document.getElementById('g-name').value.trim(),target=parseFloat(document.getElementById('g-target').value),date=document.getElementById('g-date').value,monthly=parseFloat(document.getElementById('g-mon').value)||0,icon=document.getElementById('g-icon').value;if(!name||!target||!date){showToast('Fill in all required fields');return;}if(GID){const i=S.goals.findIndex(g=>g.id===GID);if(i>-1)S.goals[i]={...S.goals[i],name,target,date,monthly,icon};}else S.goals.push({id:'g'+Date.now(),name,target,date,monthly,icon,start:new Date().toISOString().split('T')[0]});closeModal('goal-modal');renderSavings();renderDash();showToast('Goal saved ✓');GID=null;await saveS();};
-window.delGoal=async function(id){if(!confirm('Delete goal and all contributions?'))return;const lk=S.contributions.filter(c=>c.goalId===id).map(c=>c.linkedExpense).filter(Boolean);for(const eid of lk){S.expenses=S.expenses.filter(e=>e.id!==eid);await delDoc('expenses',eid);}const cs=S.contributions.filter(c=>c.goalId===id);for(const c of cs)await delDoc('contributions',c.id);S.goals=S.goals.filter(g=>g.id!==id);S.contributions=S.contributions.filter(c=>c.goalId!==id);await saveS();renderSavings();renderDash();showToast('Goal deleted');};
+window.delGoal=async function(id){if(!await pktConfirm({title:'Delete goal?',msg:'This will also remove all contributions linked to this goal.',icon:'🎯',okLabel:'Delete',danger:true}))return;const lk=S.contributions.filter(c=>c.goalId===id).map(c=>c.linkedExpense).filter(Boolean);for(const eid of lk){S.expenses=S.expenses.filter(e=>e.id!==eid);await delDoc('expenses',eid);}const cs=S.contributions.filter(c=>c.goalId===id);for(const c of cs)await delDoc('contributions',c.id);S.goals=S.goals.filter(g=>g.id!==id);S.contributions=S.contributions.filter(c=>c.goalId!==id);await saveS();renderSavings();renderDash();showToast('Goal deleted');};
 window.openContributeModal=function(){document.getElementById('co-goal').innerHTML=S.goals.map(g=>`<option value="${g.id}">${g.icon} ${g.name}</option>`).join('');document.getElementById('co-date').value=tod();document.getElementById('co-amt').value='';openModal('contrib-modal');};
 window.quickContrib=function(goalId){window.openContributeModal();document.getElementById('co-goal').value=goalId;};
 window.saveContrib=async function(){const goalId=document.getElementById('co-goal').value,amount=parseFloat(document.getElementById('co-amt').value),date=document.getElementById('co-date').value;if(!amount||!date){showToast('Fill in amount and date');return;}const g=S.goals.find(x=>x.id===goalId);const eId='e'+Date.now();const exp={desc:'Savings → '+(g?g.name:'Goal'),amount,cat:'Savings Transfer',date,note:'Auto from savings contribution',linkedGoal:goalId};S.expenses.push({id:eId,...exp});await saveDoc('expenses',eId,exp);const cId='c'+(Date.now()+1);const cont={goalId,amount,date,linkedExpense:eId};S.contributions.push({id:cId,...cont});await saveDoc('contributions',cId,cont);closeModal('contrib-modal');renderSavings();renderDash();renderExp();showToast('Contribution saved ✓');};
-window.delContrib=async function(id){const c=S.contributions.find(x=>x.id===id);if(!confirm('Remove contribution and linked expense?'))return;if(c?.linkedExpense){S.expenses=S.expenses.filter(e=>e.id!==c.linkedExpense);await delDoc('expenses',c.linkedExpense);}S.contributions=S.contributions.filter(x=>x.id!==id);await delDoc('contributions',id);renderSavings();renderDash();renderExp();showToast('Removed');};
+window.delContrib=async function(id){const c=S.contributions.find(x=>x.id===id);if(!await pktConfirm({title:'Remove contribution?',msg:c?.linkedExpense?'This will also remove the linked expense record.':'This cannot be undone.',icon:'💰',okLabel:'Remove',danger:true}))return;if(c?.linkedExpense){S.expenses=S.expenses.filter(e=>e.id!==c.linkedExpense);await delDoc('expenses',c.linkedExpense);}S.contributions=S.contributions.filter(x=>x.id!==id);await delDoc('contributions',id);renderSavings();renderDash();renderExp();showToast('Removed');};
 
 // ── RECURRING ──
 let RCID=null;
@@ -3051,7 +3062,7 @@ function renderRecurring(){
 window.openRecurModal=function(id){RCID=id||null;document.getElementById('rec-mt').textContent=id?'Edit Recurring':'Add Recurring Expense';popCatSel('rc-cat');if(id){const r=(S.recurringExpenses||[]).find(x=>x.id===id);if(r){document.getElementById('rc-desc').value=r.desc;document.getElementById('rc-amt').value=r.amount;document.getElementById('rc-day').value=r.day;document.getElementById('rc-cat').value=r.cat;document.getElementById('rc-note').value=r.note||'';populateGoalSel('rc-goal');if(document.getElementById('rc-goal'))document.getElementById('rc-goal').value=r.goalId||'';}}else{['rc-desc','rc-amt','rc-day','rc-note'].forEach(id=>document.getElementById(id).value='');document.getElementById('rc-cat').value='Rent & Housing';}onRecCatChange();openModal('recur-modal');};
 window.saveRecur=async function(){const desc=document.getElementById('rc-desc').value.trim(),amount=parseFloat(document.getElementById('rc-amt').value),day=parseInt(document.getElementById('rc-day').value),cat=document.getElementById('rc-cat').value,note=document.getElementById('rc-note').value.trim(),goalId=document.getElementById('rc-goal')?.value||null;if(!desc||!amount||!day||day<1||day>28){showToast('Fill in all fields (day must be 1-28)');return;}if(!S.recurringExpenses)S.recurringExpenses=[];const id=RCID||'r'+Date.now();const rec={id,desc,amount,day,cat,note,goalId,paused:false};if(RCID){const i=S.recurringExpenses.findIndex(r=>r.id===RCID);if(i>-1)S.recurringExpenses[i]=rec;}else S.recurringExpenses.push(rec);await saveS();closeModal('recur-modal');renderRecurring();showToast('Recurring saved ✓');RCID=null;};
 window.togRecur=async function(id){const r=(S.recurringExpenses||[]).find(x=>x.id===id);if(!r)return;r.paused=!r.paused;await saveS();renderRecurring();showToast(r.paused?'Paused':'Resumed');};
-window.delRecur=async function(id){if(!confirm('Delete this recurring expense?'))return;S.recurringExpenses=(S.recurringExpenses||[]).filter(r=>r.id!==id);await saveS();renderRecurring();showToast('Deleted');};
+window.delRecur=async function(id){if(!await pktConfirm({title:'Delete recurring expense?',msg:'Future auto-logging for this item will stop.',icon:'↻',okLabel:'Delete',danger:true}))return;S.recurringExpenses=(S.recurringExpenses||[]).filter(r=>r.id!==id);await saveS();renderRecurring();showToast('Deleted');};
 async function autoLogRecurring(){if(!(S.recurringExpenses||[]).length)return;const now=new Date(),m=now.getMonth(),y=now.getFullYear(),td=now.getDate(),lk=`pkt_rc_${y}_${m}`,logged=JSON.parse(localStorage.getItem(lk)||'[]');for(const r of S.recurringExpenses){if(r.paused||logged.includes(r.id))continue;if(td>=r.day){const exists=S.expenses.some(e=>e.recurId===r.id&&new Date(e.date).getMonth()===m&&new Date(e.date).getFullYear()===y);if(!exists){const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(r.day).padStart(2,'0')}`;const eId='e'+Date.now()+Math.random().toString(36).slice(2,6);const exp={desc:r.desc,amount:r.amount,cat:r.cat,date:ds,note:r.note||'',recurring:true,recurId:r.id};if(r.cat==='Savings Transfer'){const cId='c'+Date.now()+Math.random().toString(36).slice(2,6);const contrib={goalId:r.goalId||null,amount:r.amount,date:ds,linkedExpense:eId,manual:false};S.contributions.push({id:cId,...contrib});await saveDoc('contributions',cId,contrib);exp.linkedContrib=cId;}S.expenses.push({id:eId,...exp});await saveDoc('expenses',eId,exp);logged.push(r.id);showToast(`Auto-logged: ${r.desc}`);}}}localStorage.setItem(lk,JSON.stringify(logged));}
 
 // ── ANALYTICS ──
@@ -3828,7 +3839,7 @@ window.saveIncomeReceipt=async function(){
 };
 
 window.delIncomeReceipt=async function(id){
-  if(!confirm('Remove this income receipt?')) return;
+  if(!await pktConfirm({title:'Remove receipt?',msg:'This income record will be permanently deleted.',icon:'💰',okLabel:'Remove',danger:true})) return;
   S.incomeReceipts=S.incomeReceipts.filter(r=>r.id!==id);
   await delDoc('incomeReceipts',id);
   renderIncStatement();
@@ -3837,7 +3848,7 @@ window.delIncomeReceipt=async function(id){
   showToast('Removed');
 };
 
-window.delInc=async function(id){if(!confirm('Remove this income source?'))return;S.incomeSources=S.incomeSources.filter(s=>s.id!==id);await delDoc('income',id);renderIncome();renderDash();showToast('Removed');};
+window.delInc=async function(id){if(!await pktConfirm({title:'Remove income source?',msg:'Past receipts from this source will remain, but no new forecasts will be generated.',icon:'💰',okLabel:'Remove',danger:true}))return;S.incomeSources=S.incomeSources.filter(s=>s.id!==id);await delDoc('income',id);renderIncome();renderDash();showToast('Removed');};
 
 // ── SETTINGS ──
 window.updateLnInc=function(){const el=document.getElementById('ln-inc');if(el)el.textContent=fmt(totInc());};
@@ -3850,7 +3861,7 @@ window.calcLoan=function(){
   document.getElementById('ln-res').innerHTML=`<div style="margin-top:14px;padding:12px;background:#1a1a2e;border-radius:var(--radius-sm);"><div style="font-size:10px;color:var(--gold);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">${lbl} Summary</div><div style="font-family:'DM Serif Display',serif;font-size:28px;color:white;">${fmt(mo)}<span style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:rgba(255,255,255,.5);"> / month</span></div>${ir?`<div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:3px;">${ir}% of your monthly income</div>`:''}</div><div class="g2" style="margin-top:10px;"><div class="met"><div class="met-l">Principal</div><div class="met-v">${fmt(pr)}</div><div class="met-s">Borrowed amount</div></div><div class="met"><div class="met-l">Total Interest</div><div class="met-v" style="color:var(--red)">${fmt(int)}</div><div class="met-s">Cost of borrowing</div></div><div class="met"><div class="met-l">Total Repayment</div><div class="met-v">${fmt(tot)}</div><div class="met-s">Principal + interest</div></div><div class="met"><div class="met-l">Full Cost</div><div class="met-v">${fmt(tot+(dep||0))}</div><div class="met-s">Incl. deposit</div></div></div>${gH}${yr.length>1?`<div style="margin-top:12px;"><div style="font-size:11px;font-weight:500;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;">Year-by-year breakdown</div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--paper-2);">${['Year','Principal','Interest','Balance'].map(h=>`<th style="padding:6px 8px;text-align:${h==='Year'?'left':'right'};font-weight:500;color:var(--ink-3);">${h}</th>`).join('')}</tr></thead><tbody>${yr.map(row=>`<tr style="border-bottom:1px solid var(--paper-2);"><td style="padding:6px 8px;font-weight:500;">Year ${row.y}</td><td style="padding:6px 8px;text-align:right;color:var(--green);">${fmt(row.yP)}</td><td style="padding:6px 8px;text-align:right;color:var(--red);">${fmt(row.yI)}</td><td style="padding:6px 8px;text-align:right;">${fmt(row.b)}</td></tr>`).join('')}</tbody></table></div></div>`:''}`;
 };
 window.exportData=function(){const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pocket-backup-'+new Date().toISOString().split('T')[0]+'.json';a.click();showToast('Exported ✓');};
-window.handleImport=function(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async ev=>{try{const d=JSON.parse(ev.target.result);if(!d.expenses&&!d.incomeSources){showToast('Invalid backup file');return;}if(!confirm('This will overwrite all your current data. Continue?'))return;
+window.handleImport=function(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=async ev=>{try{const d=JSON.parse(ev.target.result);if(!d.expenses&&!d.incomeSources){showToast('Invalid backup file');return;}if(!await pktConfirm({title:'Overwrite all data?',msg:'This will replace all your current data with the imported file. This cannot be undone.',icon:'📂',okLabel:'Import & Overwrite',danger:true}))return;
 if(d.expenses)for(const ex of d.expenses)await saveDoc('expenses',ex.id,ex);
 if(d.incomeSources)for(const is of d.incomeSources)await saveDoc('income',is.id,is);
 if(d.contributions)for(const co of d.contributions)await saveDoc('contributions',co.id,co);
@@ -3860,8 +3871,28 @@ if(d.accounts?.length)S.accounts=d.accounts;
 if(d.schemaVersion)S.schemaVersion=d.schemaVersion;
 S.budgets=d.budgets||S.budgets;S.goals=d.goals||S.goals;S.recurringExpenses=d.recurringExpenses||[];S.incomeReceipts=d.incomeReceipts||S.incomeReceipts||[];S.receivables=d.receivables||S.receivables||[];S.loans=d.loans||S.loans||[];
 await saveS();showToast('Import successful ✓');refreshPage();}catch(err){showToast('Invalid or corrupted file');}};r.readAsText(f);e.target.value='';};
-window.clearAllData=async function(){if(!confirm('Delete ALL your data permanently?'))return;if(!confirm('Are you absolutely sure?'))return;for(const e of S.expenses)await delDoc('expenses',e.id);for(const s of S.incomeSources)await delDoc('income',s.id);for(const r of (S.incomeReceipts||[]))await delDoc('incomeReceipts',r.id);
+window.clearAllData=async function(){if(!await pktConfirm({title:'Delete ALL data?',msg:'This will permanently erase every expense, income record, goal, and budget. This cannot be undone.',icon:'⚠️',okLabel:'Delete Everything',danger:true}))return;for(const e of S.expenses)await delDoc('expenses',e.id);for(const s of S.incomeSources)await delDoc('income',s.id);for(const r of (S.incomeReceipts||[]))await delDoc('incomeReceipts',r.id);
 for(const c of S.contributions)await delDoc('contributions',c.id);S.expenses=[];S.incomeSources=[];S.incomeReceipts=[];S.contributions=[];S.budgets=[];S.goals=[];S.categories=normalizeCategories(DCATS);S.recurringExpenses=[];S.assets=[];S.liabilities=[];S.loans=[];S.receivables=[];S.accounts=[];await saveS();showToast('All data deleted');renderDash();};
+
+// ── STYLED CONFIRM DIALOG ── replaces native confirm()
+let _pktConfirmResolve=null;
+window.pktConfirm=function({title='Are you sure?',msg='',icon='🗑️',okLabel='Confirm',danger=true}={}){
+  return new Promise(resolve=>{
+    _pktConfirmResolve=resolve;
+    document.getElementById('pkt-confirm-icon').textContent=icon;
+    document.getElementById('pkt-confirm-title').textContent=title;
+    document.getElementById('pkt-confirm-msg').textContent=msg;
+    const okBtn=document.getElementById('pkt-confirm-ok');
+    okBtn.textContent=okLabel;
+    okBtn.style.cssText=`display:block;width:100%;padding:14px;border-radius:var(--radius-sm);border:none;font-size:14px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;margin-bottom:10px;background:${danger?'var(--red)':'var(--gold)'};color:${danger?'white':'var(--ink)'};`;
+    okBtn.onclick=()=>pktConfirmAccept();
+    document.getElementById('pkt-confirm-modal').classList.add('open');
+  });
+};
+window.pktConfirmAccept=function(){document.getElementById('pkt-confirm-modal').classList.remove('open');if(_pktConfirmResolve){_pktConfirmResolve(true);_pktConfirmResolve=null;}};
+window.pktConfirmReject=function(){document.getElementById('pkt-confirm-modal').classList.remove('open');if(_pktConfirmResolve){_pktConfirmResolve(false);_pktConfirmResolve=null;}};
+// Close on overlay click
+document.getElementById('pkt-confirm-modal').addEventListener('click',function(e){if(e.target===this)pktConfirmReject();});
 
 // ── MODALS & TOAST ──
 // openModal and closeModal are defined in the global script above
@@ -4029,7 +4060,7 @@ window.saveAsset=async function(){
   if(editAstId){const i=S.assets.findIndex(a=>a.id===editAstId);if(i>-1)S.assets[i]=data;}else S.assets.push(data);
   await saveS();closeModal('asset-modal');renderNetWorth();showToast('Asset saved ✓');editAstId=null;
 };
-window.delAsset=async function(id){if(!confirm('Delete this asset?'))return;S.assets=(S.assets||[]).filter(a=>a.id!==id);await saveS();renderNetWorth();showToast('Removed');};
+window.delAsset=async function(id){if(!await pktConfirm({title:'Delete asset?',msg:'This asset will be removed from your net worth.',icon:'📦',okLabel:'Delete',danger:true}))return;S.assets=(S.assets||[]).filter(a=>a.id!==id);await saveS();renderNetWorth();showToast('Removed');};
 window.openLiabilityModal=function(id){
   editLiabId=id||null;
   document.getElementById('liab-mt').textContent=id?'Edit Liability':'Add Liability';
@@ -4046,7 +4077,7 @@ window.saveLiability=async function(){
   if(editLiabId){const i=S.liabilities.findIndex(l=>l.id===editLiabId);if(i>-1)S.liabilities[i]=data;}else S.liabilities.push(data);
   await saveS();closeModal('liability-modal');renderNetWorth();showToast('Liability saved ✓');editLiabId=null;
 };
-window.delLiability=async function(id){if(!confirm('Delete this liability?'))return;S.liabilities=(S.liabilities||[]).filter(l=>l.id!==id);await saveS();renderNetWorth();showToast('Removed');};
+window.delLiability=async function(id){if(!await pktConfirm({title:'Delete liability?',msg:'This liability will be removed from your net worth.',icon:'📦',okLabel:'Delete',danger:true}))return;S.liabilities=(S.liabilities||[]).filter(l=>l.id!==id);await saveS();renderNetWorth();showToast('Removed');};
 
 // ── DEBT TRACKER ─────────────────────────────────────────
 function calcMonthlyPayment(bal,rate,term){
@@ -4226,7 +4257,7 @@ window.saveLoanPayment=async function(){
   payingLoanId=null;
 };
 window.delLoan=async function(id){
-  if(!confirm('Delete this loan?'))return;
+  if(!await pktConfirm({title:'Delete loan?',msg:'This loan and all its payment history will be removed.',icon:'🏦',okLabel:'Delete',danger:true}))return;
   S.loans=(S.loans||[]).filter(l=>l.id!==id);
   await saveS();renderDebt();renderNetWorth();showToast('Removed');
 };
@@ -4425,7 +4456,7 @@ window.saveReceivableRepayment=async function(){
 };
 
 window.delReceivable=async function(id){
-  if(!confirm('Delete this receivable?'))return;
+  if(!await pktConfirm({title:'Delete receivable?',msg:'This record of money owed to you will be removed.',icon:'🤝',okLabel:'Delete',danger:true}))return;
   S.receivables=(S.receivables||[]).filter(r=>r.id!==id);
   await saveS();renderReceivables();renderNetWorth();showToast('Removed');
 };
@@ -5176,23 +5207,55 @@ function renderAnIncomeOverview(){
   const thisMonthInc=actualIncomeOrForecast(m,y);
   const cashSources=S.incomeSources.filter(s=>!s.noncash);
   const receiptCount=(S.incomeReceipts||[]).filter(r=>!r.noncash).length;
+  // Count only sources that have actual cash receipts this month
+  const thisMonthReceipts=(S.incomeReceipts||[]).filter(r=>{
+    if(r.noncash||!r.date)return false;
+    const d=new Date(r.date);
+    return d.getMonth()===m&&d.getFullYear()===y;
+  });
+  const hasActualThisMonth=incomeReceiptsCashTotal(m,y)>0;
+  const activeSrcCount=hasActualThisMonth
+    ? new Set(thisMonthReceipts.map(r=>r.sourceId).filter(Boolean)).size || thisMonthReceipts.length
+    : cashSources.length;
+  const srcLabel=hasActualThisMonth
+    ? `${activeSrcCount} source${activeSrcCount!==1?'s':''} · actual`
+    : `${cashSources.length} source${cashSources.length!==1?'s':''} · forecast`;
   const statsEl=document.getElementById('an-inc-stats');
   if(statsEl)statsEl.innerHTML=`
-    <div class="card" style="padding:12px;"><div class="ct">This Month</div><div class="cv" style="font-size:18px;color:var(--green);">${fmt(thisMonthInc)}</div><div class="cs">${cashSources.length} source${cashSources.length!==1?'s':''}${incomeReceiptsCashTotal(m,y)>0?' · actual':' · forecast'}</div></div>
-    <div class="card" style="padding:12px;"><div class="ct">Monthly Baseline</div><div class="cv" style="font-size:18px;color:var(--green);">${fmt(monthlyBase)}</div><div class="cs">Recurring equiv.</div></div>
+    <div class="card" style="padding:12px;"><div class="ct">This Month</div><div class="cv" style="font-size:18px;color:var(--green);">${fmt(thisMonthInc)}</div><div class="cs">${srcLabel}</div></div>
+    <div class="card" style="padding:12px;"><div class="ct">Monthly Baseline</div><div class="cv" style="font-size:18px;color:var(--green);">${fmt(monthlyBase)}</div><div class="cs">Recurring sources only</div></div>
     <div class="card" style="padding:12px;"><div class="ct">All-time Received</div><div class="cv" style="font-size:18px;color:var(--gold);">${fmt(cumIncActual)}</div><div class="cs">${receiptCount} receipt${receiptCount!==1?'s':''} logged</div></div>`;
-  // Income by source doughnut — shows this month's breakdown
+  // Income by source doughnut — actual receipts this month; fallback to forecast if none
   if(cashSources.length){
     dChart('an-inc-chart');
     const clrs=['#c9a84c','#2d7a5f','#2471a3','#8e44ad','#c0392b','#e67e22'];
-    const chartAmts=cashSources.map(s=>monthlyEq(s,m,y)||parseFloat(s.amount));
-    CI['an-inc-chart']=new Chart(document.getElementById('an-inc-chart').getContext('2d'),{
-      type:'doughnut',
-      data:{labels:cashSources.map(s=>s.name),datasets:[{data:chartAmts,backgroundColor:clrs.map((c,i)=>clrs[i%clrs.length]+'cc'),borderColor:clrs,borderWidth:2}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'60%'}
+    // Build receipt totals by sourceId for this month
+    const receiptsBySource={};
+    (S.incomeReceipts||[]).filter(r=>{
+      if(r.noncash||!r.date)return false;
+      const d=new Date(r.date);
+      return d.getMonth()===m&&d.getFullYear()===y;
+    }).forEach(r=>{
+      if(r.sourceId)receiptsBySource[r.sourceId]=(receiptsBySource[r.sourceId]||0)+(parseFloat(r.amount)||0);
     });
+    const hasActual=Object.keys(receiptsBySource).length>0;
+    const chartAmts=cashSources.map(s=>hasActual?(receiptsBySource[s.id]||0):monthlyEq(s,m,y)||parseFloat(s.amount));
+    const visEntries=cashSources.map((s,i)=>({s,i,amt:chartAmts[i]})).filter(e=>e.amt>0);
+    if(visEntries.length){
+      CI['an-inc-chart']=new Chart(document.getElementById('an-inc-chart').getContext('2d'),{
+        type:'doughnut',
+        data:{labels:visEntries.map(e=>e.s.name),datasets:[{data:visEntries.map(e=>e.amt),backgroundColor:visEntries.map(e=>clrs[e.i%clrs.length]+'cc'),borderColor:visEntries.map(e=>clrs[e.i%clrs.length]),borderWidth:2}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'60%'}
+      });
+    }
+    // Update subtitle to clarify actual vs forecast
+    const incOvCard=document.getElementById('an-inc-chart')?.closest('.card');
+    if(incOvCard){const sh=incOvCard.querySelector('.sh');if(sh){let p=sh.querySelector('p');if(!p){p=document.createElement('p');sh.appendChild(p);}p.textContent=hasActual?'Actual receipts this month':'Forecast — no receipts recorded yet';}}
     const legEl=document.getElementById('an-inc-leg');
-    if(legEl)legEl.innerHTML=cashSources.map((s,i)=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${clrs[i%clrs.length]};display:inline-block;"></span>${s.name}</span>`).join('');
+    if(legEl)legEl.innerHTML=cashSources.map((s,i)=>{
+      const amt=chartAmts[i];
+      return`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);opacity:${amt>0?1:0.35};"><span style="width:10px;height:10px;border-radius:2px;background:${clrs[i%clrs.length]};display:inline-block;"></span>${s.name}</span>`;
+    }).join('');
   }
 }
 
@@ -5628,6 +5691,117 @@ window.exportPDF=function(){
 }
 
 
+// ── HABIT & STREAK SYSTEM ────────────────────────────────
+
+// Returns true if user has recorded any expense or income on a given YYYY-MM-DD
+function hasActivityOnDate(dateStr){
+  return S.expenses.some(e=>e.date===dateStr)||
+         (S.incomeReceipts||[]).some(r=>r.date===dateStr)||
+         S.contributions.some(c=>c.date===dateStr);
+}
+
+// Compute current daily tracking streak (consecutive days with any activity ending today/yesterday)
+function calcStreak(){
+  const today=new Date();today.setHours(0,0,0,0);
+  let streak=0,d=new Date(today);
+  // If today already has activity, count from today; else start from yesterday
+  const todayStr=d.toISOString().split('T')[0];
+  if(!hasActivityOnDate(todayStr))d.setDate(d.getDate()-1);
+  for(let i=0;i<365;i++){
+    const s=d.toISOString().split('T')[0];
+    if(hasActivityOnDate(s)){streak++;d.setDate(d.getDate()-1);}
+    else break;
+  }
+  return streak;
+}
+
+// Save and retrieve the last-seen streak to detect new milestones
+function getLastStreak(){return parseInt(localStorage.getItem('pkt_last_streak')||'0');}
+function saveLastStreak(n){localStorage.setItem('pkt_last_streak',String(n));}
+
+// Check streak milestones and show a celebration toast
+function checkStreakMilestone(){
+  const streak=calcStreak();
+  if(streak<1)return;
+  const last=getLastStreak();
+  const milestones=[3,7,14,21,30,60,90,180,365];
+  const hit=milestones.find(m=>streak>=m&&last<m);
+  if(hit){
+    const msgs={3:'3-day streak! 🔥 Keep the habit going.',7:'One week streak! 🏆 You\'re building something real.',14:'Two weeks strong! 💪 Tracking is becoming second nature.',21:'21 days — habits are formed! 🌟',30:'30-day streak! You\'re a finance tracking pro. 🏅',60:'60 days of tracking! Incredible consistency. ⭐',90:'90-day streak! Your financial picture is crystal clear. 🎯',180:'Half a year! You\'re in rare company. 💎',365:'One full year of tracking! Legendary. 🥇'};
+    setTimeout(()=>showToast(msgs[hit]||`${hit}-day streak! 🔥`),1200);
+  }
+  saveLastStreak(streak);
+  return streak;
+}
+
+// Render streak badge on dashboard
+function renderStreakBadge(){
+  const el=document.getElementById('dash-streak');
+  if(!el)return;
+  const streak=calcStreak();
+  if(streak<2){el.style.display='none';return;}
+  el.style.display='flex';
+  el.innerHTML=`<span style="font-size:16px;">🔥</span><span style="font-size:12px;font-weight:600;color:var(--gold);">${streak}-day streak</span>`;
+}
+
+// End-of-day nudge — shown once per day after 8 PM if no activity today
+function checkEndOfDayNudge(){
+  const now=new Date();
+  const h=now.getHours();
+  if(h<20)return; // Only after 8 PM
+  const todayStr=now.toISOString().split('T')[0];
+  const dismissKey='pkt_eod_nudge_'+todayStr;
+  if(localStorage.getItem(dismissKey))return; // Already dismissed today
+  if(hasActivityOnDate(todayStr))return; // Already tracked today
+  // Only show if user has been using the app (has some data)
+  if(!S.expenses.length&&!S.incomeSources.length)return;
+  showInAppNudge({
+    icon:'🌙',
+    title:'Day wrapping up?',
+    msg:'You haven\'t recorded anything today. Even one expense keeps your streak alive.',
+    primaryLabel:'Record now',
+    primaryAction:()=>{closeFabMenu();openFabMenu();},
+    dismissKey
+  });
+}
+
+// In-app nudge banner (non-intrusive, slides in above the bottom nav)
+let _nudgeDismissKey=null;
+window.dismissInAppNudge=function(){
+  const el=document.getElementById('pkt-inapp-nudge');
+  if(el){el.style.transform='translateY(120%)';setTimeout(()=>el.remove(),300);}
+  if(_nudgeDismissKey)localStorage.setItem(_nudgeDismissKey,'1');
+  _nudgeDismissKey=null;
+};
+function showInAppNudge({icon,title,msg,primaryLabel,primaryAction,dismissKey}){
+  // Remove any existing nudge
+  const old=document.getElementById('pkt-inapp-nudge');if(old)old.remove();
+  _nudgeDismissKey=dismissKey||null;
+  const el=document.createElement('div');
+  el.id='pkt-inapp-nudge';
+  el.style.cssText='position:fixed;bottom:calc(var(--sb) + 72px);left:12px;right:12px;z-index:150;background:var(--glass-bg);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid var(--glass-border);border-radius:16px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);transform:translateY(120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1);display:flex;align-items:center;gap:12px;';
+  el.innerHTML=`
+    <span style="font-size:24px;flex-shrink:0;">${icon}</span>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:2px;">${title}</div>
+      <div style="font-size:11px;color:var(--ink-3);line-height:1.4;">${msg}</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+      <button onclick="dismissInAppNudge();(${primaryAction.toString()})()" style="background:var(--gold);color:var(--ink);border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap;">${primaryLabel}</button>
+      <button onclick="dismissInAppNudge()" style="background:var(--paper-2);color:var(--ink-3);border:none;border-radius:8px;padding:5px 10px;font-size:10px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">Later</button>
+    </div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{el.style.transform='translateY(0)';}));
+  // Auto-dismiss after 12 seconds
+  setTimeout(()=>{if(document.getElementById('pkt-inapp-nudge'))dismissInAppNudge();},12000);
+}
+
+// Motivational micro-copy shown after saving actions
+const SAVE_AFFIRMATIONS=['Logged! Every entry counts. ✓','Saved! You\'re on top of it. ✓','Done! Your future self will thank you. ✓','Recorded! Small habits, big results. ✓','Added! Awareness is the first step. ✓'];
+let _affirmIdx=0;
+function affirmToast(){showToast(SAVE_AFFIRMATIONS[_affirmIdx++%SAVE_AFFIRMATIONS.length]);}
+window._affirmToast=affirmToast;
+
 function initApp(){
   // If user already has data, mark onboarding as done so it never shows
   if(S.incomeSources.length>0||S.expenses.length>0||S.budgets.length>0){
@@ -5645,6 +5819,11 @@ function initApp(){
   renderDash();
   setSyncDot(navigator.onLine?'online':'offline');
   setInterval(()=>{const g=document.getElementById('greeting');if(g)g.textContent=greet()+' ✦';},60000);
+  // Habit system
+  setTimeout(()=>{checkStreakMilestone();renderStreakBadge();},1500);
+  // End-of-day nudge — check now and every 30 min
+  setTimeout(checkEndOfDayNudge, 3000);
+  setInterval(checkEndOfDayNudge, 30*60*1000);
 }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -5674,7 +5853,15 @@ function initApp(){
 
     <div class="fg">
       <label class="fl req">Amount</label>
-      <input id="ircpt-amt" type="number" class="fi" placeholder="0.00" oninput="checkReceiptDuplicate()">
+      <div style="position:relative;">
+        <input id="ircpt-amt" type="text" inputmode="text" class="fi" placeholder="0.00 or 1200+300" autocomplete="off"
+          style="padding-right:36px;"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();evalAmt('ircpt-amt','ircpt-amt-prev');}"
+          onblur="evalAmt('ircpt-amt','ircpt-amt-prev')" oninput="checkReceiptDuplicate()">
+        <button type="button" onclick="evalAmt('ircpt-amt','ircpt-amt-prev')" title="Calculate"
+          style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--gold);color:var(--ink);border:none;border-radius:6px;width:24px;height:24px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">=</button>
+      </div>
+      <div id="ircpt-amt-prev" style="font-size:11px;color:var(--green);margin-top:3px;min-height:14px;"></div>
     </div>
 
     <div class="fg">
@@ -5711,6 +5898,17 @@ function initApp(){
       <button class="btn btn-ghost" onclick="closeModal('income-receipt-modal')">Cancel</button>
       <button class="btn btn-gold" onclick="saveIncomeReceipt()">Save Receipt</button>
     </div>
+  </div>
+</div>
+<!-- CONFIRM MODAL -->
+<div class="mo" id="pkt-confirm-modal" style="align-items:flex-end;">
+  <div class="fab-sheet" id="pkt-confirm-sheet" style="padding:24px 20px calc(var(--sb) + 24px);">
+    <div class="mh"></div>
+    <div id="pkt-confirm-icon" style="font-size:32px;text-align:center;margin-bottom:8px;font-family:system-ui,sans-serif;"></div>
+    <div id="pkt-confirm-title" style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--ink);text-align:center;margin-bottom:6px;"></div>
+    <div id="pkt-confirm-msg" style="font-size:13px;color:var(--ink-3);text-align:center;line-height:1.5;margin-bottom:20px;"></div>
+    <button id="pkt-confirm-ok" style="display:block;width:100%;padding:14px;border-radius:var(--radius-sm);border:none;font-size:14px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;margin-bottom:10px;"></button>
+    <button onclick="pktConfirmReject()" style="display:block;width:100%;padding:12px;border-radius:var(--radius-sm);border:none;background:var(--paper-2);color:var(--ink-2);font-size:13px;font-weight:500;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;">Cancel</button>
   </div>
 </div>
 <!-- FAB QUICK ACTION MODAL -->

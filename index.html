@@ -690,17 +690,22 @@ select.fi:focus{border-color:var(--gold);outline:none;}
   <div id="pending-receipts-wrap"></div>
   <div id="overdue-recv-wrap"></div>
   <div class="card-dark" id="dash-wallet">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+    <!-- Top row: greeting + customise -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
       <div class="ct-g" id="greeting">Good morning ✦</div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div style="font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.05em;text-transform:uppercase;" title="All-time income received minus all-time spending and savings">Net Position ⓘ</div>
-        <button onclick="openDashCustomise()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);border-radius:8px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:.04em;" aria-label="Customise dashboard">⚙ Cards</button>
-      </div>
+      <button onclick="openDashCustomise()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.45);border-radius:8px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:.04em;" aria-label="Customise dashboard">⚙</button>
     </div>
-    <div id="dash-balance" style="font-family:'DM Serif Display',serif;font-size:42px;color:white;line-height:1.1;margin-bottom:4px;">₵0.00</div>
-    <div id="dash-balance-sub" style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:6px;"></div>
-    <div id="dash-streak" style="display:none;align-items:center;gap:6px;margin-bottom:10px;background:rgba(255,255,255,0.07);border-radius:8px;padding:5px 10px;width:fit-content;"></div>
-    <div id="dash-accounts-strip" style="display:none;margin-bottom:10px;"></div>
+    <!-- Balance -->
+    <div style="margin-bottom:12px;">
+      <div style="font-size:10px;color:rgba(255,255,255,.35);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;" title="All income received minus all spending and savings">Net Position</div>
+      <div id="dash-balance" style="font-family:'DM Serif Display',serif;font-size:44px;color:white;line-height:1;letter-spacing:-.01em;">₵0.00</div>
+      <div id="dash-balance-sub" style="font-size:12px;color:rgba(255,255,255,.4);margin-top:5px;"></div>
+    </div>
+    <!-- Streak (only when active) -->
+    <div id="dash-streak" style="display:none;align-items:center;gap:6px;margin-bottom:12px;background:rgba(255,255,255,0.06);border-radius:8px;padding:5px 10px;width:fit-content;"></div>
+    <!-- Accounts strip (only when accounts exist) -->
+    <div id="dash-accounts-strip" style="display:none;margin-bottom:12px;"></div>
+    <!-- Income/spending stats strip -->
     <div id="inc-strip" class="inc-strip"></div>
   </div>
   <div id="dash-stats" class="g2"></div>
@@ -740,7 +745,6 @@ select.fi:focus{border-color:var(--gold);outline:none;}
     </div>
     <div class="dr-label" id="exp-dr-label"></div>
   </div>
-  <div class="ar" style="margin-bottom:10px;"><button class="btn btn-gold" style="flex:none;" onclick="openExpenseModal()">+ Add Expense</button></div>
   <div class="g3" id="exp-stats"></div>
   <div class="card">
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
@@ -2285,13 +2289,9 @@ function renderDash(){
   }
 
   if(balSub){
-    const subParts=[];
-    subParts.push(`${fmt(nonSavSpent)} spent in ${MOS[m]}`);
-    balSub.textContent=subParts.join('  ·  ');
-    // Add a small explanatory tag below the number
-    let posTag=document.getElementById('dash-pos-tag');
-    if(!posTag){posTag=document.createElement('div');posTag.id='dash-pos-tag';posTag.style.cssText='font-size:10px;color:rgba(255,255,255,.25);margin-top:2px;letter-spacing:.02em;';balSub.insertAdjacentElement('afterend',posTag);}
-    posTag.textContent='income received − spending − savings (all time)';
+    balSub.textContent=`${fmt(nonSavSpent)} spent in ${MOS[m]}`;
+    // Remove any old pos tag
+    const oldTag=document.getElementById('dash-pos-tag');if(oldTag)oldTag.remove();
   }
 
   const ri=document.getElementById('tb-inc');
@@ -2922,39 +2922,6 @@ window.saveExpense=async function(){
     }
     await saveS(); // persist account balance changes
     renderDashAccountsStrip();
-  }
-  if(EID){const i=S.expenses.findIndex(e=>e.id===EID);if(i>-1)S.expenses[i]={...S.expenses[i],...data};}
-  else S.expenses.push({id,...data});
-  await saveDoc('expenses',id,data);
-  clearAllErrors(['exp-desc','exp-amt','exp-date']);
-  closeModal('expense-modal');renderExp();renderDash();
-  showToast(EID?'Updated ✓':'Expense added ✓');EID=null;
-};
-  // Auto-create/update a contribution when category is Savings Transfer
-  if(cat==='Savings Transfer'){
-    const goalId=document.getElementById('exp-goal')?.value||null;
-    if(EID){
-      const existing=S.expenses.find(e=>e.id===EID);
-      const lcid=existing?.linkedContrib;
-      if(lcid){
-        const ci=S.contributions.findIndex(c=>c.id===lcid);
-        if(ci>-1)S.contributions[ci]={...S.contributions[ci],amount,date,goalId:goalId||null};
-        await saveDoc('contributions',lcid,{goalId:goalId||null,amount,date,linkedExpense:EID,manual:true});
-        data.linkedContrib=lcid;
-      } else {
-        const cId='c'+Date.now();
-        const contrib={goalId:goalId||null,amount,date,linkedExpense:id,manual:true};
-        S.contributions.push({id:cId,...contrib});
-        await saveDoc('contributions',cId,contrib);
-        data.linkedContrib=cId;
-      }
-    } else {
-      const cId='c'+Date.now();
-      const contrib={goalId:goalId||null,amount,date,linkedExpense:id,manual:true};
-      S.contributions.push({id:cId,...contrib});
-      await saveDoc('contributions',cId,contrib);
-      data.linkedContrib=cId;
-    }
   }
   if(EID){const i=S.expenses.findIndex(e=>e.id===EID);if(i>-1)S.expenses[i]={...S.expenses[i],...data};}
   else S.expenses.push({id,...data});
@@ -4299,17 +4266,34 @@ window.pktConfirm=function({title='Are you sure?',msg='',icon='🗑️',okLabel=
 window.pktConfirmAccept=function(){document.getElementById('pkt-confirm-modal').classList.remove('open');if(_pktConfirmResolve){_pktConfirmResolve(true);_pktConfirmResolve=null;}};
 window.pktConfirmReject=function(){document.getElementById('pkt-confirm-modal').classList.remove('open');if(_pktConfirmResolve){_pktConfirmResolve(false);_pktConfirmResolve=null;}};
 // Close on overlay click
-document.getElementById('pkt-confirm-modal').addEventListener('click',function(e){if(e.target===this)pktConfirmReject();});
+// Close confirm modal on overlay click — use delegation since modal HTML is below this script
+document.addEventListener('click',function(e){
+  const modal=document.getElementById('pkt-confirm-modal');
+  if(modal&&modal.classList.contains('open')&&e.target===modal)pktConfirmReject();
+});
 
 // ── MODALS & TOAST ──
-// openModal and closeModal are defined in the global script above
-document.querySelectorAll('.mo').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o){o.classList.remove('open');}});});
-// FAB menu overlay click-to-close
+// Overlay click-to-close — delegation covers all .mo modals including those defined below the script
 document.addEventListener('click',function(e){
-  const fm=document.getElementById('fab-menu-modal');
-  if(fm&&fm.classList.contains('open')&&e.target===fm)closeFabMenu();
+  if(e.target.classList.contains('mo')&&e.target.classList.contains('open')){
+    // Use closeFabMenu for the FAB menu (it does extra cleanup)
+    if(e.target.id==='fab-menu-modal'){closeFabMenu();}
+    else{e.target.classList.remove('open');}
+  }
 });
-document.querySelectorAll('.modal').forEach(m=>{let sy=0;m.addEventListener('touchstart',e=>{sy=e.touches[0].clientY;},{passive:true});m.addEventListener('touchmove',e=>{if(e.touches[0].clientY-sy>80&&m.scrollTop===0)m.closest('.mo').classList.remove('open');},{passive:true});});
+// Touch swipe-down to close — delegation
+document.addEventListener('touchstart',function(e){
+  const modal=e.target.closest('.modal');
+  if(modal)modal._touchStartY=e.touches[0].clientY;
+},{passive:true});
+document.addEventListener('touchmove',function(e){
+  const modal=e.target.closest('.modal');
+  if(!modal||modal._touchStartY===undefined)return;
+  if(e.touches[0].clientY-modal._touchStartY>80&&modal.scrollTop===0){
+    const mo=modal.closest('.mo');
+    if(mo)mo.classList.remove('open');
+  }
+},{passive:true});
 function showToast(msg){const t=document.getElementById('toast');document.getElementById('toast-msg').textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 window.showToast=showToast;
 
@@ -4578,6 +4562,30 @@ function renderDebt(){
   const rvPanel=document.getElementById('debt-panel-receivables');
   if(rvPanel&&rvPanel.style.display!=='none')renderReceivables();
 }
+
+window.calcLoanPreview=function(){
+  const orig=parseFloat(document.getElementById('ln2-orig')?.value)||0;
+  const bal=parseFloat(document.getElementById('ln2-bal')?.value)||orig;
+  const rate=(parseFloat(document.getElementById('ln2-rate')?.value)||0)/100/12;
+  const termMonths=parseInt(document.getElementById('ln2-term')?.value)||60;
+  const prev=document.getElementById('ln2-calc-preview');
+  if(!prev||!bal){if(prev)prev.style.display='none';return;}
+  let monthly;
+  if(rate===0){monthly=bal/termMonths;}
+  else{monthly=bal*rate*Math.pow(1+rate,termMonths)/(Math.pow(1+rate,termMonths)-1);}
+  if(isNaN(monthly)||!isFinite(monthly)){prev.style.display='none';return;}
+  const totalPmt=monthly*termMonths;
+  const totalInt=totalPmt-bal;
+  prev.style.display='block';
+  prev.innerHTML=`<div style="font-weight:500;color:var(--ink);margin-bottom:6px;">Payment Preview</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      <div><div style="color:var(--ink-3);font-size:10px;">Monthly</div><div style="font-weight:600;color:var(--ink);font-size:13px;">${fmt(monthly)}</div></div>
+      <div><div style="color:var(--ink-3);font-size:10px;">Total Interest</div><div style="font-weight:600;color:var(--red);font-size:13px;">${fmt(totalInt)}</div></div>
+      <div><div style="color:var(--ink-3);font-size:10px;">Total Repayment</div><div style="font-weight:600;color:var(--ink);font-size:13px;">${fmt(totalPmt)}</div></div>
+    </div>`;
+  const pmtEl=document.getElementById('ln2-pmt');
+  if(pmtEl&&!pmtEl.value)pmtEl.value=monthly.toFixed(2);
+};
 
 window.openLoanModal=function(id){
   editLoanId=id||null;
@@ -5455,30 +5463,6 @@ window.loanPlannerAddToTracker=function(){
     showToast('Loan details pre-filled ✓');
   },200);
 };
-  const orig=parseFloat(document.getElementById('ln2-orig')?.value)||0;
-  const bal=parseFloat(document.getElementById('ln2-bal')?.value)||orig;
-  const rate=(parseFloat(document.getElementById('ln2-rate')?.value)||0)/100/12;
-  const termMonths=parseInt(document.getElementById('ln2-term')?.value)||60;
-  const prev=document.getElementById('ln2-calc-preview');
-  if(!prev||!bal)return;
-  let monthly;
-  if(rate===0){monthly=bal/termMonths;}
-  else{monthly=bal*rate*Math.pow(1+rate,termMonths)/(Math.pow(1+rate,termMonths)-1);}
-  if(isNaN(monthly)||!isFinite(monthly)){prev.style.display='none';return;}
-  const totalPmt=monthly*termMonths;
-  const totalInt=totalPmt-bal;
-  prev.style.display='block';
-  prev.style.background='var(--paper-2)';
-  prev.innerHTML=`<div style="font-weight:500;color:var(--ink);margin-bottom:6px;">Payment Preview</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-      <div><div style="color:var(--ink-3);font-size:10px;">Monthly</div><div style="font-weight:600;color:var(--ink);font-size:13px;">${fmt(monthly)}</div></div>
-      <div><div style="color:var(--ink-3);font-size:10px;">Total Interest</div><div style="font-weight:600;color:var(--red);font-size:13px;">${fmt(totalInt)}</div></div>
-      <div><div style="color:var(--ink-3);font-size:10px;">Total Repayment</div><div style="font-weight:600;color:var(--ink);font-size:13px;">${fmt(totalPmt)}</div></div>
-    </div>`;
-  // Auto-fill monthly payment if empty
-  const pmtEl=document.getElementById('ln2-pmt');
-  if(pmtEl&&!pmtEl.value)pmtEl.value=monthly.toFixed(2);
-};
 
 // For cash flow / analytics: use actual receipts for current+future months,
 // forecast only for completed past months (where receipts might not have been logged)
@@ -5792,14 +5776,14 @@ window.obFinish=async function(){
     setTimeout(()=>showToast('Welcome to Pocket! ✦ Your setup is complete.'),400);
   },400);
 }
-window.obSkip=function(){hideOnboarding();refreshPage();}
+window.obSkip=function(){hideOnboarding();refreshPage();};
 
-// Add ob-step .done style
-(function(){
+// Add ob-step .done style inline
+(function addObStepStyle(){
   const s=document.createElement('style');
   s.textContent='.ob-step.done{background:var(--gold);opacity:0.5;}.ob-step{transition:all .3s ease;}';
   document.head.appendChild(s);
-})();
+}());
 
 // ── CSV IMPORT ───────────────────────────────────────────
 let csvData=[];let csvHeaders=[];let csvMapped=[];
@@ -6215,16 +6199,21 @@ function checkEndOfDayNudge(){
 
 // In-app nudge banner (non-intrusive, slides in above the bottom nav)
 let _nudgeDismissKey=null;
+let _nudgePrimaryAction=null;
 window.dismissInAppNudge=function(){
   const el=document.getElementById('pkt-inapp-nudge');
   if(el){el.style.transform='translateY(120%)';setTimeout(()=>el.remove(),300);}
   if(_nudgeDismissKey)localStorage.setItem(_nudgeDismissKey,'1');
-  _nudgeDismissKey=null;
+  _nudgeDismissKey=null;_nudgePrimaryAction=null;
+};
+window._nudgeDoAction=function(){
+  if(_nudgePrimaryAction)_nudgePrimaryAction();
+  dismissInAppNudge();
 };
 function showInAppNudge({icon,title,msg,primaryLabel,primaryAction,dismissKey}){
-  // Remove any existing nudge
   const old=document.getElementById('pkt-inapp-nudge');if(old)old.remove();
   _nudgeDismissKey=dismissKey||null;
+  _nudgePrimaryAction=primaryAction||null;
   const el=document.createElement('div');
   el.id='pkt-inapp-nudge';
   el.style.cssText='position:fixed;bottom:calc(var(--sb) + 72px);left:12px;right:12px;z-index:150;background:var(--glass-bg);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid var(--glass-border);border-radius:16px;padding:14px 16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);transform:translateY(120%);transition:transform .35s cubic-bezier(.34,1.1,.64,1);display:flex;align-items:center;gap:12px;';
@@ -6235,12 +6224,11 @@ function showInAppNudge({icon,title,msg,primaryLabel,primaryAction,dismissKey}){
       <div style="font-size:11px;color:var(--ink-3);line-height:1.4;">${msg}</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
-      <button onclick="dismissInAppNudge();(${primaryAction.toString()})()" style="background:var(--gold);color:var(--ink);border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap;">${primaryLabel}</button>
+      <button onclick="_nudgeDoAction()" style="background:var(--gold);color:var(--ink);border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;white-space:nowrap;">${primaryLabel}</button>
       <button onclick="dismissInAppNudge()" style="background:var(--paper-2);color:var(--ink-3);border:none;border-radius:8px;padding:5px 10px;font-size:10px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;">Later</button>
     </div>`;
   document.body.appendChild(el);
   requestAnimationFrame(()=>requestAnimationFrame(()=>{el.style.transform='translateY(0)';}));
-  // Auto-dismiss after 12 seconds
   setTimeout(()=>{if(document.getElementById('pkt-inapp-nudge'))dismissInAppNudge();},12000);
 }
 

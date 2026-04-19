@@ -633,6 +633,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
     <button class="sb-item" data-page="expenses"><span class="si">↕</span><span class="sl">Expenses</span></button>
     <button class="sb-item" data-page="budget"><span class="si">⊟</span><span class="sl">Budget</span></button>
     <button class="sb-item" data-page="income"><span class="si">＋</span><span class="sl">Income</span></button>
+    <button class="sb-item" data-page="accounts"><span class="si">💳</span><span class="sl">Accounts</span></button>
     <div class="sb-sec">Insights</div>
     <button class="sb-item" data-page="savings"><span class="si">◎</span><span class="sl">Savings Goals</span></button>
     <button class="sb-item" data-page="health"><span class="si">❤</span><span class="sl">Health Score</span></button>
@@ -721,6 +722,9 @@ select.fi:focus{border-color:var(--gold);outline:none;}
 
 <!-- EXPENSES -->
 <div id="page-expenses" class="page">
+  <!-- Page-level FAB for adding expenses (mobile only) -->
+  <button id="exp-page-fab" onclick="openExpenseModal()" aria-label="Add expense"
+    style="position:fixed;bottom:calc(var(--sb) + 70px);right:16px;width:52px;height:52px;border-radius:50%;background:var(--red);color:white;font-size:22px;display:none;align-items:center;justify-content:center;box-shadow:0 8px 28px rgba(220,107,121,0.38);cursor:pointer;border:none;z-index:41;transition:transform .18s,opacity .18s;">+</button>
   <!-- Month navigator — only visible when preset=month -->
   <div class="mnav" id="exp-month-nav" style="margin-bottom:4px;">
     <button onclick="changeExpMonth(-1)" aria-label="Previous month">←</button>
@@ -1136,14 +1140,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
         </div>
       </div>
       <div class="card">
-        <div class="sh"><h2>💳 Accounts</h2><p>Track money across wallets & banks</p></div>
-        <div style="font-size:12px;color:var(--ink-3);margin-bottom:12px;line-height:1.5;">Add your accounts (MoMo, bank, cash) so you can see which pocket your money is in. Completely optional.</div>
-        <div id="acct-list" style="margin-bottom:10px;"></div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-gold" style="flex:1;" onclick="openAccountModal()">+ Add Account</button>
-          <button class="btn btn-ghost" style="flex:1;" onclick="openAccountTransferModal()">⇄ Transfer</button>
-        </div>
-      </div>
+        <div class="sh"><h2>Data</h2></div>
         <div style="display:flex;flex-direction:column;gap:8px;">
           <button class="btn btn-ghost btn-full" onclick="exportXLSX()">↓ Export to Spreadsheet (.xlsx)</button>
           <button class="btn btn-ghost btn-full" onclick="exportPDF()">↓ Export Monthly Report (.pdf)</button>
@@ -1158,6 +1155,51 @@ select.fi:focus{border-color:var(--gold);outline:none;}
 <!-- Loan calculator moved to Debt Tracker -->
     </div>
   </div>
+</div>
+<!-- ACCOUNTS -->
+<div id="page-accounts" class="page">
+
+  <!-- Empty state — shown when no accounts exist -->
+  <div id="acct-empty-state" style="display:none;padding:32px 0;text-align:center;">
+    <div style="font-size:48px;margin-bottom:12px;">💳</div>
+    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--ink);margin-bottom:8px;">No accounts yet</div>
+    <div style="font-size:13px;color:var(--ink-3);line-height:1.6;max-width:280px;margin:0 auto 20px;">Track money across your MoMo wallet, bank accounts, and cash. Completely optional — Pocket works fine without it.</div>
+    <button class="btn btn-gold" onclick="openAccountModal()">+ Add your first account</button>
+  </div>
+
+  <!-- Active state — shown when accounts exist -->
+  <div id="acct-active-state" style="display:none;">
+    <!-- Hero: total balance across all accounts -->
+    <div class="card-dark" style="margin-bottom:12px;">
+      <div class="ct-g">Total Balance</div>
+      <div id="acct-total-bal" style="font-family:'DM Serif Display',serif;font-size:38px;color:white;margin:4px 0 12px;"></div>
+      <div class="g2" style="margin-bottom:0;">
+        <div class="ii"><div class="lb">Accounts</div><div class="am" id="acct-count"></div></div>
+        <div class="ii"><div class="lb">Last Updated</div><div class="am" id="acct-last-update" style="font-size:13px;"></div></div>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="ar" style="margin-bottom:12px;">
+      <button class="btn btn-gold" onclick="openAccountModal()">+ Add Account</button>
+      <button class="btn btn-ghost" onclick="openAccountTransferModal()">⇄ Transfer</button>
+    </div>
+
+    <!-- Account cards -->
+    <div id="acct-cards" style="margin-bottom:16px;"></div>
+
+    <!-- Activity log -->
+    <div class="card">
+      <div class="sh">
+        <h2>Activity</h2>
+        <select class="fi" id="acct-activity-filter" onchange="renderAccountsPage()" style="font-size:11px;padding:5px 8px;width:auto;">
+          <option value="">All Accounts</option>
+        </select>
+      </div>
+      <div id="acct-activity-list"></div>
+    </div>
+  </div>
+
 </div>
 
 </main><!-- end main content -->
@@ -1180,6 +1222,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
     <button onclick="closeMoreDrawer()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--ink-3);padding:2px 6px;">✕</button>
   </div>
   <div class="more-grid">
+    <button class="more-item" id="more-accounts" onclick="showPage('accounts');closeMoreDrawer()"><span class="ti">💳</span>Accounts</button>
     <button class="more-item" id="more-health" onclick="showPage('health');closeMoreDrawer()"><span class="ti">❤</span>Health</button>
     <button class="more-item" id="more-networth" onclick="showPage('networth');closeMoreDrawer()"><span class="ti">◑</span>Net Worth</button>
     <button class="more-item" id="more-debt" onclick="showPage('debt');closeMoreDrawer()"><span class="ti">⊗</span>Debt</button>
@@ -1837,6 +1880,7 @@ function startSync(uid){
       S.liabilities=(v.liabilities||[]).filter(l=>!l.id?.startsWith('ll_'));
       S.loans=v.loans||[];
       S.receivables=v.receivables||[];
+      S.accounts=v.accounts||[];
       if(v.selectedColor)S.selectedColor=v.selectedColor;
     }
     READY.profile=true;
@@ -2046,7 +2090,9 @@ function applyLayout(){
     if(pt)pt.style.display='none';
     if(da)da.style.display='none';
     if(bn)bn.style.display='flex';
-    if(fb)fb.style.display=isDesk()?'none':(['dashboard','expenses','savings','recurring'].includes(CP)?'flex':'none');
+    if(fb)fb.style.display=isDesk()?'none':(['dashboard','savings','recurring'].includes(CP)?'flex':'none');
+    const expFab=document.getElementById('exp-page-fab');
+    if(expFab)expFab.style.display=(!isDesk()&&CP==='expenses')?'flex':'none';
     ['dash-stats','dash-lower','bud-wrap','inc-wrap','an-charts','set-wrap'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='';});
     document.getElementById('dash-stats').className='g2';
     setTimeout(setContentBounds, 50);
@@ -2084,9 +2130,9 @@ window.closeMoreDrawer=function(){document.getElementById('more-drawer').classLi
 
 // ── NAV ──
 let CP='dashboard';
-function refreshPage(){({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{const _at=document.getElementById('inc-tab-alltime');const _st=document.getElementById('inc-tab-statement');if(_at&&_at.style.display!=='none')renderIncAllTime();else if(_st&&_st.style.display!=='none')renderIncStatement();else renderIncome();},recurring:renderRecurring,import:renderImportPage,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[CP]?.();}
+function refreshPage(){({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{const _at=document.getElementById('inc-tab-alltime');const _st=document.getElementById('inc-tab-statement');if(_at&&_at.style.display!=='none')renderIncAllTime();else if(_st&&_st.style.display!=='none')renderIncStatement();else renderIncome();},recurring:renderRecurring,import:renderImportPage,networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights,accounts:renderAccountsPage})[CP]?.();}
 const PRIMARY_TABS=['dashboard','expenses','income','savings','analytics'];
-const MORE_TABS=['analytics','savings','recurring','import','settings','health','networth','debt','insights'];
+const MORE_TABS=['analytics','savings','recurring','import','settings','health','networth','debt','insights','accounts'];
 
 window.showPage=function(id){
   CP=id;
@@ -2106,10 +2152,14 @@ window.showPage=function(id){
   document.querySelectorAll('.sb-item[data-page="'+id+'"]').forEach(el=>el.classList.add('active'));
   document.getElementById('main-content').scrollTop=0;
   const fb=document.getElementById('fab');
-  if(fb)fb.style.display=isDesk()?'none':(['dashboard','expenses','savings','recurring'].includes(id)?'flex':'none');
-  const titles={dashboard:'Dashboard',expenses:'Expenses',budget:'Budget',savings:'Savings Goals',analytics:'Analytics',income:'Income',recurring:'Recurring Expenses',import:'Import CSV',settings:'Settings',networth:'Net Worth',debt:'Debt Tracker',health:'Health Score',insights:'Spending Insights'};
+  // Global FAB: hide on expenses (expenses has its own + FAB), show on dashboard/savings/recurring
+  if(fb)fb.style.display=isDesk()?'none':(['dashboard','savings','recurring'].includes(id)?'flex':'none');
+  // Expense page FAB: only on expenses, mobile only
+  const expFab=document.getElementById('exp-page-fab');
+  if(expFab)expFab.style.display=(!isDesk()&&id==='expenses')?'flex':'none';
+  const titles={dashboard:'Dashboard',expenses:'Expenses',budget:'Budget',savings:'Savings Goals',analytics:'Analytics',income:'Income',recurring:'Recurring Expenses',import:'Import CSV',settings:'Settings',networth:'Net Worth',debt:'Debt Tracker',health:'Health Score',insights:'Spending Insights',accounts:'Accounts'};
   const pt=document.getElementById('d-ptitle');if(pt)pt.textContent=titles[id]||id;
-  ({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{const _at=document.getElementById('inc-tab-alltime');const _st=document.getElementById('inc-tab-statement');if(_at&&_at.style.display!=='none')renderIncAllTime();else if(_st&&_st.style.display!=='none')renderIncStatement();else renderIncome();},recurring:renderRecurring,import:renderImportPage,settings:()=>{updateLnInc();renderAccounts();},networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights})[id]?.();
+  ({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{const _at=document.getElementById('inc-tab-alltime');const _st=document.getElementById('inc-tab-statement');if(_at&&_at.style.display!=='none')renderIncAllTime();else if(_st&&_st.style.display!=='none')renderIncStatement();else renderIncome();},recurring:renderRecurring,import:renderImportPage,settings:()=>{updateLnInc();},networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights,accounts:renderAccountsPage})[id]?.();
 };
 window.fabAction=function(){openFabMenu();};
 
@@ -4031,31 +4081,162 @@ function prefillReceiptAccount(srcId){
 }
 
 // Render accounts list in settings
-function renderAccounts(){
-  const el=document.getElementById('acct-list');
-  if(!el)return;
+// ── ACCOUNTS PAGE RENDER ──────────────────────────────────
+function renderAccountsPage(){
   const accounts=S.accounts||[];
+  const emptyEl=document.getElementById('acct-empty-state');
+  const activeEl=document.getElementById('acct-active-state');
+  if(!emptyEl||!activeEl)return;
+
   if(!accounts.length){
-    el.innerHTML='<div class="empty" style="padding:8px 0;"><p style="color:var(--ink-3);font-size:12px;">No accounts yet. Add your first account below.</p></div>';
+    emptyEl.style.display='block';
+    activeEl.style.display='none';
     return;
   }
+  emptyEl.style.display='none';
+  activeEl.style.display='block';
+
+  // Hero totals
   const total=accounts.reduce((t,a)=>t+(parseFloat(a.balance)||0),0);
-  el.innerHTML=accounts.map(a=>`
-    <div class="li">
-      <div class="li-ic" style="background:var(--blue-light);color:var(--blue);font-family:system-ui,sans-serif;">${ACCT_ICONS[a.type]||'📦'}</div>
+  const el=document.getElementById('acct-total-bal');
+  if(el){el.textContent=fmt(total);el.style.color=total<0?'#ff8a80':'white';}
+  const countEl=document.getElementById('acct-count');
+  if(countEl)countEl.textContent=accounts.length;
+  const updEl=document.getElementById('acct-last-update');
+  if(updEl){
+    const latest=accounts.reduce((d,a)=>a.lastUpdated&&a.lastUpdated>d?a.lastUpdated:d,'');
+    updEl.textContent=latest?new Date(latest).toLocaleDateString('en-GH',{day:'numeric',month:'short'}):'—';
+  }
+
+  // Account cards
+  const cardsEl=document.getElementById('acct-cards');
+  if(cardsEl){
+    cardsEl.innerHTML=accounts.map(a=>{
+      const bal=parseFloat(a.balance)||0;
+      return`<div class="card" style="padding:14px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:44px;height:44px;border-radius:12px;background:var(--blue-light);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:22px;font-family:system-ui,sans-serif;flex-shrink:0;">${ACCT_ICONS[a.type]||'📦'}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:600;color:var(--ink);">${a.name}</div>
+            <div style="font-size:11px;color:var(--ink-3);margin-top:1px;text-transform:capitalize;">${a.type||'account'}${a.note?' · '+a.note:''}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${bal<0?'var(--red)':'var(--ink)'};">${fmt(bal)}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="openAccountEditModal('${a.id}')">↻ Update balance</button>
+          <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="openAccountModal('${a.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="delAccount('${a.id}')">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Populate activity filter
+  const filterSel=document.getElementById('acct-activity-filter');
+  if(filterSel){
+    const cur=filterSel.value;
+    filterSel.innerHTML='<option value="">All Accounts</option>'+
+      accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+    if(cur)filterSel.value=cur;
+  }
+
+  // Build unified activity log
+  const filterId=filterSel?.value||'';
+  const activity=[];
+
+  // Expenses tagged to accounts
+  (S.expenses||[]).forEach(e=>{
+    if(!e.accountId)return;
+    if(filterId&&e.accountId!==filterId)return;
+    const acct=accounts.find(a=>a.id===e.accountId);
+    if(!acct)return;
+    activity.push({
+      date:e.date,
+      icon:ACCT_ICONS[acct.type]||'📦',
+      acctName:acct.name,
+      desc:e.desc,
+      sub:`${acct.name} · ${e.cat}`,
+      amount:-parseFloat(e.amount||0),
+      id:'exp_'+e.id,
+      type:'expense'
+    });
+  });
+
+  // Income receipts tagged to accounts
+  (S.incomeReceipts||[]).forEach(r=>{
+    if(!r.accountId||r.noncash)return;
+    if(filterId&&r.accountId!==filterId)return;
+    const acct=accounts.find(a=>a.id===r.accountId);
+    if(!acct)return;
+    const src=S.incomeSources.find(s=>s.id===r.sourceId);
+    activity.push({
+      date:r.date,
+      icon:ACCT_ICONS[acct.type]||'📦',
+      acctName:acct.name,
+      desc:r.note||src?.name||'Income',
+      sub:`${acct.name} · income`,
+      amount:parseFloat(r.amount||0),
+      id:'inc_'+r.id,
+      type:'income'
+    });
+  });
+
+  // Transfers stored in account.transfers
+  accounts.forEach(acct=>{
+    if(filterId&&acct.id!==filterId)return;
+    (acct.transfers||[]).forEach(t=>{
+      activity.push({
+        date:t.date,
+        icon:'⇄',
+        acctName:acct.name,
+        desc:t.type==='out'?`Transfer to ${t.toName}`:`Transfer from ${t.fromName}`,
+        sub:`${acct.name} · transfer`,
+        amount:t.type==='out'?-parseFloat(t.amount||0):parseFloat(t.amount||0),
+        id:'xf_'+t.id,
+        type:'transfer'
+      });
+    });
+  });
+
+  // Sort newest first
+  activity.sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  const listEl=document.getElementById('acct-activity-list');
+  if(!listEl)return;
+
+  if(!activity.length){
+    listEl.innerHTML=`<div class="empty"><div class="icon">📋</div><p>No tagged activity yet.<br><span style="color:var(--ink-3);font-size:11px;">Tag expenses and income receipts to accounts when recording them.</span></p></div>`;
+    return;
+  }
+
+  // Group by month
+  let lastMonth='';
+  listEl.innerHTML=activity.map(a=>{
+    const d=new Date(a.date);
+    const mKey=MOS[d.getMonth()]+' '+d.getFullYear();
+    let header='';
+    if(mKey!==lastMonth){
+      lastMonth=mKey;
+      header=`<div style="font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;padding:10px 0 4px;border-top:1px solid var(--paper-2);margin-top:4px;">${mKey}</div>`;
+    }
+    const isPositive=a.amount>=0;
+    const amtColor=a.type==='transfer'?'var(--blue)':isPositive?'var(--green)':'var(--red)';
+    const amtStr=(isPositive?'+':'')+fmt(Math.abs(a.amount));
+    return`${header}<div class="li">
+      <div class="li-ic" style="background:${a.type==='income'?'var(--green-light)':a.type==='transfer'?'var(--blue-light)':'var(--red-light)'};color:${a.type==='income'?'var(--green)':a.type==='transfer'?'var(--blue)':'var(--red)'};font-family:system-ui,sans-serif;">${a.icon}</div>
       <div class="li-nm">
-        <div class="p">${a.name}</div>
-        <div class="s">${a.type||'account'}${a.note?' · '+a.note:''}</div>
+        <div class="p">${a.desc}</div>
+        <div class="s">${a.sub} · ${d.toLocaleDateString('en-GH',{day:'numeric',month:'short'})}</div>
       </div>
-      <div style="font-family:'DM Serif Display',serif;font-size:14px;color:var(--ink);margin-right:8px;">${fmt(parseFloat(a.balance)||0)}</div>
-      <button class="btn btn-ghost btn-sm" onclick="openAccountEditModal('${a.id}')">Edit</button>
-      <button class="btn btn-danger btn-sm" onclick="delAccount('${a.id}')">✕</button>
-    </div>`).join('')+
-    `<div style="border-top:1px solid var(--paper-2);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-size:12px;color:var(--ink-3);">Total across accounts</span>
-      <span style="font-family:'DM Serif Display',serif;font-size:16px;color:var(--green);">${fmt(total)}</span>
+      <div class="li-am" style="color:${amtColor};">${amtStr}</div>
     </div>`;
+  }).join('');
 }
+
+// Keep legacy renderAccounts as alias (called from old settings path, now a no-op)
+function renderAccounts(){renderAccountsPage();}
 
 // Render accounts strip on dashboard
 function renderDashAccountsStrip(){
@@ -4065,7 +4246,7 @@ function renderDashAccountsStrip(){
   if(!accounts.length){el.style.display='none';return;}
   el.style.display='block';
   el.innerHTML=`<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;">
-    ${accounts.map(a=>`<div onclick="showPage('settings')" style="flex-shrink:0;background:rgba(255,255,255,0.08);border-radius:10px;padding:7px 12px;cursor:pointer;">
+    ${accounts.map(a=>`<div onclick="showPage('accounts')" style="flex-shrink:0;background:rgba(255,255,255,0.08);border-radius:10px;padding:7px 12px;cursor:pointer;">
       <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:2px;">${ACCT_ICONS[a.type]||'📦'} ${a.name}</div>
       <div style="font-family:'DM Serif Display',serif;font-size:14px;color:white;">${fmt(parseFloat(a.balance)||0)}</div>
     </div>`).join('')}
@@ -4107,7 +4288,7 @@ window.saveAccount=async function(){
   }
   await saveS();
   closeModal('account-modal');
-  renderAccounts();
+  renderAccountsPage();
   renderDashAccountsStrip();
   populateAccountSelectors();
   showToast(_editAcctId?'Account updated ✓':'Account added ✓');
@@ -4132,7 +4313,7 @@ window.saveAccountEdit=async function(){
   if(i>-1)S.accounts[i]={...S.accounts[i],balance:bal,lastUpdated:new Date().toISOString().split('T')[0]};
   await saveS();
   closeModal('account-edit-modal');
-  renderAccounts();
+  renderAccountsPage();
   renderDashAccountsStrip();
   populateAccountSelectors();
   showToast('Balance updated ✓');
@@ -4143,7 +4324,7 @@ window.delAccount=async function(id){
   if(!await pktConfirm({title:'Delete account?',msg:'This account record will be removed. Past transactions referencing it will remain.',icon:'💳',okLabel:'Delete',danger:true}))return;
   S.accounts=(S.accounts||[]).filter(a=>a.id!==id);
   await saveS();
-  renderAccounts();
+  renderAccountsPage();
   renderDashAccountsStrip();
   populateAccountSelectors();
   showToast('Account removed');
@@ -4175,20 +4356,21 @@ window.saveAccountTransfer=async function(){
   const to=S.accounts.find(a=>a.id===toId);
   if(!from||!to)return;
   if((parseFloat(from.balance)||0)<amt){showToast(`Insufficient balance in ${from.name}`);return;}
+  // Move money between accounts — no expense logged, net position unchanged
   from.balance=(parseFloat(from.balance)||0)-amt;
   to.balance=(parseFloat(to.balance)||0)+amt;
+  // Log the transfer in the account's own history (not as an expense)
+  if(!from.transfers)from.transfers=[];
+  from.transfers.push({id:'xf'+Date.now(),type:'out',toId,toName:to.name,amount:amt,date,note:note||''});
+  if(!to.transfers)to.transfers=[];
+  to.transfers.push({id:'xf'+Date.now()+1,type:'in',fromId,fromName:from.name,amount:amt,date,note:note||''});
   await saveS();
-  // Log as an expense (debit from source) with a transfer note
-  const expId='e'+Date.now();
-  const exp={desc:`Transfer → ${to.name}`,amount:amt,cat:'Other',date,note:note||`Account transfer`,accountId:fromId,isTransfer:true};
-  S.expenses.push({id:expId,...exp});
-  await saveDoc('expenses',expId,exp);
   closeModal('account-transfer-modal');
-  renderAccounts();
+  renderAccountsPage();
   renderDashAccountsStrip();
   populateAccountSelectors();
   renderDash();
-  showToast(`Transferred ${fmt(amt)} ✓`);
+  showToast(`${fmt(amt)} moved from ${from.name} to ${to.name} ✓`);
 };
 
 // Update account balance when expense is saved (deduct from chosen account)

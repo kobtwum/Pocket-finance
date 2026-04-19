@@ -261,6 +261,9 @@ body.dark .fi::placeholder{color:var(--ink-3);opacity:1;}
   .d-actions{display:flex;align-items:center;gap:10px;}
   .content{position:relative;top:auto;bottom:auto;flex:1;overflow-y:auto;padding:24px 32px 24px;min-height:0;}
   .fab{display:none !important;}
+  /* Expense page has its own FAB — allow it on desktop too, positioned within content */
+  #exp-page-fab{display:none;}
+  #exp-page-fab.show{display:flex !important;bottom:32px;right:32px;}
   /* Desktop modal - centered */
   .mo{align-items:center;justify-content:center;}
   .modal{border-radius:var(--radius);width:480px;max-width:90vw;transform:scale(.95);padding:28px;max-height:88vh;transition:transform .2s ease,opacity .15s ease;opacity:0;}
@@ -697,16 +700,12 @@ select.fi:focus{border-color:var(--gold);outline:none;}
       <button onclick="openDashCustomise()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.45);border-radius:8px;padding:4px 10px;font-size:10px;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;letter-spacing:.04em;" aria-label="Customise dashboard">⚙</button>
     </div>
     <!-- Balance -->
-    <div style="margin-bottom:12px;">
+    <div style="margin-bottom:16px;">
       <div style="font-size:10px;color:rgba(255,255,255,.35);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;" title="All income received minus all spending and savings">Net Position</div>
       <div id="dash-balance" style="font-family:'DM Serif Display',serif;font-size:44px;color:white;line-height:1;letter-spacing:-.01em;">₵0.00</div>
       <div id="dash-balance-sub" style="font-size:12px;color:rgba(255,255,255,.4);margin-top:5px;"></div>
     </div>
-    <!-- Streak (only when active) -->
-    <div id="dash-streak" style="display:none;align-items:center;gap:6px;margin-bottom:12px;background:rgba(255,255,255,0.06);border-radius:8px;padding:5px 10px;width:fit-content;"></div>
-    <!-- Accounts strip (only when accounts exist) -->
-    <div id="dash-accounts-strip" style="display:none;margin-bottom:12px;"></div>
-    <!-- Income/spending stats strip -->
+    <!-- Income/spending stat strip -->
     <div id="inc-strip" class="inc-strip"></div>
   </div>
   <div id="dash-stats" class="g2"></div>
@@ -722,9 +721,9 @@ select.fi:focus{border-color:var(--gold);outline:none;}
 
 <!-- EXPENSES -->
 <div id="page-expenses" class="page">
-  <!-- Page-level FAB for adding expenses (mobile only) -->
+  <!-- Expense FAB — gold gradient, consistent with global FAB, shown on expenses page on both mobile and desktop -->
   <button id="exp-page-fab" onclick="openExpenseModal()" aria-label="Add expense"
-    style="position:fixed;bottom:calc(var(--sb) + 70px);right:16px;width:52px;height:52px;border-radius:50%;background:var(--red);color:white;font-size:22px;display:none;align-items:center;justify-content:center;box-shadow:0 8px 28px rgba(220,107,121,0.38);cursor:pointer;border:none;z-index:41;transition:transform .18s,opacity .18s;">+</button>
+    class="fab" style="display:none;z-index:41;">+</button>
   <!-- Month navigator — only visible when preset=month -->
   <div class="mnav" id="exp-month-nav" style="margin-bottom:4px;">
     <button onclick="changeExpMonth(-1)" aria-label="Previous month">←</button>
@@ -825,21 +824,51 @@ select.fi:focus{border-color:var(--gold);outline:none;}
     <button class="tab" onclick="switchATab('cashflow')">Cash Flow</button>
   </div>
   <div id="analytics-overview">
-    <div class="g3" id="an-stats"></div>
-    <div class="card" style="margin-bottom:12px;">
-      <div class="sh"><h2>Income Overview</h2></div>
-      <div class="g3" id="an-inc-stats" style="margin-bottom:10px;"></div>
-      <div style="position:relative;height:180px;"><canvas role="img" aria-label="Income overview chart" id="an-inc-chart"></canvas></div>
-      <div id="an-inc-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+    <!-- Financial verdict + save rate hero -->
+    <div class="card-dark" style="margin-bottom:12px;" id="an-verdict-card">
+      <div class="ct-g" id="an-verdict-period"></div>
+      <div id="an-verdict" style="font-family:'DM Serif Display',serif;font-size:20px;color:white;margin:6px 0 14px;line-height:1.3;"></div>
+      <div class="g3" style="margin-bottom:0;">
+        <div class="ii"><div class="lb">Save Rate</div><div class="am" id="an-sr-month"></div><div class="nt">this month</div></div>
+        <div class="ii"><div class="lb">3-Month Avg</div><div class="am" id="an-sr-3m"></div><div class="nt">save rate</div></div>
+        <div class="ii"><div class="lb">All-time</div><div class="am" id="an-sr-all"></div><div class="nt">save rate</div></div>
+      </div>
     </div>
-    <div class="card" style="margin-bottom:12px;">
-      <div class="sh"><h2>Expense Overview</h2></div>
-      <div class="g3" id="an-exp-stats" style="margin-bottom:10px;"></div>
-      <div style="position:relative;height:180px;margin-top:4px;"><canvas role="img" aria-label="Expense trend chart" id="an-exp-trend"></canvas></div>
+
+    <!-- Income vs Spending this month -->
+    <div class="card" style="margin-bottom:12px;" id="an-inc-exp-card">
+      <div class="sh"><h2 id="an-inc-exp-title">This Month</h2><p id="an-inc-exp-sub"></p></div>
+      <!-- Unified income/spending comparison -->
+      <div id="an-inc-exp-bars" style="margin-bottom:10px;"></div>
+      <!-- Income breakdown doughnut -->
+      <div id="an-inc-section" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--paper-2);">
+        <div style="font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;">Income Sources</div>
+        <div style="position:relative;height:160px;"><canvas role="img" aria-label="Income overview chart" id="an-inc-chart"></canvas></div>
+        <div id="an-inc-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+      </div>
     </div>
+
+    <!-- Spending trend (last 6 months) -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="sh">
+        <h2>Spending Trend</h2>
+        <span id="an-spend-trend-badge" style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:100px;"></span>
+      </div>
+      <div style="position:relative;height:180px;"><canvas role="img" aria-label="Expense trend chart" id="an-exp-trend"></canvas></div>
+      <div id="an-trend-note" style="font-size:11px;color:var(--ink-3);margin-top:8px;text-align:center;"></div>
+    </div>
+
+    <!-- Category breakdown -->
     <div id="an-charts">
-      <div class="card"><div class="sh"><h2>By Category</h2></div><div style="position:relative;height:220px;"><canvas role="img" aria-label="Expenses by category chart" id="cat-pie"></canvas></div><div id="cat-pie-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div></div>
-      <div class="card"><div class="sh"><h2>Top Categories</h2></div><div id="top-cats"></div></div>
+      <div class="card">
+        <div class="sh"><h2>By Category</h2><p id="an-cat-period">All time</p></div>
+        <div style="position:relative;height:200px;"><canvas role="img" aria-label="Expenses by category chart" id="cat-pie"></canvas></div>
+        <div id="cat-pie-leg" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+      </div>
+      <div class="card">
+        <div class="sh"><h2>Top Categories</h2><p id="an-top-cat-period">vs income</p></div>
+        <div id="top-cats"></div>
+      </div>
     </div>
   </div>
   <div id="analytics-savings-trend" style="display:none;">
@@ -2092,7 +2121,7 @@ function applyLayout(){
     if(bn)bn.style.display='flex';
     if(fb)fb.style.display=isDesk()?'none':(['dashboard','savings','recurring'].includes(CP)?'flex':'none');
     const expFab=document.getElementById('exp-page-fab');
-    if(expFab)expFab.style.display=(!isDesk()&&CP==='expenses')?'flex':'none';
+    if(expFab){expFab.classList.toggle('show',CP==='expenses');expFab.style.display=CP==='expenses'?'flex':'none';}
     ['dash-stats','dash-lower','bud-wrap','inc-wrap','an-charts','set-wrap'].forEach(id=>{const el=document.getElementById(id);if(el)el.className='';});
     document.getElementById('dash-stats').className='g2';
     setTimeout(setContentBounds, 50);
@@ -2152,11 +2181,11 @@ window.showPage=function(id){
   document.querySelectorAll('.sb-item[data-page="'+id+'"]').forEach(el=>el.classList.add('active'));
   document.getElementById('main-content').scrollTop=0;
   const fb=document.getElementById('fab');
-  // Global FAB: hide on expenses (expenses has its own + FAB), show on dashboard/savings/recurring
+  // Global FAB: show on dashboard/savings/recurring (mobile only — CSS hides on desktop)
   if(fb)fb.style.display=isDesk()?'none':(['dashboard','savings','recurring'].includes(id)?'flex':'none');
-  // Expense page FAB: only on expenses, mobile only
+  // Expense page FAB: show on expenses page on ALL screen sizes (uses .show class to override desktop CSS)
   const expFab=document.getElementById('exp-page-fab');
-  if(expFab)expFab.style.display=(!isDesk()&&id==='expenses')?'flex':'none';
+  if(expFab){expFab.classList.toggle('show',id==='expenses');expFab.style.display=id==='expenses'?'flex':'none';}
   const titles={dashboard:'Dashboard',expenses:'Expenses',budget:'Budget',savings:'Savings Goals',analytics:'Analytics',income:'Income',recurring:'Recurring Expenses',import:'Import CSV',settings:'Settings',networth:'Net Worth',debt:'Debt Tracker',health:'Health Score',insights:'Spending Insights',accounts:'Accounts'};
   const pt=document.getElementById('d-ptitle');if(pt)pt.textContent=titles[id]||id;
   ({dashboard:renderDash,expenses:renderExp,budget:renderBudget,savings:renderSavings,analytics:renderAnalytics,income:()=>{const _at=document.getElementById('inc-tab-alltime');const _st=document.getElementById('inc-tab-statement');if(_at&&_at.style.display!=='none')renderIncAllTime();else if(_st&&_st.style.display!=='none')renderIncStatement();else renderIncome();},recurring:renderRecurring,import:renderImportPage,settings:()=>{updateLnInc();},networth:renderNetWorth,debt:renderDebt,health:renderHealth,insights:renderInsights,accounts:renderAccountsPage})[id]?.();
@@ -2366,7 +2395,7 @@ function renderDash(){
   document.getElementById('dash-rec').innerHTML=rec.length?rec.map(e=>eRow(e,true)).join(''):'<div class="empty"><div class="icon">📋</div><p>No expenses yet this month</p></div>';
   const bc=byCat(m,y);
   document.getElementById('dash-bud').innerHTML=S.budgets.length?S.budgets.slice(0,5).map(b=>{const sp=bc[b.cat]||0,rawP=b.limit>0?sp/b.limit*100:0,p2=rawP.toFixed(0),barP=Math.min(100,rawP);const c=gCat(b.cat);const pl=rawP>100?'pill-r':rawP>70?'pill-gold':'pill-g';return`<div class="bc"><div class="bc-h"><div class="bc-top"><div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name} <span class="pill ${pl}">${p2}%</span></div><div class="bc-a">${fmt(sp)} / ${fmt(b.limit)}</div></div></div><div class="pw"><div class="pb ${rawP>100?'pb-red':rawP>70?'pb-gold':'pb-green'}" style="width:${barP}%"></div></div></div>`;}).join(''):'<div class="empty"><div class="icon">📊</div><p>Set budget categories to track spending</p></div>';
-  renderBudgetAlerts();renderDashHealth();renderDashInsights();renderPendingReceiptsNudge();renderOverdueReceivablesNudge();renderStreakBadge();renderDashAccountsStrip();
+  renderBudgetAlerts();renderDashHealth();renderDashInsights();renderPendingReceiptsNudge();renderOverdueReceivablesNudge();
   document.getElementById('dash-sav').innerHTML=S.goals.length?S.goals.map(g=>{const sv=gSaved(g.id),p3=Math.min(100,g.target>0?sv/g.target*100:0).toFixed(1);return`<div class="li"><div class="li-ic" style="background:var(--green-light);color:var(--green);font-size:18px;font-family:system-ui,sans-serif;">${g.icon}</div><div class="li-nm"><div class="p">${g.name}</div><div class="s">${fmt(sv)} of ${fmt(g.target)}</div></div><span class="pill pill-g">${p3}%</span></div>`;}).join(''):'<div class="empty"><div class="icon">🎯</div><p>No savings goals yet</p></div>';
 
   // Income receipts card
@@ -3239,20 +3268,189 @@ async function autoLogRecurring(){if(!(S.recurringExpenses||[]).length)return;co
 // ── ANALYTICS ──
 window.switchATab=function(tab){document.querySelectorAll('#page-analytics .tab').forEach(t=>t.classList.remove('active'));['overview','savings-trend','monthly','cashflow'].forEach(t=>{const el=document.getElementById('analytics-'+t);if(el)el.style.display='none';});const el=document.getElementById('analytics-'+tab);if(el)el.style.display='block';document.querySelectorAll('#page-analytics .tab').forEach(t=>{if(t.getAttribute('onclick')?.includes("'"+tab+"'"))t.classList.add('active');});if(tab==='cashflow')renderAnCashFlow();};
 function renderAnalytics(){
-  renderAnIncomeOverview();renderAnExpOverview();renderAnOv();renderAnSav();renderAnMon();}
-function renderAnOv(){
-  // Exclude Savings Transfer from spending totals — it's not a real expense
-  const all=S.expenses.filter(e=>e.cat!=='Savings Transfer');
-  const tot=all.reduce((s,e)=>s+parseFloat(e.amount),0);
-  const mwd=mwData(),avg=tot/Math.max(1,mwd.length);
-  // All-time earned: use actual receipts if any, else cumulative forecast
+  renderAnOverview();renderAnSav();renderAnMon();}
+
+function renderAnOverview(){
+  const now=new Date(),m=now.getMonth(),y=now.getFullYear();
+  const mwd=mwData();
+
+  // ── CORE DATA ──
+  const thisMonthInc=actualIncomeOrForecast(m,y);
+  const thisMonthSpent=mExps(m,y).filter(e=>!isFuture(e)&&e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0);
+  const thisMonthSaved=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===m&&d.getFullYear()===y;}).reduce((s,c)=>s+parseFloat(c.amount),0);
+  const saveRateMonth=thisMonthInc>0?thisMonthSaved/thisMonthInc*100:0;
+
+  // 3-month average save rate
+  const last3=mwd.slice(-3);
+  let sr3Num=0,sr3Den=0;
+  last3.forEach(({month,year})=>{
+    const inc=earnedForPeriod(month,year);
+    const sav=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0);
+    sr3Num+=sav;sr3Den+=inc;
+  });
+  const saveRate3m=sr3Den>0?sr3Num/sr3Den*100:0;
+
+  // All-time save rate
   const receiptTotal=(S.incomeReceipts||[]).filter(r=>!r.noncash).reduce((t,r)=>t+(parseFloat(r.amount)||0),0);
   const cumInc=receiptTotal>0?receiptTotal:calcCumulativeIncome();
-  const sr=cumInc>0?(allSaved()/cumInc*100).toFixed(1):0;
-  document.getElementById('an-stats').innerHTML=`<div class="card" style="padding:12px;"><div class="ct">All-time Earned</div><div class="cv" style="font-size:18px;color:var(--gold)">${fmt(cumInc)}</div><div class="cs">${mwd.length} month${mwd.length!==1?'s':''}</div></div><div class="card" style="padding:12px;"><div class="ct">All-time Spent</div><div class="cv" style="font-size:18px">${fmt(tot)}</div><div class="cs">${all.length} transactions</div></div><div class="card" style="padding:12px;"><div class="ct">Total Saved</div><div class="cv" style="font-size:18px;color:var(--green)">${fmt(allSaved())}</div><div class="cs">${sr}% of all income</div></div>`;
-  const ct={};all.forEach(e=>{if(e.cat!=='Savings Transfer')ct[e.cat]=(ct[e.cat]||0)+parseFloat(e.amount);});const sorted=Object.entries(ct).sort((a,b)=>b[1]-a[1]);
-  dChart('cat-pie');if(sorted.length){CI['cat-pie']=new Chart(document.getElementById('cat-pie').getContext('2d'),{type:'doughnut',data:{labels:sorted.map(x=>x[0]),datasets:[{data:sorted.map(x=>x[1]),backgroundColor:sorted.map(x=>gCat(x[0]).color+'cc'),borderColor:sorted.map(x=>gCat(x[0]).color),borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'55%'}});document.getElementById('cat-pie-leg').innerHTML=sorted.slice(0,6).map(([cat])=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${gCat(cat).color};display:inline-block;"></span>${cat}</span>`).join('');}
-  document.getElementById('top-cats').innerHTML=sorted.slice(0,5).map(([cat,amt])=>{const p=(amt/Math.max(1,tot)*100).toFixed(1),c=gCat(cat);return`<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--paper-2);"><div style="width:30px;height:30px;border-radius:8px;background:${c.color}22;display:flex;align-items:center;justify-content:center;font-size:16px;font-family:system-ui,sans-serif;">${c.icon}</div><div style="flex:1;"><div style="font-size:12.5px;font-weight:500;">${cat}</div><div class="pw" style="margin-top:4px;"><div class="pb pb-blue" style="width:${p}%"></div></div></div><div style="text-align:right;"><div style="font-size:12px;font-weight:500;">${fmt(amt)}</div><div style="font-size:11px;color:var(--ink-3);">${p}%</div></div></div>`;}).join('')||'<div class="empty"><div class="icon">📊</div><p>No expense data yet</p></div>';
+  const saveRateAll=cumInc>0?allSaved()/cumInc*100:0;
+
+  // ── VERDICT ──
+  const periodEl=document.getElementById('an-verdict-period');
+  if(periodEl)periodEl.textContent=MOS[m]+' '+y;
+  const verdictEl=document.getElementById('an-verdict');
+  if(verdictEl){
+    let verdict='';
+    if(thisMonthInc===0){
+      verdict='Record your income receipts to see how this month is going.';
+    } else if(saveRateMonth>=20){
+      verdict=`Strong month — you\'re saving ${saveRateMonth.toFixed(0)}% of your income. Keep this up.`;
+    } else if(saveRateMonth>=10){
+      verdict=`Decent progress. You\'re saving ${saveRateMonth.toFixed(0)}% — push toward 20% if you can.`;
+    } else if(saveRateMonth>0){
+      verdict=`Your save rate is ${saveRateMonth.toFixed(0)}% this month. There\'s room to grow — review your biggest expense categories.`;
+    } else if(thisMonthSpent>thisMonthInc){
+      verdict=`Spending (${fmt(thisMonthSpent)}) exceeded income (${fmt(thisMonthInc)}) this month. Address this now.`;
+    } else {
+      verdict=`No savings recorded yet this month. Even a small contribution to your goals matters.`;
+    }
+    verdictEl.textContent=verdict;
+  }
+
+  // ── SAVE RATES ──
+  const srColor=r=>r>=20?'var(--green)':r>=10?'var(--gold)':'var(--red)';
+  const srFmt=r=>r>0?r.toFixed(1)+'%':'—';
+  const srM=document.getElementById('an-sr-month');if(srM){srM.textContent=srFmt(saveRateMonth);srM.style.color=srColor(saveRateMonth);}
+  const sr3=document.getElementById('an-sr-3m');if(sr3){sr3.textContent=srFmt(saveRate3m);sr3.style.color=srColor(saveRate3m);}
+  const srA=document.getElementById('an-sr-all');if(srA){srA.textContent=srFmt(saveRateAll);srA.style.color=srColor(saveRateAll);}
+
+  // ── INCOME VS SPENDING COMPARISON ──
+  const titleEl=document.getElementById('an-inc-exp-title');
+  if(titleEl)titleEl.textContent=MOS[m]+' '+y;
+  const subEl=document.getElementById('an-inc-exp-sub');
+  const hasActualInc=incomeReceiptsCashTotal(m,y)>0;
+  if(subEl)subEl.textContent=hasActualInc?'actual income':'income forecast';
+
+  const barsEl=document.getElementById('an-inc-exp-bars');
+  if(barsEl){
+    const maxVal=Math.max(thisMonthInc,thisMonthSpent,thisMonthSaved,1);
+    const bar=(val,color,label,sublabel)=>`
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+          <span style="font-size:12px;font-weight:500;color:var(--ink);">${label}</span>
+          <span style="font-family:'DM Serif Display',serif;font-size:15px;color:${color};">${fmt(val)}${sublabel?' <span style="font-size:10px;color:var(--ink-3);font-family:var(--font-sans);">'+sublabel+'</span>':''}</span>
+        </div>
+        <div class="pw"><div class="pb" style="width:${Math.min(100,val/maxVal*100).toFixed(1)}%;background:${color};"></div></div>
+      </div>`;
+    const incPctOfInc=thisMonthInc>0?100:0;
+    const spendPct=thisMonthInc>0?(thisMonthSpent/thisMonthInc*100).toFixed(0)+'% of income':'';
+    const savPct=thisMonthInc>0?(thisMonthSaved/thisMonthInc*100).toFixed(0)+'% of income':'';
+    const left=thisMonthInc-thisMonthSpent-thisMonthSaved;
+    barsEl.innerHTML=
+      bar(thisMonthInc,'var(--green)','Income received',hasActualInc?'actual':'forecast')+
+      bar(thisMonthSpent,'var(--red)','Spent',spendPct)+
+      bar(thisMonthSaved,'var(--blue)','Saved',savPct)+
+      (left>0?bar(left,'var(--ink-3)','Unallocated','available'):'');
+  }
+
+  // ── INCOME SOURCE DOUGHNUT ──
+  const cashSources=S.incomeSources.filter(s=>!s.noncash);
+  if(cashSources.length){
+    dChart('an-inc-chart');
+    const clrs=['#c9a84c','#2d7a5f','#2471a3','#8e44ad','#c0392b','#e67e22'];
+    const receiptsBySource={};
+    (S.incomeReceipts||[]).filter(r=>{
+      if(r.noncash||!r.date)return false;
+      const d=new Date(r.date);return d.getMonth()===m&&d.getFullYear()===y;
+    }).forEach(r=>{if(r.sourceId)receiptsBySource[r.sourceId]=(receiptsBySource[r.sourceId]||0)+(parseFloat(r.amount)||0);});
+    const hasActual=Object.keys(receiptsBySource).length>0;
+    const chartAmts=cashSources.map(s=>hasActual?(receiptsBySource[s.id]||0):monthlyEq(s,m,y)||parseFloat(s.amount));
+    const visEntries=cashSources.map((s,i)=>({s,i,amt:chartAmts[i]})).filter(e=>e.amt>0);
+    const incSecEl=document.getElementById('an-inc-section');
+    if(incSecEl)incSecEl.style.display=visEntries.length?'block':'none';
+    if(visEntries.length){
+      CI['an-inc-chart']=new Chart(document.getElementById('an-inc-chart').getContext('2d'),{
+        type:'doughnut',
+        data:{labels:visEntries.map(e=>e.s.name),datasets:[{data:visEntries.map(e=>e.amt),backgroundColor:visEntries.map(e=>clrs[e.i%clrs.length]+'cc'),borderColor:visEntries.map(e=>clrs[e.i%clrs.length]),borderWidth:2}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'62%'}
+      });
+      const legEl=document.getElementById('an-inc-leg');
+      if(legEl)legEl.innerHTML=cashSources.map((s,i)=>{
+        const amt=chartAmts[i];
+        return`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);opacity:${amt>0?1:0.35};"><span style="width:10px;height:10px;border-radius:2px;background:${clrs[i%clrs.length]};display:inline-block;"></span>${s.name}${amt>0?' · '+fmt(amt):''}</span>`;
+      }).join('');
+    }
+  }
+
+  // ── SPENDING TREND (last 6 months) with trend indicator ──
+  const trendMwd=mwd.slice(-6);
+  if(trendMwd.length>=2){
+    const trendData=trendMwd.map(({month,year})=>mExps(month,year).filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0));
+    const trendLabels=trendMwd.map(({month,year})=>MOS[month].slice(0,3)+' '+String(year).slice(2));
+    // Trend: compare last month to 3-month avg before it
+    const last=trendData[trendData.length-1];
+    const prev3=trendData.slice(-4,-1);
+    const avgPrev=prev3.length?prev3.reduce((s,v)=>s+v,0)/prev3.length:0;
+    const trendPct=avgPrev>0?((last-avgPrev)/avgPrev*100):0;
+    const trendBadge=document.getElementById('an-spend-trend-badge');
+    if(trendBadge&&avgPrev>0){
+      const up=trendPct>3,down=trendPct<-3;
+      trendBadge.textContent=(up?'↑ ':down?'↓ ':'')+Math.abs(trendPct).toFixed(0)+'% vs avg';
+      trendBadge.style.background=up?'var(--red-light)':down?'var(--green-light)':'var(--paper-2)';
+      trendBadge.style.color=up?'var(--red)':down?'var(--green)':'var(--ink-3)';
+    }
+    const trendNote=document.getElementById('an-trend-note');
+    if(trendNote&&avgPrev>0){
+      const diff=last-avgPrev;
+      trendNote.textContent=diff>0?`Spending up ${fmt(diff)} vs 3-month average`:diff<0?`Spending down ${fmt(Math.abs(diff))} vs 3-month average`:'On par with 3-month average';
+    }
+    dChart('an-exp-trend');
+    CI['an-exp-trend']=new Chart(document.getElementById('an-exp-trend').getContext('2d'),{
+      type:'bar',
+      data:{labels:trendLabels,datasets:[{data:trendData,backgroundColor:trendData.map((v,i)=>i===trendData.length-1?'#c0392bcc':'#c0392b55'),borderColor:'#c0392b',borderWidth:1.5,borderRadius:6}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.raw)}`}}},scales:{y:{ticks:{callback:v=>fmt(v),font:{size:10}},grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false},ticks:{font:{size:10}}}}}
+    });
+  }
+
+  // ── CATEGORY BREAKDOWN (all-time, % of income) ──
+  const allExp=S.expenses.filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e));
+  const tot=allExp.reduce((s,e)=>s+parseFloat(e.amount),0);
+  const ct={};allExp.forEach(e=>{ct[e.cat]=(ct[e.cat]||0)+parseFloat(e.amount);});
+  const sorted=Object.entries(ct).sort((a,b)=>b[1]-a[1]);
+  const catPeriodEl=document.getElementById('an-cat-period');
+  if(catPeriodEl)catPeriodEl.textContent='all time';
+  const topCatPeriodEl=document.getElementById('an-top-cat-period');
+  if(topCatPeriodEl)topCatPeriodEl.textContent=cumInc>0?'% of all income':'% of total spend';
+
+  dChart('cat-pie');
+  if(sorted.length){
+    CI['cat-pie']=new Chart(document.getElementById('cat-pie').getContext('2d'),{
+      type:'doughnut',
+      data:{labels:sorted.map(x=>x[0]),datasets:[{data:sorted.map(x=>x[1]),backgroundColor:sorted.map(x=>gCat(x[0]).color+'cc'),borderColor:sorted.map(x=>gCat(x[0]).color),borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'55%'}
+    });
+    document.getElementById('cat-pie-leg').innerHTML=sorted.slice(0,6).map(([cat])=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:10px;height:10px;border-radius:2px;background:${gCat(cat).color};display:inline-block;"></span>${cat}</span>`).join('');
+  }
+
+  // Top categories with % of income (not just % of spend)
+  document.getElementById('top-cats').innerHTML=sorted.slice(0,5).map(([cat,amt])=>{
+    const pctOfSpend=(amt/Math.max(1,tot)*100);
+    const pctOfInc=cumInc>0?(amt/cumInc*100):0;
+    const c=gCat(cat);
+    const barW=pctOfSpend.toFixed(1);
+    const dispPct=cumInc>0?pctOfInc.toFixed(1)+'% of income':pctOfSpend.toFixed(1)+'% of spend';
+    return`<div style="display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--paper-2);">
+      <div style="width:30px;height:30px;border-radius:8px;background:${c.color}22;display:flex;align-items:center;justify-content:center;font-size:16px;font-family:system-ui,sans-serif;">${c.icon}</div>
+      <div style="flex:1;">
+        <div style="font-size:12.5px;font-weight:500;">${cat}</div>
+        <div class="pw" style="margin-top:4px;"><div class="pb" style="width:${barW}%;background:${c.color}99;"></div></div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:12px;font-weight:600;">${fmt(amt)}</div>
+        <div style="font-size:10px;color:var(--ink-3);">${dispPct}</div>
+      </div>
+    </div>`;
+  }).join('')||'<div class="empty"><div class="icon">📊</div><p>No expense data yet</p></div>';
 }
 function renderAnSav(){const mwd=mwData();if(!mwd.length)return;let cum=0;const cd=mwd.map(({month,year})=>{cum+=S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0);return{label:MOS[month].slice(0,3)+' '+year,value:cum};});const md=mwd.map(({month,year})=>({label:MOS[month].slice(0,3)+' '+year,value:S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0)}));dChart('sav-cum');CI['sav-cum']=new Chart(document.getElementById('sav-cum').getContext('2d'),{type:'line',data:{labels:cd.map(d=>d.label),datasets:[{data:cd.map(d=>d.value),borderColor:'#2d7a5f',backgroundColor:'#2d7a5f22',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:'#2d7a5f'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}});dChart('sav-mon');CI['sav-mon']=new Chart(document.getElementById('sav-mon').getContext('2d'),{type:'bar',data:{labels:md.map(d=>d.label),datasets:[{data:md.map(d=>d.value),backgroundColor:'#2d7a5f99',borderColor:'#2d7a5f',borderWidth:2,borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}});}
 function renderAnMon(){const mwd=mwData();if(!mwd.length)return;const lb=mwd.map(({month,year})=>MOS[month].slice(0,3)+' '+year);const id_=mwd.map(({month,year})=>earnedForPeriod(month,year));const sd=mwd.map(({month,year})=>mExps(month,year).filter(e=>!isFuture(e)&&e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0));const vd=mwd.map(({month,year})=>S.contributions.filter(c=>{const d=new Date(c.date);return d.getMonth()===month&&d.getFullYear()===year;}).reduce((s,c)=>s+parseFloat(c.amount),0));dChart('inc-exp');CI['inc-exp']=new Chart(document.getElementById('inc-exp').getContext('2d'),{type:'bar',data:{labels:lb,datasets:[{label:'Income',data:id_,type:'line',borderColor:'#c9a84c',backgroundColor:'rgba(201,168,76,0.1)',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:'#c9a84c',borderWidth:2,order:1},{label:'Spent',data:sd,backgroundColor:'#c0392b88',borderColor:'#c0392b',borderWidth:1,borderRadius:4,order:2},{label:'Saved',data:vd,backgroundColor:'#2d7a5f88',borderColor:'#2d7a5f',borderWidth:1,borderRadius:4,order:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'bottom',labels:{font:{size:10},boxWidth:10,usePointStyle:true}}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}});document.getElementById('mon-sum').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--paper-2);">${['Month','Income','Spent','Saved','Left','Rate'].map(h=>`<th style="padding:7px 8px;text-align:${h==='Month'?'left':'right'};font-weight:500;color:var(--ink-3);">${h}</th>`).join('')}</tr></thead><tbody>${mwd.map(({month,year},i)=>{const mInc=id_[i],sp=sd[i],sv=vd[i],rem=mInc-sp-sv,rate=mInc>0?(sv/mInc*100).toFixed(1):0;return`<tr style="border-bottom:1px solid var(--paper-2);"><td style="padding:7px 8px;font-weight:500;">${lb[i]}</td><td style="padding:7px 8px;text-align:right;color:var(--green);">${fmt(mInc)}</td><td style="padding:7px 8px;text-align:right;color:var(--red);">${fmt(sp)}</td><td style="padding:7px 8px;text-align:right;color:var(--green);">${fmt(sv)}</td><td style="padding:7px 8px;text-align:right;color:${rem<0?'var(--red)':'var(--green)'};">${fmt(rem)}</td><td style="padding:7px 8px;text-align:right;"><span class="pill ${parseFloat(rate)>=15?'pill-g':'pill-r'}">${rate}%</span></td></tr>`;}).join('')}</tbody></table>`;}
@@ -5764,99 +5962,6 @@ window.copyCashFlowCSV=function(){
     a.click();showToast('CSV downloaded ✓');
   });
 };
-function renderAnExpOverview(){
-  const mwd=mwData().slice(-6);
-  const now=new Date(),m=now.getMonth(),y=now.getFullYear();
-  const allExp=S.expenses.filter(e=>e.cat!=='Savings Transfer');
-  const thisMonthExp=allExp.filter(e=>{const d=new Date(e.date);return d.getMonth()===m&&d.getFullYear()===y;});
-  const allTimeSpent=allExp.reduce((s,e)=>s+parseFloat(e.amount),0);
-  const thisMonthSpent=thisMonthExp.reduce((s,e)=>s+parseFloat(e.amount),0);
-  const avgMonthSpent=mwd.length?mwd.reduce((s,{month,year})=>s+mExps(month,year).filter(e=>e.cat!=='Savings Transfer').reduce((t,e)=>t+parseFloat(e.amount),0),0)/mwd.length:0;
-  // Biggest category this month
-  const bc=byCat(m,y);delete bc['Savings Transfer'];
-  const topCat=Object.entries(bc).sort((a,b)=>b[1]-a[1])[0];
-  const el=document.getElementById('an-exp-stats');
-  if(el)el.innerHTML=`
-    <div class="card" style="padding:12px;"><div class="ct">This Month</div><div class="cv" style="font-size:18px;color:var(--red);">${fmt(thisMonthSpent)}</div><div class="cs">${thisMonthExp.length} transactions</div></div>
-    <div class="card" style="padding:12px;"><div class="ct">Avg / Month</div><div class="cv" style="font-size:18px;">${fmt(avgMonthSpent)}</div><div class="cs">Last ${mwd.length} months</div></div>
-    <div class="card" style="padding:12px;"><div class="ct">All-time Spent</div><div class="cv" style="font-size:18px;">${fmt(allTimeSpent)}</div><div class="cs">${allExp.length} transactions</div></div>
-    ${topCat?`<div class="card" style="padding:12px;"><div class="ct">Top Category</div><div style="font-size:16px;font-weight:600;color:var(--ink);margin:4px 0 2px;"><span style="font-family:system-ui,sans-serif;">${gCat(topCat[0]).icon}</span> ${topCat[0]}</div><div class="cs">${fmt(topCat[1])} this month</div></div>`:''}`;  // Monthly spending trend chart
-  dChart('an-exp-trend');
-  if(mwd.length){
-    const labels=mwd.map(({month,year})=>MOS[month].slice(0,3)+' '+year);
-    const data=mwd.map(({month,year})=>mExps(month,year).filter(e=>e.cat!=='Savings Transfer').reduce((s,e)=>s+parseFloat(e.amount),0));
-    CI['an-exp-trend']=new Chart(document.getElementById('an-exp-trend').getContext('2d'),{
-      type:'bar',
-      data:{labels,datasets:[{data,backgroundColor:'#c0392b88',borderColor:'#c0392b',borderWidth:2,borderRadius:6}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>fmt(v)},grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{display:false}}}}
-    });
-  }
-}
-
-function renderAnIncomeOverview(){
-  const now=new Date(),m=now.getMonth(),y=now.getFullYear();
-  const mwd=mwData().slice(-6);
-  // Stats — use actual receipts when available, forecast otherwise
-  const monthlyBase=monthlyBaseline();
-  // All-time earned = sum of actual receipts (cash only)
-  const cumIncActual=(S.incomeReceipts||[]).filter(r=>!r.noncash).reduce((sum,r)=>sum+(parseFloat(r.amount)||0),0);
-  // This month = actual receipts if any, else forecast
-  const thisMonthInc=actualIncomeOrForecast(m,y);
-  const cashSources=S.incomeSources.filter(s=>!s.noncash);
-  const receiptCount=(S.incomeReceipts||[]).filter(r=>!r.noncash).length;
-  // Count only sources that have actual cash receipts this month
-  const thisMonthReceipts=(S.incomeReceipts||[]).filter(r=>{
-    if(r.noncash||!r.date)return false;
-    const d=new Date(r.date);
-    return d.getMonth()===m&&d.getFullYear()===y;
-  });
-  const hasActualThisMonth=incomeReceiptsCashTotal(m,y)>0;
-  const activeSrcCount=hasActualThisMonth
-    ? new Set(thisMonthReceipts.map(r=>r.sourceId).filter(Boolean)).size || thisMonthReceipts.length
-    : cashSources.length;
-  const srcLabel=hasActualThisMonth
-    ? `${activeSrcCount} source${activeSrcCount!==1?'s':''} · actual`
-    : `${cashSources.length} source${cashSources.length!==1?'s':''} · forecast`;
-  const statsEl=document.getElementById('an-inc-stats');
-  if(statsEl)statsEl.innerHTML=`
-    <div class="card" style="padding:12px;"><div class="ct">This Month</div><div class="cv" style="font-size:18px;color:var(--green);">${fmt(thisMonthInc)}</div><div class="cs">${srcLabel}</div></div>
-    <div class="card" style="padding:12px;"><div class="ct">Monthly Baseline</div><div class="cv" style="font-size:18px;color:var(--green);">${fmt(monthlyBase)}</div><div class="cs">Recurring sources only</div></div>
-    <div class="card" style="padding:12px;"><div class="ct">All-time Received</div><div class="cv" style="font-size:18px;color:var(--gold);">${fmt(cumIncActual)}</div><div class="cs">${receiptCount} receipt${receiptCount!==1?'s':''} logged</div></div>`;
-  // Income by source doughnut — actual receipts this month; fallback to forecast if none
-  if(cashSources.length){
-    dChart('an-inc-chart');
-    const clrs=['#c9a84c','#2d7a5f','#2471a3','#8e44ad','#c0392b','#e67e22'];
-    // Build receipt totals by sourceId for this month
-    const receiptsBySource={};
-    (S.incomeReceipts||[]).filter(r=>{
-      if(r.noncash||!r.date)return false;
-      const d=new Date(r.date);
-      return d.getMonth()===m&&d.getFullYear()===y;
-    }).forEach(r=>{
-      if(r.sourceId)receiptsBySource[r.sourceId]=(receiptsBySource[r.sourceId]||0)+(parseFloat(r.amount)||0);
-    });
-    const hasActual=Object.keys(receiptsBySource).length>0;
-    const chartAmts=cashSources.map(s=>hasActual?(receiptsBySource[s.id]||0):monthlyEq(s,m,y)||parseFloat(s.amount));
-    const visEntries=cashSources.map((s,i)=>({s,i,amt:chartAmts[i]})).filter(e=>e.amt>0);
-    if(visEntries.length){
-      CI['an-inc-chart']=new Chart(document.getElementById('an-inc-chart').getContext('2d'),{
-        type:'doughnut',
-        data:{labels:visEntries.map(e=>e.s.name),datasets:[{data:visEntries.map(e=>e.amt),backgroundColor:visEntries.map(e=>clrs[e.i%clrs.length]+'cc'),borderColor:visEntries.map(e=>clrs[e.i%clrs.length]),borderWidth:2}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmt(c.raw)}`}}},cutout:'60%'}
-      });
-    }
-    // Update subtitle to clarify actual vs forecast
-    const incOvCard=document.getElementById('an-inc-chart')?.closest('.card');
-    if(incOvCard){const sh=incOvCard.querySelector('.sh');if(sh){let p=sh.querySelector('p');if(!p){p=document.createElement('p');sh.appendChild(p);}p.textContent=hasActual?'Actual receipts this month':'Forecast — no receipts recorded yet';}}
-    const legEl=document.getElementById('an-inc-leg');
-    if(legEl)legEl.innerHTML=cashSources.map((s,i)=>{
-      const amt=chartAmts[i];
-      return`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);opacity:${amt>0?1:0.35};"><span style="width:10px;height:10px;border-radius:2px;background:${clrs[i%clrs.length]};display:inline-block;"></span>${s.name}</span>`;
-    }).join('');
-  }
-}
-
-
 // ── INIT ──
 // All functions and state declared — now safe to start auth
 wrapSaveFunctions();

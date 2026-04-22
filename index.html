@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script>
 (function(){
-  const m={name:"Pocket — Personal Finance",short_name:"Pocket",description:"Personal budgeting and savings tracker",start_url:".",display:"standalone",background_color:"#1a1a2e",theme_color:"#1a1a2e",orientation:"any",icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231a1a2e' rx='20'/%3E%3Crect x='15' y='15' width='70' height='70' fill='%23c9a84c' rx='14'/%3E%3Crect x='22' y='22' width='56' height='56' fill='%231a1a2e' rx='10'/%3E%3Ctext x='50' y='68' font-family='serif' font-size='48' font-weight='bold' fill='%23c9a84c' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E",sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"}]};
+  const m={name:"Pocket — Personal Finance",short_name:"Pocket",description:"Personal budgeting and savings tracker",start_url:".",display:"standalone",background_color:"#1a1a2e",theme_color:"#1a1a2e",orientation:"portrait",icons:[{src:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%231a1a2e' rx='20'/%3E%3Crect x='15' y='15' width='70' height='70' fill='%23c9a84c' rx='14'/%3E%3Crect x='22' y='22' width='56' height='56' fill='%231a1a2e' rx='10'/%3E%3Ctext x='50' y='68' font-family='serif' font-size='48' font-weight='bold' fill='%23c9a84c' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E",sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"}]};
   const b=new Blob([JSON.stringify(m)],{type:'application/manifest+json'});
   const l=document.createElement('link');l.rel='manifest';l.href=URL.createObjectURL(b);document.head.appendChild(l);
 })();
@@ -721,9 +721,6 @@ select.fi:focus{border-color:var(--gold);outline:none;}
 
 <!-- EXPENSES -->
 <div id="page-expenses" class="page">
-  <!-- Expense FAB — gold gradient, consistent with global FAB, shown on expenses page on both mobile and desktop -->
-  <button id="exp-page-fab" onclick="openExpenseModal()" aria-label="Add expense"
-    class="fab" style="display:none;z-index:41;">+</button>
   <!-- Month navigator — only visible when preset=month -->
   <div class="mnav" id="exp-month-nav" style="margin-bottom:4px;">
     <button onclick="changeExpMonth(-1)" aria-label="Previous month">←</button>
@@ -902,6 +899,8 @@ select.fi:focus{border-color:var(--gold);outline:none;}
       <div id="cf-table" style="overflow-x:auto;"></div>
     </div>
   </div>
+
+
 </div>
 
 <!-- INCOME -->
@@ -1267,6 +1266,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
 </div><!-- end .app -->
 
 <button class="fab" id="fab" onclick="openFabMenu()" aria-label="Quick add">+</button>
+<button class="fab" id="exp-page-fab" onclick="openExpenseModal()" aria-label="Add expense" style="display:none;z-index:41;">+</button>
 
 <!-- MODALS -->
 <div class="mo" id="expense-modal"><div class="modal"><div class="mh"></div>
@@ -1407,7 +1407,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
     <div class="fg" style="display:flex;align-items:flex-end;padding-bottom:2px;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:500;color:var(--ink-2);"><input type="checkbox" id="in-pin" style="width:16px;height:16px;cursor:pointer;"/> 📌 Pin to dashboard</label></div>
     <div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="in-note" placeholder="Any detail..."/></div>
   </div>
-  <div id="in-spread-row" style="display:none;" class="s-row" style="padding:8px 0;">
+  <div id="in-spread-row" style="display:none;padding:8px 0;" class="s-row">
     <div><div class="s-lbl" style="font-size:12px;">Recording method</div><div class="s-sub">How to show this in your monthly income</div></div>
     <select class="fi" id="in-spread" style="width:auto;padding:6px 8px;font-size:12px;" onchange="onSpreadChange()">
       <option value="spread">Spread across all months</option>
@@ -1415,6 +1415,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
     </select>
   </div>
   <div id="in-freq-note" style="background:var(--blue-light);border-radius:var(--radius-sm);padding:8px 12px;font-size:11px;color:var(--blue);margin-bottom:4px;display:none;"></div>
+  <div class="fg" id="in-acct-row" style="display:none;"><label class="fl">Default Account</label><select class="fi" id="in-acct"><option value="">— Not specified —</option></select><div style="font-size:10px;color:var(--ink-3);margin-top:3px;">Income receipts from this source will pre-fill this account.</div></div>
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('income-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveIncome()">Save</button></div>
 </div></div>
 
@@ -1550,6 +1551,8 @@ select.fi:focus{border-color:var(--gold);outline:none;}
       <option value="other">Other</option>
     </select>
   </div>
+  <div class="fg" id="rv-acct-row" style="display:none;"><label class="fl">Paid from Account</label><select class="fi" id="rv-acct"><option value="">— Not specified —</option></select></div>
+  <div style="background:var(--blue-light);border-radius:var(--radius-sm);padding:8px 12px;font-size:11px;color:var(--blue);margin-bottom:8px;">This amount will be deducted from your wallet balance as a lending expense.</div>
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('receivable-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveReceivable()">Save</button></div>
 </div></div>
 
@@ -3119,6 +3122,57 @@ window.toggleRolloverBtn=function(){
   val.value=isOn?'true':'false';
   btn.setAttribute('aria-checked',isOn?'true':'false');
 };
+window.openBudgetDrill=function(cat){
+  const m=budgetMonth,y=budgetYear;
+  const b=S.budgets.find(x=>x.cat===cat);
+  if(!b)return;
+  const c=gCat(cat);
+  const exps=mExps(m,y).filter(e=>!isFuture(e)&&(e.cat===cat||gCat(e.cat).name===cat));
+  const sp=exps.reduce((s,e)=>s+parseFloat(e.amount),0);
+  const isCurrentMonth=m===new Date().getMonth()&&y===new Date().getFullYear();
+  const effLimit=isCurrentMonth?effectiveBudgetLimit(cat):(b.limit||0);
+  const rawPct=effLimit>0?sp/effLimit*100:0;
+  const isOver=rawPct>100;
+  // Header
+  const title=document.getElementById('bud-drill-title');
+  if(title)title.innerHTML=`<span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name}`;
+  const badge=document.getElementById('bud-drill-badge');
+  if(badge){
+    badge.textContent=rawPct.toFixed(0)+'%'+(isOver?' ⚠':'');
+    badge.className='pill '+(isOver?'pill-r':rawPct>70?'pill-gold':'pill-g');
+  }
+  // Summary bar
+  const sumEl=document.getElementById('bud-drill-summary');
+  if(sumEl){
+    sumEl.innerHTML=`
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-3);margin-bottom:4px;">
+        <span>${fmt(sp)} spent</span><span>${fmt(effLimit)} limit</span>
+      </div>
+      <div class="pw"><div class="pb ${isOver?'pb-red':rawPct>70?'pb-gold':'pb-green'}" style="width:${Math.min(100,rawPct).toFixed(1)}%"></div></div>
+      <div style="font-size:11px;color:var(--ink-3);margin-top:4px;">${MOS[m]} ${y} · ${exps.length} transaction${exps.length!==1?'s':''}</div>`;
+  }
+  // Transaction list
+  const listEl=document.getElementById('bud-drill-list');
+  if(listEl){
+    if(!exps.length){
+      listEl.innerHTML='<div class="empty"><div class="icon">📋</div><p>No transactions in this category for '+MOS[m]+'.</p></div>';
+    } else {
+      const sorted=[...exps].sort((a,b)=>new Date(b.date)-new Date(a.date));
+      listEl.innerHTML=sorted.map(e=>`
+        <div class="li">
+          <div class="li-ic" style="background:${c.color}22;color:${c.color};font-family:system-ui,sans-serif;">${c.icon}</div>
+          <div class="li-nm">
+            <div class="p">${e.desc}${e.recurring?' <span class="rb">↻</span>':''}</div>
+            <div class="s">${new Date(e.date).toLocaleDateString('en-GH',{day:'numeric',month:'short'})}${e.note?' · '+e.note:''}</div>
+          </div>
+          <div class="li-am" style="color:var(--red);margin-right:6px;">−${fmt(e.amount)}</div>
+          <button class="btn btn-ghost btn-sm" onclick="closeModal('bud-drill-modal');openExpenseModal('${e.id}')">Edit</button>
+        </div>`).join('');
+    }
+  }
+  openModal('bud-drill-modal');
+};
+
 window.openBudgetModal=function(cat){
   popCatSel('bud-cat');
   const btn=document.getElementById('bud-rollover-btn');
@@ -3383,32 +3437,48 @@ function renderAnOverview(){
   }
 
   // ── SPENDING TREND (last 6 months) with trend indicator ──
-  const trendMwd=mwd.slice(-6);
-  if(trendMwd.length>=2){
-    const trendData=trendMwd.map(({month,year})=>mExps(month,year).filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0));
-    const trendLabels=trendMwd.map(({month,year})=>MOS[month].slice(0,3)+' '+String(year).slice(2));
-    // Trend: compare last month to 3-month avg before it
-    const last=trendData[trendData.length-1];
-    const prev3=trendData.slice(-4,-1);
-    const avgPrev=prev3.length?prev3.reduce((s,v)=>s+v,0)/prev3.length:0;
-    const trendPct=avgPrev>0?((last-avgPrev)/avgPrev*100):0;
-    const trendBadge=document.getElementById('an-spend-trend-badge');
-    if(trendBadge&&avgPrev>0){
+  // Always include current month even if no expenses yet
+  const trendBase=mwd.slice(-6);
+  const currentKey=y+'-'+String(m).padStart(2,'0');
+  const hasCurrent=trendBase.some(x=>x.year===y&&x.month===m);
+  const trendMwd=hasCurrent?trendBase:[...trendBase,{month:m,year:y}].slice(-6);
+
+  const trendData=trendMwd.map(({month,year})=>mExps(month,year).filter(e=>e.cat!=='Savings Transfer'&&!isFuture(e)).reduce((s,e)=>s+parseFloat(e.amount),0));
+  const trendLabels=trendMwd.map(({month,year})=>MOS[month].slice(0,3)+' '+String(year).slice(2));
+  // Trend: compare last month to 3-month avg before it
+  const last=trendData[trendData.length-1];
+  const prev3=trendData.slice(-4,-1);
+  const avgPrev=prev3.length?prev3.reduce((s,v)=>s+v,0)/prev3.length:0;
+  const trendPct=avgPrev>0?((last-avgPrev)/avgPrev*100):0;
+  const trendBadge=document.getElementById('an-spend-trend-badge');
+  if(trendBadge){
+    if(avgPrev>0){
       const up=trendPct>3,down=trendPct<-3;
       trendBadge.textContent=(up?'↑ ':down?'↓ ':'')+Math.abs(trendPct).toFixed(0)+'% vs avg';
       trendBadge.style.background=up?'var(--red-light)':down?'var(--green-light)':'var(--paper-2)';
       trendBadge.style.color=up?'var(--red)':down?'var(--green)':'var(--ink-3)';
+    } else {
+      trendBadge.textContent='';
     }
-    const trendNote=document.getElementById('an-trend-note');
-    if(trendNote&&avgPrev>0){
+  }
+  const trendNote=document.getElementById('an-trend-note');
+  if(trendNote){
+    if(avgPrev>0){
       const diff=last-avgPrev;
       trendNote.textContent=diff>0?`Spending up ${fmt(diff)} vs 3-month average`:diff<0?`Spending down ${fmt(Math.abs(diff))} vs 3-month average`:'On par with 3-month average';
+    } else if(trendData.every(v=>v===0)){
+      trendNote.textContent='Record expenses to see your spending trend.';
+    } else {
+      trendNote.textContent='';
     }
-    dChart('an-exp-trend');
-    CI['an-exp-trend']=new Chart(document.getElementById('an-exp-trend').getContext('2d'),{
+  }
+  dChart('an-exp-trend');
+  const trendCanvas=document.getElementById('an-exp-trend');
+  if(trendCanvas){
+    CI['an-exp-trend']=new Chart(trendCanvas.getContext('2d'),{
       type:'bar',
       data:{labels:trendLabels,datasets:[{data:trendData,backgroundColor:trendData.map((v,i)=>i===trendData.length-1?'#c0392bcc':'#c0392b55'),borderColor:'#c0392b',borderWidth:1.5,borderRadius:6}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.raw)}`}}},scales:{y:{ticks:{callback:v=>fmt(v),font:{size:10}},grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false},ticks:{font:{size:10}}}}}
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmt(c.raw)}`}}},scales:{y:{ticks:{callback:v=>fmt(v),font:{size:10}},grid:{color:'rgba(0,0,0,.04)'},beginAtZero:true},x:{grid:{display:false},ticks:{font:{size:10}}}}}
     });
   }
 
@@ -3953,6 +4023,16 @@ window.openIncomeModal=function(id){
     document.getElementById('in-pin').checked=false;
     if(document.getElementById('in-spread'))document.getElementById('in-spread').value='spread';
   }
+  // Populate default account selector
+  const acctRow=document.getElementById('in-acct-row');
+  const acctSel=document.getElementById('in-acct');
+  if(acctSel&&(S.accounts||[]).length){
+    acctRow.style.display='block';
+    acctSel.innerHTML='<option value="">— Not specified —</option>'+(S.accounts||[]).map(a=>`<option value="${a.id}">${ACCT_ICONS[a.type]||'📦'} ${a.name}</option>`).join('');
+    if(id){const s=S.incomeSources.find(x=>x.id===id);if(s?.defaultAccountId)acctSel.value=s.defaultAccountId;}
+  } else if(acctRow){
+    acctRow.style.display='none';
+  }
   updateIncomeModalFields();
   openModal('income-modal');
 };
@@ -3965,6 +4045,7 @@ window.saveIncome=async function(){
   const noncash=document.getElementById('in-nc').checked;
   const pinned=document.getElementById('in-pin').checked;
   const spread=document.getElementById('in-spread')?.value||'spread';
+  const defaultAccountId=document.getElementById('in-acct')?.value||null;
   const needsDate=freq==='onetime'||((freq==='quarterly'||freq==='annual')&&spread==='received');
   const day=needsDate?null:(parseInt(document.getElementById('in-day').value)||null);
   const date=needsDate?document.getElementById('in-date').value:null;
@@ -3975,7 +4056,7 @@ window.saveIncome=async function(){
   if(needsDate&&!date){setFieldError('in-date','Payment date is required');hasErrI=true;}
   if(hasErrI)return;
   const id=IID||'i'+Date.now();
-  const data={name,amount,freq,type,day,date,note,noncash,pinned,spread};
+  const data={name,amount,freq,type,day,date,note,noncash,pinned,spread,defaultAccountId:defaultAccountId||null};
   if(IID){const i=S.incomeSources.findIndex(s=>s.id===IID);if(i>-1)S.incomeSources[i]={...S.incomeSources[i],...data};}
   else S.incomeSources.push({id,...data});
   await saveDoc('income',id,data);
@@ -4280,7 +4361,7 @@ function prefillReceiptAccount(srcId){
 
 // Render accounts list in settings
 // ── ACCOUNTS PAGE RENDER ──────────────────────────────────
-function renderAccountsPage(){
+window.renderAccountsPage=function renderAccountsPage(){
   const accounts=S.accounts||[];
   const emptyEl=document.getElementById('acct-empty-state');
   const activeEl=document.getElementById('acct-active-state');
@@ -4433,8 +4514,8 @@ function renderAccountsPage(){
   }).join('');
 }
 
-// Keep legacy renderAccounts as alias (called from old settings path, now a no-op)
-function renderAccounts(){renderAccountsPage();}
+// Keep legacy renderAccounts as alias
+function renderAccounts(){window.renderAccountsPage();}
 
 // Render accounts strip on dashboard
 function renderDashAccountsStrip(){
@@ -4591,6 +4672,7 @@ function applyReceiptToAccount(accountId, amount, isAdd){
 
 // ── SETTINGS ──
 window.updateLnInc=function(){const el=document.getElementById('ln-inc');if(el)el.textContent=fmt(totInc());};
+
 window.calcLoan=function(){
   const lbl=document.getElementById('ln-lbl')?.value.trim()||'Loan';
   const price=parseFloat(document.getElementById('ln-price')?.value)||0;
@@ -4928,7 +5010,10 @@ function renderDebt(){
           ${[...l.payments].reverse().map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--paper-2);font-size:11px;">
             <div><div style="font-weight:500;">${new Date(p.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}</div>
             <div style="color:var(--ink-3);">Principal: ${fmt(p.principal)} · Interest: ${fmt(p.interest)}</div></div>
-            <div style="text-align:right;"><div style="color:var(--green);font-weight:500;">${fmt(p.amount)}</div><div style="color:var(--ink-3);">Bal: ${fmt(p.balanceAfter)}</div></div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="text-align:right;"><div style="color:var(--green);font-weight:500;">${fmt(p.amount)}</div><div style="color:var(--ink-3);">Bal: ${fmt(p.balanceAfter)}</div></div>
+              <button onclick="delLoanPayment('${l.id}','${p.id}')" style="background:var(--red-light);color:var(--red);border:none;border-radius:6px;padding:3px 7px;font-size:11px;cursor:pointer;">✕</button>
+            </div>
           </div>`).join('')}
         </div>
       </div>`:''}
@@ -5052,6 +5137,25 @@ window.saveLoanPayment=async function(){
   showToast(newBal<=0?'Loan fully paid off! 🎉':'Payment recorded ✓');
   payingLoanId=null;
 };
+window.delLoanPayment=async function(loanId,paymentId){
+  if(!await pktConfirm({title:'Delete payment?',msg:'This payment record will be removed and the loan balance will be recalculated.',icon:'💳',okLabel:'Delete',danger:true}))return;
+  const li=S.loans.findIndex(l=>l.id===loanId);
+  if(li<0)return;
+  const loan=S.loans[li];
+  const payment=loan.payments?.find(p=>p.id===paymentId);
+  if(!payment)return;
+  // Remove the payment and recalculate balance
+  const newPayments=(loan.payments||[]).filter(p=>p.id!==paymentId);
+  // Balance = last payment's balanceAfter, or original if no payments remain
+  const lastPmt=newPayments.length?[...newPayments].sort((a,b)=>new Date(a.date)-new Date(b.date))[newPayments.length-1]:null;
+  const newBalance=lastPmt?lastPmt.balanceAfter:loan.original;
+  S.loans[li]={...loan,payments:newPayments,balance:newBalance};
+  // Also remove the linked expense if exists
+  const expToRemove=S.expenses.find(e=>e.note&&e.note.includes('Loan payment')&&e.date===payment.date&&parseFloat(e.amount)===parseFloat(payment.amount));
+  if(expToRemove){S.expenses=S.expenses.filter(e=>e.id!==expToRemove.id);await delDoc('expenses',expToRemove.id);}
+  await saveS();renderDebt();renderNetWorth();renderDash();showToast('Payment removed ✓');
+};
+
 window.delLoan=async function(id){
   if(!await pktConfirm({title:'Delete loan?',msg:'This loan and all its payment history will be removed.',icon:'🏦',okLabel:'Delete',danger:true}))return;
   S.loans=(S.loans||[]).filter(l=>l.id!==id);
@@ -5138,7 +5242,10 @@ function renderReceivables(){
           ${[...r.repayments].reverse().map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--paper-2);font-size:11px;">
             <div><div style="font-weight:500;">${new Date(p.date).toLocaleDateString('en-GH',{day:'numeric',month:'short',year:'numeric'})}</div>
             ${p.note?`<div style="color:var(--ink-3);">${p.note}</div>`:''}</div>
-            <div style="text-align:right;"><div style="color:var(--green);font-weight:500;">+${fmt(p.amount)}</div><div style="color:var(--ink-3);">Bal: ${fmt(p.balanceAfter)}</div></div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="text-align:right;"><div style="color:var(--green);font-weight:500;">+${fmt(p.amount)}</div><div style="color:var(--ink-3);">Bal: ${fmt(p.balanceAfter)}</div></div>
+              <button onclick="delReceivableRepayment('${r.id}','${p.id}')" style="background:var(--red-light);color:var(--red);border:none;border-radius:6px;padding:3px 7px;font-size:11px;cursor:pointer;">✕</button>
+            </div>
           </div>`).join('')}
         </div>
       </div>`:''}
@@ -5174,6 +5281,16 @@ window.openReceivableModal=function(id){
     document.getElementById('rv-note').value='';
     document.getElementById('rv-type').value='personal';
   }
+  // Populate account selector
+  const acctRow=document.getElementById('rv-acct-row');
+  const acctSel=document.getElementById('rv-acct');
+  if(acctSel&&(S.accounts||[]).length){
+    acctRow.style.display='block';
+    acctSel.innerHTML='<option value="">— Not specified —</option>'+(S.accounts||[]).map(a=>`<option value="${a.id}">${ACCT_ICONS[a.type]||'📦'} ${a.name} (${fmt(a.balance||0)})</option>`).join('');
+    if(id){const r=(S.receivables||[]).find(x=>x.id===id);if(r?.accountId)acctSel.value=r.accountId;}
+  } else if(acctRow){
+    acctRow.style.display='none';
+  }
   openModal('receivable-modal');
 };
 
@@ -5184,6 +5301,7 @@ window.saveReceivable=async function(){
   const due=document.getElementById('rv-due').value;
   const note=document.getElementById('rv-note').value.trim();
   const type=document.getElementById('rv-type').value;
+  const accountId=document.getElementById('rv-acct')?.value||null;
   clearAllErrors(['rv-name','rv-amt','rv-date']);
   let hasErr=false;
   if(!name){setFieldError('rv-name','Borrower name is required');hasErr=true;}
@@ -5192,18 +5310,33 @@ window.saveReceivable=async function(){
   if(hasErr)return;
   if(!S.receivables)S.receivables=[];
   const id=editRecvId||'rv'+Date.now();
-  const data={id,name,amount,date,due,note,type};
+  const data={id,name,amount,date,due,note,type,accountId:accountId||null};
+
   if(editRecvId){
+    const existing=S.receivables.find(r=>r.id===editRecvId);
+    // If amount changed and there's a linked expense, update it
+    if(existing?.linkedExpense){
+      const ei=S.expenses.findIndex(e=>e.id===existing.linkedExpense);
+      if(ei>-1){S.expenses[ei]={...S.expenses[ei],amount,date,note:note||'Money lent to '+name};await saveDoc('expenses',existing.linkedExpense,S.expenses[ei]);}
+    }
     const i=S.receivables.findIndex(r=>r.id===editRecvId);
-    if(i>-1)S.receivables[i]={...data,repayments:S.receivables[i].repayments||[]};
+    if(i>-1)S.receivables[i]={...data,repayments:S.receivables[i].repayments||[],linkedExpense:existing?.linkedExpense||null};
   } else {
-    S.receivables.push({...data,repayments:[]});
+    // Log an expense so wallet balance decreases
+    const expId='e'+Date.now();
+    const expData={desc:'Money lent — '+name,amount,cat:'Other',date,note:note||'',accountId:accountId||null,isLending:true,receivableId:id};
+    S.expenses.push({id:expId,...expData});
+    await saveDoc('expenses',expId,expData);
+    // Deduct from account if specified
+    if(accountId&&hasAccounts())applyExpenseToAccount(accountId,amount,false);
+    S.receivables.push({...data,repayments:[],linkedExpense:expId});
   }
   await saveS();
   closeModal('receivable-modal');
   renderReceivables();
   renderNetWorth();
-  showToast('Saved ✓');
+  renderDash();
+  showToast(editRecvId?'Updated ✓':'Recorded — amount deducted from wallet ✓');
   editRecvId=null;
 };
 
@@ -5251,10 +5384,36 @@ window.saveReceivableRepayment=async function(){
   repayingRecvId=null;
 };
 
+window.delReceivableRepayment=async function(receivableId,paymentId){
+  if(!await pktConfirm({title:'Delete repayment?',msg:'This repayment record will be removed.',icon:'🤝',okLabel:'Delete',danger:true}))return;
+  const ri=S.receivables.findIndex(r=>r.id===receivableId);
+  if(ri<0)return;
+  const recv=S.receivables[ri];
+  const payment=recv.repayments?.find(p=>p.id===paymentId);
+  if(!payment)return;
+  // Remove repayment and recalculate balance afters
+  const newRepayments=(recv.repayments||[]).filter(p=>p.id!==paymentId);
+  // Recalculate balanceAfter for remaining payments
+  const sorted=[...newRepayments].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  let bal=parseFloat(recv.amount)||0;
+  sorted.forEach(p=>{bal=Math.max(0,bal-parseFloat(p.amount));p.balanceAfter=bal;});
+  S.receivables[ri]={...recv,repayments:sorted};
+  // Remove the linked income receipt if exists
+  const irToRemove=(S.incomeReceipts||[]).find(r=>r.note&&r.note.includes('Repayment from '+recv.name)&&r.date===payment.date&&parseFloat(r.amount)===parseFloat(payment.amount));
+  if(irToRemove){S.incomeReceipts=S.incomeReceipts.filter(r=>r.id!==irToRemove.id);await delDoc('incomeReceipts',irToRemove.id);}
+  await saveS();renderReceivables();renderNetWorth();renderDash();showToast('Repayment removed ✓');
+};
+
 window.delReceivable=async function(id){
-  if(!await pktConfirm({title:'Delete receivable?',msg:'This record of money owed to you will be removed.',icon:'🤝',okLabel:'Delete',danger:true}))return;
+  if(!await pktConfirm({title:'Delete receivable?',msg:'This record and its linked expense entry will be removed.',icon:'🤝',okLabel:'Delete',danger:true}))return;
+  const r=(S.receivables||[]).find(x=>x.id===id);
+  // Remove linked lending expense
+  if(r?.linkedExpense){
+    S.expenses=S.expenses.filter(e=>e.id!==r.linkedExpense);
+    await delDoc('expenses',r.linkedExpense);
+  }
   S.receivables=(S.receivables||[]).filter(r=>r.id!==id);
-  await saveS();renderReceivables();renderNetWorth();showToast('Removed');
+  await saveS();renderReceivables();renderNetWorth();renderDash();showToast('Removed');
 };
 
 // ── FINANCIAL HEALTH SCORE ───────────────────────────────
@@ -5661,7 +5820,7 @@ function renderBudget(){
     return`<div class="bc">
       <div class="bc-h">
         <div class="bc-top">
-          <div class="bc-n"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name} <span class="pill ${pl}">${pct}%${isOver?' ⚠':''}</span>${b.rollover&&isCurrentMonth?'<span class="pill pill-b" style="font-size:11px">↻</span>':''}</div>
+          <div class="bc-n" onclick="openBudgetDrill('${b.cat}')" style="cursor:pointer;" title="Tap to see transactions"><span style="font-family:system-ui,sans-serif;">${c.icon}</span> ${c.name} <span class="pill ${pl}">${pct}%${isOver?' ⚠':''}</span>${b.rollover&&isCurrentMonth?'<span class="pill pill-b" style="font-size:11px">↻</span>':''}</div>
           <div class="bc-a">${fmt(sp)} / ${fmt(effLimit)}</div>
         </div>
         ${isCurrentMonth?`<div class="bc-bot">
@@ -6624,6 +6783,22 @@ function initApp(){
     </div>
   </div>
 </div>
+<!-- BUDGET CATEGORY DRILL-DOWN MODAL -->
+<div class="mo" id="bud-drill-modal" style="align-items:flex-end;">
+  <div class="modal" style="border-radius:var(--radius) var(--radius) 0 0;max-height:80vh;">
+    <div class="mh"></div>
+    <div class="sh" id="bud-drill-header">
+      <h2 id="bud-drill-title"></h2>
+      <span id="bud-drill-badge" class="pill"></span>
+    </div>
+    <div id="bud-drill-summary" style="margin-bottom:12px;"></div>
+    <div id="bud-drill-list" style="overflow-y:auto;max-height:50vh;"></div>
+    <div class="mfooter" style="margin-top:12px;">
+      <button class="btn btn-ghost btn-full" onclick="closeModal('bud-drill-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ACCOUNT MODAL -->
 <div class="mo" id="account-modal"><div class="modal"><div class="mh"></div>
   <div class="mt" id="acct-mt">Add Account</div>

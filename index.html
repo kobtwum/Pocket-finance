@@ -2888,6 +2888,12 @@ window.openExpenseModal=function(id){
   // Populate account selector
   populateAccountSelectors();
   if(id){const e=S.expenses.find(x=>x.id===id);const sel=document.getElementById('exp-acct');if(sel&&e?.accountId)sel.value=e.accountId;}
+  else{
+    // Pre-fill default account for new expenses
+    const defAcct=(S.accounts||[]).find(a=>a.isDefault);
+    const sel=document.getElementById('exp-acct');
+    if(sel&&defAcct)sel.value=defAcct.id;
+  }
   // Wire up budget warning + savings goal row visibility
   setTimeout(()=>{
     const catEl=document.getElementById('exp-cat');
@@ -4396,7 +4402,7 @@ window.renderAccountsPage=function renderAccountsPage(){
         <div style="display:flex;align-items:center;gap:12px;">
           <div style="width:44px;height:44px;border-radius:12px;background:var(--blue-light);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:22px;font-family:system-ui,sans-serif;flex-shrink:0;">${ACCT_ICONS[a.type]||'📦'}</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:14px;font-weight:600;color:var(--ink);">${a.name}</div>
+            <div style="font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px;">${a.name}${a.isDefault?'<span style="font-size:9px;font-weight:700;background:var(--gold);color:#fff;padding:2px 6px;border-radius:20px;letter-spacing:0.3px;">DEFAULT</span>':''}</div>
             <div style="font-size:11px;color:var(--ink-3);margin-top:1px;text-transform:capitalize;">${a.type||'account'}${a.note?' · '+a.note:''}</div>
           </div>
           <div style="text-align:right;">
@@ -4542,10 +4548,14 @@ window.openAccountModal=function(id){
       document.getElementById('acct-bal').value=a.balance||'';
       document.getElementById('acct-type').value=a.type||'bank';
       document.getElementById('acct-note').value=a.note||'';
+      const dfltCb=document.getElementById('acct-is-default');
+      if(dfltCb)dfltCb.checked=!!a.isDefault;
     }
   } else {
     ['acct-name','acct-bal','acct-note'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('acct-type').value='bank';
+    const dfltCb=document.getElementById('acct-is-default');
+    if(dfltCb)dfltCb.checked=false;
   }
   openModal('account-modal');
 };
@@ -4558,7 +4568,10 @@ window.saveAccount=async function(){
   if(!name){showToast('Enter an account name');return;}
   if(!S.accounts)S.accounts=[];
   const id=_editAcctId||'acct'+Date.now();
-  const data={name,balance,type,note};
+  const isDefault=document.getElementById('acct-is-default')?.checked||false;
+  const data={name,balance,type,note,isDefault};
+  // If this account is set as default, clear default from all others
+  if(isDefault)S.accounts.forEach(a=>{if(a.id!==id)a.isDefault=false;});
   if(_editAcctId){
     const i=S.accounts.findIndex(a=>a.id===_editAcctId);
     if(i>-1)S.accounts[i]={...S.accounts[i],...data};
@@ -6817,6 +6830,13 @@ function initApp(){
     </div>
   </div>
   <div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="acct-note" placeholder="e.g. Salary account"/></div>
+  <div class="fg" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface-2,var(--bg-2));border-radius:10px;">
+    <input type="checkbox" id="acct-is-default" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;"/>
+    <div>
+      <label for="acct-is-default" style="font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;">Set as default expense account</label>
+      <div style="font-size:11px;color:var(--ink-3);margin-top:1px;">New expenses will pre-fill this account automatically.</div>
+    </div>
+  </div>
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('account-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveAccount()">Save Account</button></div>
 </div></div>
 

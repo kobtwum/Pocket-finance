@@ -1160,12 +1160,10 @@ select.fi:focus{border-color:var(--gold);outline:none;}
           </div>
         </div>
         <div class="s-row">
-          <div><div class="s-lbl">Exchange Rate</div><div class="s-sub" id="rate-sub">Rate vs GHS (manual)</div></div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span style="font-size:12px;color:var(--ink-3);">1 GHS =</span>
-            <input class="fi" type="number" id="rate-input" step="0.0001" placeholder="0.0920" style="width:90px;padding:6px 8px;font-size:13px;" oninput="updateRate(this.value)"/>
-          </div>
+          <div><div class="s-lbl">Exchange Rates</div><div class="s-sub">GHS rates — used for FX expenses & accounts</div></div>
+          <button class="btn btn-ghost btn-sm" onclick="toggleRateTable()">Edit</button>
         </div>
+        <div id="rate-table" style="display:none;margin-top:8px;"></div>
       </div>
       <div class="card">
         <div class="sh"><h2>Data</h2></div>
@@ -1275,16 +1273,27 @@ select.fi:focus{border-color:var(--gold);outline:none;}
   <div class="g2">
     <div class="fg">
       <label class="fl req" for="exp-amt">Amount</label>
-      <div style="position:relative;">
-        <input class="fi" type="text" inputmode="text" id="exp-amt" placeholder="0.00 or 450+230" aria-required="true" autocomplete="off"
-          style="padding-right:36px;"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();evalExpAmt();}"
-          onblur="evalExpAmt()"/>
-        <button type="button" onclick="evalExpAmt()" title="Calculate"
-          style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--gold);color:var(--ink);border:none;border-radius:6px;width:24px;height:24px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">=</button>
+      <div style="display:flex;gap:6px;margin-bottom:4px;">
+        <select id="exp-fx-cur" class="fi" style="width:96px;flex-shrink:0;font-size:13px;" onchange="onExpFxChange()"></select>
+        <div style="position:relative;flex:1;">
+          <input class="fi" type="text" inputmode="text" id="exp-amt" placeholder="0.00 or 450+230" aria-required="true" autocomplete="off"
+            style="padding-right:36px;width:100%;box-sizing:border-box;"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();evalExpAmt();}"
+            onblur="evalExpAmt();onExpFxChange();"/>
+          <button type="button" onclick="evalExpAmt();onExpFxChange();" title="Calculate"
+            style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:var(--gold);color:var(--ink);border:none;border-radius:6px;width:24px;height:24px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">=</button>
+        </div>
       </div>
       <div id="exp-amt-preview" style="font-size:11px;color:var(--green);margin-top:3px;min-height:16px;"></div>
-      <div style="font-size:10px;color:var(--ink-3);margin-top:2px;">Tip: type an expression like <span style="font-family:monospace;">450+230</span> and tap <strong>=</strong> to calculate</div>
+      <div id="exp-fx-ghs-row" style="display:none;margin-top:6px;padding:8px 10px;background:var(--paper-2);border-radius:8px;">
+        <div style="font-size:11px;color:var(--ink-3);margin-bottom:4px;">GHS equivalent (used for all calculations)</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:13px;color:var(--ink-3);">₵</span>
+          <input class="fi" type="number" id="exp-fx-ghs" placeholder="0.00" step="0.01" style="flex:1;font-size:13px;" oninput="onExpFxGhsEdit()"/>
+          <div id="exp-fx-rate-hint" style="font-size:10px;color:var(--ink-3);white-space:nowrap;"></div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--ink-3);margin-top:4px;">Tip: type an expression like <span style="font-family:monospace;">450+230</span> and tap <strong>=</strong> to calculate</div>
     </div>
     <div class="fg"><label class="fl req" for="exp-date">Date</label><input class="fi" type="date" id="exp-date" aria-required="true"/></div>
   </div>
@@ -1655,29 +1664,133 @@ const CURRENCIES={
 const DEFAULT_RATES={USD:0.0920,EUR:0.0850,GBP:0.0720,NGN:142.5,KES:11.9,ZAR:1.68,XOF:55.4};
 let CUR=localStorage.getItem('pkt_cur')||'GHS';
 function getRate(c){const stored=localStorage.getItem('pkt_rate_'+c);return stored?parseFloat(stored):(DEFAULT_RATES[c]||1);}
+// Convert GHS amount to display currency
 function fmt(n){
   const v=parseFloat(n||0);
   if(CUR==='GHS')return'₵'+v.toLocaleString('en-GH',{minimumFractionDigits:2,maximumFractionDigits:2});
   const rate=getRate(CUR);const cv=v*rate;const sym=CURRENCIES[CUR]?.symbol||CUR;
   return sym+cv.toLocaleString(CURRENCIES[CUR]?.locale||'en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
+// Format an amount in a specific currency (ignores display CUR)
+function fmtFx(amount,currency){
+  const v=parseFloat(amount||0);
+  if(!currency||currency==='GHS')return'₵'+v.toLocaleString('en-GH',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const sym=CURRENCIES[currency]?.symbol||currency;
+  return sym+v.toLocaleString(CURRENCIES[currency]?.locale||'en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+// Convert foreign currency amount to GHS
+function toGHS(amount,currency){
+  if(!currency||currency==='GHS')return parseFloat(amount||0);
+  const rate=getRate(currency); // rate = units of currency per 1 GHS
+  return parseFloat(amount||0)/rate;
+}
+// Convert GHS to foreign currency
+function fromGHS(ghsAmount,currency){
+  if(!currency||currency==='GHS')return parseFloat(ghsAmount||0);
+  return parseFloat(ghsAmount||0)*getRate(currency);
+}
 window.setCur=function(c){CUR=c;localStorage.setItem('pkt_cur',c);updateCurUI();try{refreshPage();}catch(e){}try{const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(netCashPosition());}catch(e){}}
 window.updateRate=function(val){if(!val||isNaN(val))return;localStorage.setItem('pkt_rate_'+CUR,val);try{refreshPage();}catch(e){}try{const ri=document.getElementById('tb-inc');if(ri)ri.textContent=fmt(netCashPosition());}catch(e){}}
 function updateCurUI(){
-  // Only updates UI elements — never reads S, never calls refreshPage
   ['topbar-cur','set-cur'].forEach(id=>{
     const el=document.getElementById(id);if(!el)return;
     el.innerHTML=Object.entries(CURRENCIES).map(([k,v])=>`<option value="${k}" ${k===CUR?'selected':''}>${v.symbol} ${k}</option>`).join('');
     el.value=CUR;
   });
-  const ri=document.getElementById('rate-input');
-  const rs=document.getElementById('rate-sub');
-  if(ri){
-    if(CUR==='GHS'){ri.value='';ri.disabled=true;ri.placeholder='Base currency';}
-    else{ri.disabled=false;ri.value=getRate(CUR);ri.placeholder=String(DEFAULT_RATES[CUR]||'');}
-  }
-  if(rs)rs.textContent=CUR==='GHS'?'GHS is the base currency':`1 GHS = ${CURRENCIES[CUR]?.symbol||CUR} (edit to update)`;
+  // Populate FX currency selectors
+  const fxOpts=Object.entries(CURRENCIES).map(([k,v])=>`<option value="${k}">${v.symbol} ${k} — ${v.name}</option>`).join('');
+  ['exp-fx-cur','acct-currency'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    el.innerHTML=fxOpts;el.value='GHS';
+  });
+  // Rate table in settings
+  renderRateTable();
 }
+
+// ── FX RATE TABLE ─────────────────────────────────────────────
+let _rateTableOpen=false;
+window.toggleRateTable=function(){
+  _rateTableOpen=!_rateTableOpen;
+  const el=document.getElementById('rate-table');
+  if(el)el.style.display=_rateTableOpen?'block':'none';
+  if(_rateTableOpen)renderRateTable();
+};
+function renderRateTable(){
+  const el=document.getElementById('rate-table');if(!el||!_rateTableOpen)return;
+  el.innerHTML=Object.entries(CURRENCIES).filter(([k])=>k!=='GHS').map(([k,v])=>{
+    const stored=localStorage.getItem('pkt_rate_'+k);
+    const rate=stored?parseFloat(stored):DEFAULT_RATES[k];
+    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--paper-2);">
+      <span style="font-size:13px;min-width:36px;font-weight:600;">${v.symbol}</span>
+      <span style="font-size:12px;color:var(--ink-3);flex:1;">${v.name}</span>
+      <span style="font-size:11px;color:var(--ink-3);">1 GHS =</span>
+      <input class="fi" type="number" step="0.0001" value="${rate||''}" placeholder="${DEFAULT_RATES[k]||''}"
+        style="width:80px;padding:5px 7px;font-size:12px;" 
+        oninput="saveRate('${k}',this.value)"
+        onblur="if(!this.value)this.value='${DEFAULT_RATES[k]||''}'" />
+    </div>`;
+  }).join('')+`<div style="font-size:10px;color:var(--ink-3);margin-top:8px;">Rates are stored locally. Update periodically for accuracy.</div>`;
+}
+window.saveRate=function(currency,val){
+  if(!val||isNaN(val))return;
+  localStorage.setItem('pkt_rate_'+currency,val);
+};
+
+// ── FX EXPENSE MODAL HELPERS ──────────────────────────────────
+function populateFxCurSelect(){
+  const sel=document.getElementById('exp-fx-cur');if(!sel)return;
+  sel.innerHTML=Object.entries(CURRENCIES).map(([k,v])=>`<option value="${k}">${v.symbol} ${k}</option>`).join('');
+  sel.value='GHS';
+  // Pre-select currency of default account if it has one
+  const defAcct=(S.accounts||[]).find(a=>a.isDefault);
+  if(defAcct?.currency)sel.value=defAcct.currency;
+}
+
+window.onExpFxChange=function(){
+  const cur=document.getElementById('exp-fx-cur')?.value||'GHS';
+  const fxRow=document.getElementById('exp-fx-ghs-row');
+  const ghsInput=document.getElementById('exp-fx-ghs');
+  const hint=document.getElementById('exp-fx-rate-hint');
+  if(cur==='GHS'){
+    if(fxRow)fxRow.style.display='none';
+    return;
+  }
+  if(fxRow)fxRow.style.display='block';
+  // Auto-convert entered amount to GHS
+  const origAmt=parseFloat(document.getElementById('exp-amt')?.value)||0;
+  const ghsEq=Math.round(toGHS(origAmt,cur)*100)/100;
+  if(ghsInput)ghsInput.value=ghsEq||'';
+  const rate=getRate(cur);
+  if(hint)hint.textContent=`1 ${cur} = ₵${(1/rate).toFixed(4)}`;
+};
+
+window.onExpFxGhsEdit=function(){
+  // User manually overriding GHS equivalent — just keep it, no auto-recalc
+  const hint=document.getElementById('exp-fx-rate-hint');
+  if(hint)hint.textContent='custom rate';
+};
+
+// ── FX ACCOUNT MODAL HELPERS ──────────────────────────────────
+function populateAcctCurrencySelect(value){
+  const sel=document.getElementById('acct-currency');if(!sel)return;
+  sel.innerHTML=Object.entries(CURRENCIES).map(([k,v])=>`<option value="${k}">${v.symbol} ${k} — ${v.name}</option>`).join('');
+  sel.value=value||'GHS';
+  const hint=document.getElementById('acct-currency-hint');
+  if(hint)hint.style.display=(value&&value!=='GHS')?'block':'none';
+}
+
+window.onAcctCurrencyChange=function(){
+  const cur=document.getElementById('acct-currency')?.value||'GHS';
+  const hint=document.getElementById('acct-currency-hint');
+  const balLabel=document.querySelector('label[for="acct-bal"],#acct-bal-label');
+  if(hint)hint.style.display=cur!=='GHS'?'block':'none';
+  // Update balance placeholder to show currency symbol
+  const balInput=document.getElementById('acct-bal');
+  if(balInput){
+    const sym=CURRENCIES[cur]?.symbol||cur;
+    balInput.placeholder=`0.00 ${cur!=='GHS'?'('+sym+')':''}`;
+  }
+};
 
 // ── DARK MODE ──
 let DARK=localStorage.getItem('pkt_dark')==='1';
@@ -2539,7 +2652,12 @@ function isFuture(e){
 function eRow(e,compact=false){
   const c=gCat(e.cat);
   const future=isFuture(e);
-  return`<div class="li" style="${future?'opacity:0.72;':''}"><div class="li-ic" style="background:${c.color}22;color:${c.color};font-family:system-ui,sans-serif;">${c.icon}</div><div class="li-nm"><div class="p">${e.desc}${future?' <span class="pill pill-b" style="font-size:10px">📅 planned</span>':''}${e.linkedGoal?` <span class="pill pill-g" style="font-size:11px">savings</span>`:''}${e.recurring?` <span class="rb">↻</span>`:''}</div><div class="s">${c.name} · ${new Date(e.date).toLocaleDateString('en-GH',{day:'numeric',month:'short'})}${e.note?' · '+e.note:''}</div></div><div class="li-am" style="color:${future?'var(--ink-3)':'var(--red)'};margin-right:${compact?0:6}px">${future?'~−':'−'}${fmt(e.amount)}</div>${compact?'':`<button class="btn btn-ghost btn-sm" onclick="openExpenseModal('${e.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delExp('${e.id}')">✕</button>`}</div>`;
+  const acct=e.accountId?(S.accounts||[]).find(a=>a.id===e.accountId):null;
+  const acctBadge=acct?` <span style="font-size:10px;background:var(--blue-light);color:var(--blue);border-radius:4px;padding:1px 5px;font-weight:500;">${ACCT_ICONS[acct.type]||'📦'} ${acct.name}</span>`:'';
+  const splitBadge=e.splitGroupId?` <span style="font-size:10px;background:var(--purple-light,#f0eaff);color:var(--purple,#7c3aed);border-radius:4px;padding:1px 5px;font-weight:500;">⬡ split</span>`:'';
+  const fxBadge=e.origCurrency&&e.origCurrency!=='GHS'?` <span style="font-size:10px;background:var(--gold-pale);color:#7a5c00;border-radius:4px;padding:1px 5px;font-weight:500;">${fmtFx(e.origAmount,e.origCurrency)}</span>`:'';
+  const amtDisplay=e.origCurrency&&e.origCurrency!=='GHS'?`${fmtFx(e.origAmount,e.origCurrency)} (${fmt(e.amount)})`:fmt(e.amount);
+  return`<div class="li" style="${future?'opacity:0.72;':''}"><div class="li-ic" style="background:${c.color}22;color:${c.color};font-family:system-ui,sans-serif;">${c.icon}</div><div class="li-nm"><div class="p">${e.desc}${future?' <span class="pill pill-b" style="font-size:10px">📅 planned</span>':''}${e.linkedGoal?` <span class="pill pill-g" style="font-size:11px">savings</span>`:''}${e.recurring?` <span class="rb">↻</span>`:''}${splitBadge}</div><div class="s">${c.name} · ${new Date(e.date).toLocaleDateString('en-GH',{day:'numeric',month:'short'})}${e.note?' · '+e.note:''}${acctBadge}</div></div><div class="li-am" style="color:${future?'var(--ink-3)':'var(--red)'};margin-right:${compact?0:6}px;text-align:right;"><div>${future?'~−':'−'}${e.origCurrency&&e.origCurrency!=='GHS'?fmtFx(e.origAmount,e.origCurrency):fmt(e.amount)}</div>${e.origCurrency&&e.origCurrency!=='GHS'?`<div style="font-size:10px;color:var(--ink-3);">₵${parseFloat(e.amount).toFixed(2)}</div>`:''}</div>${compact?'':`<button class="btn btn-ghost btn-sm" onclick="openExpenseModal('${e.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="delExp('${e.id}')">✕</button>`}</div>`;
 }
 function renderExp(){
   syncExpMonthNav();
@@ -2883,24 +3001,57 @@ window.openExpenseModal=function(id){
   EID=id||null;
   document.getElementById('exp-mt').textContent=id?'Edit Expense':'Add Expense';
   popCatSel('exp-cat');
-  if(id){const e=S.expenses.find(x=>x.id===id);if(e){document.getElementById('exp-desc').value=e.desc;document.getElementById('exp-amt').value=e.amount;document.getElementById('exp-cat').value=e.cat;document.getElementById('exp-date').value=e.date;document.getElementById('exp-note').value=e.note||'';}}
-  else{document.getElementById('exp-desc').value='';document.getElementById('exp-amt').value='';document.getElementById('exp-cat').value='Food & Dining';document.getElementById('exp-date').value=tod();document.getElementById('exp-note').value='';}
-  // Populate account selector
+  populateFxCurSelect();
+  if(id){
+    const e=S.expenses.find(x=>x.id===id);
+    if(e){
+      document.getElementById('exp-desc').value=e.desc;
+      const fxSel=document.getElementById('exp-fx-cur');
+      if(e.origCurrency&&e.origCurrency!=='GHS'){
+        if(fxSel)fxSel.value=e.origCurrency;
+        document.getElementById('exp-amt').value=e.origAmount||e.amount;
+        const ghsEl=document.getElementById('exp-fx-ghs');if(ghsEl)ghsEl.value=e.amount;
+      } else {
+        if(fxSel)fxSel.value='GHS';
+        document.getElementById('exp-amt').value=e.amount;
+      }
+      document.getElementById('exp-cat').value=e.cat;
+      document.getElementById('exp-date').value=e.date;
+      document.getElementById('exp-note').value=e.note||'';
+    }
+  } else {
+    document.getElementById('exp-desc').value='';
+    document.getElementById('exp-amt').value='';
+    document.getElementById('exp-cat').value='Food & Dining';
+    document.getElementById('exp-date').value=tod();
+    document.getElementById('exp-note').value='';
+    const fxSel=document.getElementById('exp-fx-cur');if(fxSel)fxSel.value='GHS';
+  }
+  onExpFxChange();
+  // Reset split state
+  const splitOn=document.getElementById('exp-split-on');
+  const splitSection=document.getElementById('exp-split-section');
+  const splitRows=document.getElementById('exp-split-rows');
+  const splitTrack=document.getElementById('exp-split-track');
+  const splitThumb=document.getElementById('exp-split-thumb');
+  if(splitOn)splitOn.checked=false;
+  if(splitSection)splitSection.style.display='none';
+  if(splitRows)splitRows.innerHTML='';
+  if(splitTrack)splitTrack.style.background='var(--border)';
+  if(splitThumb)splitThumb.style.left='3px';
+  const catRow=document.getElementById('exp-cat')?.closest('.fg');
+  if(catRow)catRow.style.opacity='1';
+  const splitToggleRow=document.getElementById('exp-split-toggle-row');
+  if(splitToggleRow)splitToggleRow.style.display=id?'none':'flex';
   populateAccountSelectors();
   if(id){const e=S.expenses.find(x=>x.id===id);const sel=document.getElementById('exp-acct');if(sel&&e?.accountId)sel.value=e.accountId;}
-  else{
-    // Pre-fill default account for new expenses
-    const defAcct=(S.accounts||[]).find(a=>a.isDefault);
-    const sel=document.getElementById('exp-acct');
-    if(sel&&defAcct)sel.value=defAcct.id;
-  }
-  // Wire up budget warning + savings goal row visibility
+  else{const defAcct=(S.accounts||[]).find(a=>a.isDefault);const sel=document.getElementById('exp-acct');if(sel&&defAcct)sel.value=defAcct.id;}
   setTimeout(()=>{
     const catEl=document.getElementById('exp-cat');
     const amtEl=document.getElementById('exp-amt');
     if(catEl)catEl.onchange=onExpCatChange;
-    if(amtEl)amtEl.oninput=checkExpenseModalBudget;
-    onExpCatChange(); // show/hide goal row based on current category
+    if(amtEl)amtEl.oninput=()=>{checkExpenseModalBudget();updateSplitRemainder();onExpFxChange();};
+    onExpCatChange();
   },50);
   openModal('expense-modal');
 };
@@ -2962,8 +3113,23 @@ window.evalAmt=function(inputId,previewId){
 // ── Inline calculator for expense amount field ──
 window.evalExpAmt=function(){evalAmt('exp-amt','exp-amt-preview');};
 window.saveExpense=async function(){
-  const desc=document.getElementById('exp-desc').value.trim(),amount=parseFloat(document.getElementById('exp-amt').value),cat=document.getElementById('exp-cat').value,date=document.getElementById('exp-date').value,note=document.getElementById('exp-note').value.trim();
+  const desc=document.getElementById('exp-desc').value.trim();
+  const cat=document.getElementById('exp-cat').value;
+  const date=document.getElementById('exp-date').value;
+  const note=document.getElementById('exp-note').value.trim();
   const accountId=document.getElementById('exp-acct')?.value||null;
+  // FX handling — resolve the GHS amount to store
+  const fxCur=document.getElementById('exp-fx-cur')?.value||'GHS';
+  const origAmtRaw=parseFloat(document.getElementById('exp-amt')?.value)||0;
+  let ghsAmount;
+  if(fxCur!=='GHS'){
+    // Use manually entered GHS equivalent if provided, else auto-convert
+    const manualGhs=parseFloat(document.getElementById('exp-fx-ghs')?.value);
+    ghsAmount=(!isNaN(manualGhs)&&manualGhs>0)?manualGhs:toGHS(origAmtRaw,fxCur);
+  } else {
+    ghsAmount=origAmtRaw;
+  }
+  const amount=Math.round(ghsAmount*100)/100;
   clearAllErrors(['exp-desc','exp-amt','exp-date']);
   let hasErr=false;
   if(!desc){setFieldError('exp-desc','Description is required');hasErr=true;}
@@ -2972,6 +3138,8 @@ window.saveExpense=async function(){
   if(hasErr)return;
   const id=EID||'e'+Date.now();
   const data={desc,amount,cat,date,note};
+  // Store original FX fields if applicable
+  if(fxCur!=='GHS'){data.origCurrency=fxCur;data.origAmount=origAmtRaw;}
   if(accountId)data.accountId=accountId;
   // Auto-create/update a contribution when category is Savings Transfer
   if(cat==='Savings Transfer'){
@@ -4402,11 +4570,12 @@ window.renderAccountsPage=function renderAccountsPage(){
         <div style="display:flex;align-items:center;gap:12px;">
           <div style="width:44px;height:44px;border-radius:12px;background:var(--blue-light);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:22px;font-family:system-ui,sans-serif;flex-shrink:0;">${ACCT_ICONS[a.type]||'📦'}</div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:14px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px;">${a.name}${a.isDefault?'<span style="font-size:9px;font-weight:700;background:var(--gold);color:#fff;padding:2px 6px;border-radius:20px;letter-spacing:0.3px;">DEFAULT</span>':''}</div>
+            <div style="font-size:14px;font-weight:600;color:var(--ink);">${a.name}</div>
             <div style="font-size:11px;color:var(--ink-3);margin-top:1px;text-transform:capitalize;">${a.type||'account'}${a.note?' · '+a.note:''}</div>
           </div>
           <div style="text-align:right;">
-            <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${bal<0?'var(--red)':'var(--ink)'};">${fmt(bal)}</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:20px;color:${bal<0?'var(--red)':'var(--ink)'};">${a.currency&&a.currency!=='GHS'?fmtFx(bal,a.currency):fmt(bal)}</div>
+            ${a.currency&&a.currency!=='GHS'?`<div style="font-size:10px;color:var(--ink-3);">≈ ${fmt(toGHS(bal,a.currency))}</div>`:''}
           </div>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;">
@@ -4548,14 +4717,12 @@ window.openAccountModal=function(id){
       document.getElementById('acct-bal').value=a.balance||'';
       document.getElementById('acct-type').value=a.type||'bank';
       document.getElementById('acct-note').value=a.note||'';
-      const dfltCb=document.getElementById('acct-is-default');
-      if(dfltCb)dfltCb.checked=!!a.isDefault;
+      populateAcctCurrencySelect(a.currency||'GHS');
     }
   } else {
     ['acct-name','acct-bal','acct-note'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('acct-type').value='bank';
-    const dfltCb=document.getElementById('acct-is-default');
-    if(dfltCb)dfltCb.checked=false;
+    populateAcctCurrencySelect('GHS');
   }
   openModal('account-modal');
 };
@@ -4568,10 +4735,8 @@ window.saveAccount=async function(){
   if(!name){showToast('Enter an account name');return;}
   if(!S.accounts)S.accounts=[];
   const id=_editAcctId||'acct'+Date.now();
-  const isDefault=document.getElementById('acct-is-default')?.checked||false;
-  const data={name,balance,type,note,isDefault};
-  // If this account is set as default, clear default from all others
-  if(isDefault)S.accounts.forEach(a=>{if(a.id!==id)a.isDefault=false;});
+  const currency=document.getElementById('acct-currency')?.value||'GHS';
+  const data={name,balance,type,note,currency};
   if(_editAcctId){
     const i=S.accounts.findIndex(a=>a.id===_editAcctId);
     if(i>-1)S.accounts[i]={...S.accounts[i],...data};
@@ -6830,12 +6995,9 @@ function initApp(){
     </div>
   </div>
   <div class="fg"><label class="fl">Note (optional)</label><input class="fi" id="acct-note" placeholder="e.g. Salary account"/></div>
-  <div class="fg" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface-2,var(--bg-2));border-radius:10px;">
-    <input type="checkbox" id="acct-is-default" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;"/>
-    <div>
-      <label for="acct-is-default" style="font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;">Set as default expense account</label>
-      <div style="font-size:11px;color:var(--ink-3);margin-top:1px;">New expenses will pre-fill this account automatically.</div>
-    </div>
+  <div class="fg"><label class="fl">Account Currency</label>
+    <select class="fi" id="acct-currency" onchange="onAcctCurrencyChange()"></select>
+    <div id="acct-currency-hint" style="font-size:11px;color:var(--ink-3);margin-top:4px;display:none;">Balance and transactions for this account will be recorded in this currency. GHS equivalent is used for net worth calculations.</div>
   </div>
   <div class="mf"><button class="btn btn-ghost btn-full" onclick="closeModal('account-modal')">Cancel</button><button class="btn btn-gold btn-full" onclick="saveAccount()">Save Account</button></div>
 </div></div>

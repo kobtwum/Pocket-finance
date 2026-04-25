@@ -1317,6 +1317,7 @@ select.fi:focus{border-color:var(--gold);outline:none;}
     </div>
     <div class="fg"><label class="fl req" for="exp-date">Date</label><input class="fi" type="date" id="exp-date" aria-required="true"/></div>
   </div>
+  <div class="fg"><label class="fl req" for="exp-cat">Category</label><select class="fi" id="exp-cat" aria-required="true" onchange="onExpCatChange()"></select></div>
   <div class="fg" id="exp-goal-row" style="display:none;">
     <label class="fl" for="exp-goal">Link to Savings Goal <span style="font-weight:400;color:var(--ink-3)">(optional)</span></label>
     <select class="fi" id="exp-goal"><option value="">No specific goal (general savings)</option></select>
@@ -3052,56 +3053,109 @@ function renderSavHistFiltered(){
 }
 
 window.renderExp=renderExp;
-window.openExpenseModal=function(id){
-  EID=id||null;
-  document.getElementById('exp-mt').textContent=id?'Edit Expense':'Add Expense';
+window.openExpenseModal = function(id) {
+  EID = id || null;
+  const mtEl = document.getElementById('exp-mt');
+  if (mtEl) mtEl.textContent = id ? 'Edit Expense' : 'Add Expense';
+
   popCatSel('exp-cat');
   populateFxCurSelect();
-  if(id){
-    const e=S.expenses.find(x=>x.id===id);
-    if(e){
-      document.getElementById('exp-desc').value=e.desc;
-      const fxSel=document.getElementById('exp-fx-cur');
-      if(e.origCurrency&&e.origCurrency!=='GHS'){if(fxSel)fxSel.value=e.origCurrency;document.getElementById('exp-amt').value=e.origAmount||e.amount;const ghsEl=document.getElementById('exp-fx-ghs');if(ghsEl)ghsEl.value=e.amount;}
-      else{if(fxSel)fxSel.value='GHS';document.getElementById('exp-amt').value=e.amount;}
-      document.getElementById('exp-cat').value=e.cat;
-      document.getElementById('exp-date').value=e.date;
-      document.getElementById('exp-note').value=e.note||'';
+
+  if (id) {
+    const e = S.expenses.find(x => x.id === id);
+    if (e) {
+      const descEl = document.getElementById('exp-desc');
+      if (descEl) descEl.value = e.desc;
+
+      const fxSel = document.getElementById('exp-fx-cur');
+      const amtEl = document.getElementById('exp-amt');
+      const ghsEl = document.getElementById('exp-fx-ghs');
+
+      if (e.origCurrency && e.origCurrency !== 'GHS') {
+        if (fxSel) fxSel.value = e.origCurrency;
+        if (amtEl) amtEl.value = e.origAmount || e.amount;
+        if (ghsEl) ghsEl.value = e.amount;
+      } else {
+        if (fxSel) fxSel.value = 'GHS';
+        if (amtEl) amtEl.value = e.amount;
+      }
+
+      const catEl = document.getElementById('exp-cat');
+      if (catEl) catEl.value = e.cat;
+
+      const dateEl = document.getElementById('exp-date');
+      if (dateEl) dateEl.value = e.date;
+
+      const noteEl = document.getElementById('exp-note');
+      if (noteEl) noteEl.value = e.note || '';
     }
   } else {
-    document.getElementById('exp-desc').value='';
-    document.getElementById('exp-amt').value='';
-    document.getElementById('exp-cat').value='Food & Dining';
-    document.getElementById('exp-date').value=tod();
-    document.getElementById('exp-note').value='';
-    const fxSel=document.getElementById('exp-fx-cur');if(fxSel)fxSel.value='GHS';
+    const descEl = document.getElementById('exp-desc');
+    if (descEl) descEl.value = '';
+
+    const amtEl = document.getElementById('exp-amt');
+    if (amtEl) amtEl.value = '';
+
+    const catEl = document.getElementById('exp-cat');
+    if (catEl) catEl.value = 'Food & Dining';
+
+    const dateEl = document.getElementById('exp-date');
+    if (dateEl) dateEl.value = tod();
+
+    const noteEl = document.getElementById('exp-note');
+    if (noteEl) noteEl.value = '';
+
+    const fxSel = document.getElementById('exp-fx-cur');
+    if (fxSel) fxSel.value = 'GHS';
   }
+
   onExpFxChange();
+
   // Reset split UI
-  const splitOn=document.getElementById('exp-split-on');
-  const splitSection=document.getElementById('exp-split-section');
-  const splitRows=document.getElementById('exp-split-rows');
-  const splitTrack=document.getElementById('exp-split-track');
-  const splitThumb=document.getElementById('exp-split-thumb');
-  if(splitOn)splitOn.checked=false;
-  if(splitSection)splitSection.style.display='none';
-  if(splitRows)splitRows.innerHTML='';
-  if(splitTrack)splitTrack.style.background='var(--border)';
-  if(splitThumb)splitThumb.style.left='3px';
-  const catRow=document.getElementById('exp-cat')?.closest('.fg');if(catRow)catRow.style.opacity='1';
-  const splitToggleRow=document.getElementById('exp-split-toggle-row');
-  if(splitToggleRow)splitToggleRow.style.display=id?'none':'flex';
+  const splitOn = document.getElementById('exp-split-on');
+  const splitSection = document.getElementById('exp-split-section');
+  const splitRows = document.getElementById('exp-split-rows');
+  const splitTrack = document.getElementById('exp-split-track');
+  const splitThumb = document.getElementById('exp-split-thumb');
+
+  if (splitOn) splitOn.checked = false;
+  if (splitSection) splitSection.style.display = 'none';
+  if (splitRows) splitRows.innerHTML = '';
+  if (splitTrack) splitTrack.style.background = 'var(--border)';
+  if (splitThumb) splitThumb.style.left = '3px';
+
+  const catRow = document.getElementById('exp-cat')?.closest('.fg');
+  if (catRow) catRow.style.opacity = '1';
+
+  const splitToggleRow = document.getElementById('exp-split-toggle-row');
+  if (splitToggleRow) splitToggleRow.style.display = id ? 'none' : 'flex';
+
   // Populate account selector
   populateAccountSelectors();
-  if(id){const e=S.expenses.find(x=>x.id===id);const sel=document.getElementById('exp-acct');if(sel&&e?.accountId)sel.value=e.accountId;}
-  else{const defAcct=(S.accounts||[]).find(a=>a.isDefault);const sel=document.getElementById('exp-acct');if(sel&&defAcct)sel.value=defAcct.id;}
-  setTimeout(()=>{
-    const catEl=document.getElementById('exp-cat');
-    const amtEl=document.getElementById('exp-amt');
-    if(catEl)catEl.onchange=onExpCatChange;
-    if(amtEl)amtEl.oninput=()=>{checkExpenseModalBudget();updateSplitRemainder();onExpFxChange();};
+  if (id) {
+    const e = S.expenses.find(x => x.id === id);
+    const sel = document.getElementById('exp-acct');
+    if (sel && e?.accountId) sel.value = e.accountId;
+  } else {
+    const defAcct = (S.accounts || []).find(a => a.isDefault);
+    const sel = document.getElementById('exp-acct');
+    if (sel && defAcct) sel.value = defAcct.id;
+  }
+
+  setTimeout(() => {
+    const catEl = document.getElementById('exp-cat');
+    const amtEl = document.getElementById('exp-amt');
+    if (catEl) catEl.onchange = onExpCatChange;
+    if (amtEl) {
+      amtEl.oninput = () => {
+        checkExpenseModalBudget();
+        updateSplitRemainder();
+        onExpFxChange();
+      };
+    }
     onExpCatChange();
-  },50);
+  }, 50);
+
   openModal('expense-modal');
 };
 // ── FORM VALIDATION HELPERS ──────────────────────────────

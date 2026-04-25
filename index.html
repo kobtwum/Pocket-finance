@@ -72,7 +72,7 @@ self.addEventListener('fetch',e=>{
 <style>
 :root{
   --ink:#161b2b;--ink-2:#4e5f80;--ink-3:#7d8bac;
-  --paper:rgba(255,255,255,0.62);--paper-2:rgba(255,255,255,0.48);--paper-3:rgba(255,255,255,0.32);
+  --paper:rgba(255,255,255,0.92);--paper-2:rgba(255,255,255,0.48);--paper-3:rgba(255,255,255,0.32);
   --gold:#d69d3d;--gold-light:#f0d083;--gold-pale:rgba(214,157,61,0.18);
   --green:#64b288;--green-light:rgba(100,178,136,0.15);
   --red:#dc6b79;--red-light:rgba(220,107,121,0.13);
@@ -89,7 +89,7 @@ self.addEventListener('fetch',e=>{
 }
 body.dark{
   --ink:#f3f5ff;--ink-2:#c5d0ff;--ink-3:#9aa7cc;
-  --paper:rgba(15,23,42,0.42);--paper-2:rgba(15,23,42,0.62);--paper-3:rgba(15,23,42,0.72);
+  --paper:rgba(15,23,42,0.98);--paper-2:rgba(15,23,42,0.62);--paper-3:rgba(15,23,42,0.72);
   --gold-pale:rgba(244,196,112,0.12);--gold-light:#e7c87c;
   --green-light:#144f3b;--red-light:#4e111a;--blue-light:#10172b;
   --shadow:0 24px 80px rgba(0,0,0,0.45);
@@ -5279,63 +5279,148 @@ window.setNwRange=function(months,btn){
   drawNwChart(months);
 };
 
-function drawNwChart(months){
+function drawNwChart(months) {
   dChart('nw-chart');
-  const emptyEl=document.getElementById('nw-chart-empty');
-  const canvasEl=document.getElementById('nw-chart');
-  const legendEl=document.getElementById('nw-chart-legend');
-  const statsEl=document.getElementById('nw-chart-stats');
-  let snaps=(S.nwSnapshots||[]).slice().sort((a,b)=>a.key.localeCompare(b.key));
-  if(months>0)snaps=snaps.slice(-months);
-  const now=new Date();
-  const curKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const curPt={key:curKey,month:now.getMonth(),year:now.getFullYear(),netWorth:netWorth(),assets:totalAssets(),liabilities:totalLiab()};
-  const chartSnaps=[...snaps.filter(s=>s.key!==curKey),curPt];
-  if(chartSnaps.length<2){
-    if(emptyEl)emptyEl.style.display='block';
-    if(canvasEl)canvasEl.style.display='none';
-    if(legendEl)legendEl.innerHTML='';
-    if(statsEl)statsEl.innerHTML='';
+  const emptyEl = document.getElementById('nw-chart-empty');
+  const canvasEl = document.getElementById('nw-chart');
+  const legendEl = document.getElementById('nw-chart-legend');
+  const statsEl = document.getElementById('nw-chart-stats');
+
+  let snaps = (S.nwSnapshots || []).slice().sort((a, b) => a.key.localeCompare(b.key));
+  if (months > 0) snaps = snaps.slice(-months);
+
+  const now = new Date();
+  const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const curPt = {
+    key: curKey,
+    month: now.getMonth(),
+    year: now.getFullYear(),
+    netWorth: netWorth(),
+    assets: totalAssets(),
+    liabilities: totalLiab()
+  };
+
+  const chartSnaps = [...snaps.filter(s => s.key !== curKey), curPt];
+
+  if (chartSnaps.length < 2) {
+    if (emptyEl) emptyEl.style.display = 'block';
+    if (canvasEl) canvasEl.style.display = 'none';
+    if (legendEl) legendEl.innerHTML = '';
+    if (statsEl) statsEl.innerHTML = '';
     return;
   }
-  if(emptyEl)emptyEl.style.display='none';
-  if(canvasEl)canvasEl.style.display='block';
-  const labels=chartSnaps.map(s=>MOS[s.month].slice(0,3)+'''+String(s.year).slice(2));
-  CI['nw-chart']=new Chart(canvasEl.getContext('2d'),{
-    type:'line',
-    data:{labels,datasets:[
-      {label:'Net Worth',data:chartSnaps.map(s=>Math.round(s.netWorth*100)/100),borderColor:'#c9a84c',backgroundColor:'#c9a84c18',fill:true,tension:.4,pointRadius:4,pointBackgroundColor:'#c9a84c',borderWidth:2.5},
-      {label:'Assets',data:chartSnaps.map(s=>Math.round(s.assets*100)/100),borderColor:'#2d7a5f',backgroundColor:'transparent',fill:false,tension:.4,pointRadius:3,pointBackgroundColor:'#2d7a5f',borderWidth:1.5,borderDash:[4,3]},
-      {label:'Liabilities',data:chartSnaps.map(s=>Math.round(s.liabilities*100)/100),borderColor:'#c0392b',backgroundColor:'transparent',fill:false,tension:.4,pointRadius:3,pointBackgroundColor:'#c0392b',borderWidth:1.5,borderDash:[4,3]}
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fmt(c.raw)}`}}},
-      scales:{y:{ticks:{callback:v=>fmt(v),font:{size:10}},grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false},ticks:{font:{size:10}}}}}
+
+  if (emptyEl) emptyEl.style.display = 'none';
+  if (canvasEl) canvasEl.style.display = 'block';
+
+  // ✅ Fixed labels line
+  const labels = chartSnaps.map(s => MOS[s.month].slice(0, 3) + String(s.year).slice(2));
+
+  CI['nw-chart'] = new Chart(canvasEl.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Net Worth',
+          data: chartSnaps.map(s => Math.round(s.netWorth * 100) / 100),
+          borderColor: '#c9a84c',
+          backgroundColor: '#c9a84c18',
+          fill: true,
+          tension: .4,
+          pointRadius: 4,
+          pointBackgroundColor: '#c9a84c',
+          borderWidth: 2.5
+        },
+        {
+          label: 'Assets',
+          data: chartSnaps.map(s => Math.round(s.assets * 100) / 100),
+          borderColor: '#2d7a5f',
+          backgroundColor: 'transparent',
+          fill: false,
+          tension: .4,
+          pointRadius: 3,
+          pointBackgroundColor: '#2d7a5f',
+          borderWidth: 1.5,
+          borderDash: [4, 3]
+        },
+        {
+          label: 'Liabilities',
+          data: chartSnaps.map(s => Math.round(s.liabilities * 100) / 100),
+          borderColor: '#c0392b',
+          backgroundColor: 'transparent',
+          fill: false,
+          tension: .4,
+          pointRadius: 3,
+          pointBackgroundColor: '#c0392b',
+          borderWidth: 1.5,
+          borderDash: [4, 3]
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: c => ` ${c.dataset.label}: ${fmt(c.raw)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          ticks: {
+            callback: v => fmt(v),
+            font: { size: 10 }
+          },
+          grid: { color: 'rgba(0,0,0,.04)' }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 10 } }
+        }
+      }
+    }
   });
-  if(legendEl)legendEl.innerHTML=[{color:'#c9a84c',label:'Net Worth'},{color:'#2d7a5f',label:'Assets'},{color:'#c0392b',label:'Liabilities'}]
-    .map(l=>`<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:12px;height:3px;background:${l.color};display:inline-block;border-radius:2px;"></span>${l.label}</span>`).join('');
-  if(statsEl&&chartSnaps.length>=2){
-    const first=chartSnaps[0],last=chartSnaps[chartSnaps.length-1];
-    const totalChange=last.netWorth-first.netWorth;
-    const changes=chartSnaps.slice(1).map((s,i)=>({label:labels[i+1],delta:s.netWorth-chartSnaps[i].netWorth}));
-    const best=changes.length?changes.reduce((a,b)=>b.delta>a.delta?b:a,changes[0]):null;
-    const worst=changes.length?changes.reduce((a,b)=>b.delta<a.delta?b:a,changes[0]):null;
-    const sign=totalChange>=0?'+':'';
-    statsEl.innerHTML=`
+
+  if (legendEl) {
+    legendEl.innerHTML = [
+      { color: '#c9a84c', label: 'Net Worth' },
+      { color: '#2d7a5f', label: 'Assets' },
+      { color: '#c0392b', label: 'Liabilities' }
+    ]
+      .map(l => `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);"><span style="width:12px;height:3px;background:${l.color};display:inline-block;border-radius:2px;"></span>${l.label}</span>`)
+      .join('');
+  }
+
+  if (statsEl && chartSnaps.length >= 2) {
+    const first = chartSnaps[0], last = chartSnaps[chartSnaps.length - 1];
+    const totalChange = last.netWorth - first.netWorth;
+    const changes = chartSnaps.slice(1).map((s, i) => ({
+      label: labels[i + 1],
+      delta: s.netWorth - chartSnaps[i].netWorth
+    }));
+    const best = changes.length ? changes.reduce((a, b) => b.delta > a.delta ? b : a, changes[0]) : null;
+    const worst = changes.length ? changes.reduce((a, b) => b.delta < a.delta ? b : a, changes[0]) : null;
+    const sign = totalChange >= 0 ? '+' : '';
+
+    statsEl.innerHTML = `
       <div style="flex:1;padding:0 12px 0 0;border-right:1px solid var(--paper-2);">
         <div style="font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;">Period Change</div>
-        <div style="font-size:15px;font-weight:700;color:${totalChange>=0?'var(--green)':'var(--red)'};margin-top:3px;">${sign}${fmt(Math.abs(totalChange))}</div>
-        <div style="font-size:10px;color:var(--ink-3);">${labels[0]} → ${labels[labels.length-1]}</div>
+        <div style="font-size:15px;font-weight:700;color:${totalChange >= 0 ? 'var(--green)' : 'var(--red)'};margin-top:3px;">${sign}${fmt(Math.abs(totalChange))}</div>
+        <div style="font-size:10px;color:var(--ink-3);">${labels[0]} → ${labels[labels.length - 1]}</div>
       </div>
       <div style="flex:1;padding:0 12px;border-right:1px solid var(--paper-2);">
         <div style="font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;">Best Month</div>
-        <div style="font-size:15px;font-weight:700;color:var(--green);margin-top:3px;">+${fmt(Math.max(0,best?.delta||0))}</div>
-        <div style="font-size:10px;color:var(--ink-3);">${best?.label||'—'}</div>
+        <div style="font-size:15px;font-weight:700;color:var(--green);margin-top:3px;">+${fmt(Math.max(0, best?.delta || 0))}</div>
+        <div style="font-size:10px;color:var(--ink-3);">${best?.label || '—'}</div>
       </div>
       <div style="flex:1;padding:0 0 0 12px;">
         <div style="font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;">Worst Month</div>
-        <div style="font-size:15px;font-weight:700;color:var(--red);margin-top:3px;">${fmt(worst?.delta||0)}</div>
-        <div style="font-size:10px;color:var(--ink-3);">${worst?.label||'—'}</div>
+        <div style="font-size:15px;font-weight:700;color:var(--red);margin-top:3px;">${fmt(worst?.delta || 0)}</div>
+        <div style="font-size:10px;color:var(--ink-3);">${worst?.label || '—'}</div>
       </div>`;
   }
 }
